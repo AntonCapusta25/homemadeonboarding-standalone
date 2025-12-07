@@ -215,6 +215,9 @@
     "menuIp": "Menu suggesties zijn AI-gegenereerd. Bewerk vrij in je dashboard."
   },
   "dashboard": {
+    "loading": "Laden...",
+    "buyPackaging": "Verpakkingen Nodig?",
+    "packagingDesc": "Vind leveranciers bij jou in de buurt voor bakjes, zakjes en meer",
     "addDishes": "Voeg je gerechten toe",
     "addDishesSubtitle": "Welke heerlijke maaltijden ga je aanbieden?",
     "dishName": "Naam gerecht",
