@@ -14,29 +14,29 @@ interface ServiceTypeStepProps {
 export function ServiceTypeStep({ value, onChange, onNext, onPrevious }: ServiceTypeStepProps) {
   const { t } = useTranslation();
 
-  const SERVICE_OPTIONS: { value: ServiceType; labelKey: string; descriptionKey: string; icon: React.ReactNode }[] = [
+  const SERVICE_OPTIONS: { value: ServiceType; labelKey: string; descKey: string; icon: React.ReactNode }[] = [
     {
       value: 'delivery',
       labelKey: 'serviceType.delivery',
-      descriptionKey: 'serviceType.delivery',
+      descKey: 'serviceType.deliveryDesc',
       icon: <Truck className="w-6 h-6" />,
     },
     {
       value: 'pickup',
       labelKey: 'serviceType.pickup',
-      descriptionKey: 'serviceType.pickup',
+      descKey: 'serviceType.pickupDesc',
       icon: <Store className="w-6 h-6" />,
     },
     {
       value: 'both',
       labelKey: 'serviceType.both',
-      descriptionKey: 'serviceType.both',
+      descKey: 'serviceType.bothDesc',
       icon: <Package className="w-6 h-6" />,
     },
     {
       value: 'unsure',
-      labelKey: 'serviceType.both',
-      descriptionKey: 'serviceType.both',
+      labelKey: 'serviceType.unsure',
+      descKey: 'serviceType.unsureDesc',
       icon: <HelpCircle className="w-6 h-6" />,
     },
   ];
@@ -80,6 +80,7 @@ export function ServiceTypeStep({ value, onChange, onNext, onPrevious }: Service
               
               <div className="flex-1">
                 <h3 className="font-display font-semibold text-foreground">{t(option.labelKey)}</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">{t(option.descKey)}</p>
               </div>
               
               <div className={cn(
