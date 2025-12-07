@@ -2,3 +2,6 @@ project_id = "mnhtpdsgxlyqppzyevvl"
 
 [functions.generate-logo]
 verify_jwt = false
+
+[functions.find-suppliers]
+verify_jwt = false

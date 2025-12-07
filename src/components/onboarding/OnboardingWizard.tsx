@@ -1,5 +1,7 @@
+import { useNavigate } from 'react-router-dom';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { ProgressBar } from './ProgressBar';
+import { Logo } from '@/components/Logo';
 import { WelcomeStep } from './steps/WelcomeStep';
 import { CityStep } from './steps/CityStep';
 import { CuisineStep } from './steps/CuisineStep';
@@ -14,9 +16,9 @@ import { FoodSafetyStep } from './steps/FoodSafetyStep';
 import { KvkNvwaStep } from './steps/KvkNvwaStep';
 import { PlanStep } from './steps/PlanStep';
 import { SummaryStep } from './steps/SummaryStep';
-import { toast } from '@/hooks/use-toast';
 
 export function OnboardingWizard() {
+  const navigate = useNavigate();
   const {
     currentStep,
     displayStepNumber,
@@ -31,17 +33,13 @@ export function OnboardingWizard() {
   } = useOnboarding();
 
   const handleGoToDashboard = () => {
-    toast({
-      title: "Welcome aboard! 🎉",
-      description: "Your chef profile has been created. Redirecting to dashboard...",
-    });
+    // Save profile to localStorage for dashboard
+    localStorage.setItem('chefProfile', JSON.stringify(profile));
+    navigate('/dashboard');
   };
 
   const handleBookCall = () => {
-    toast({
-      title: "Call booking",
-      description: "Opening call scheduling page...",
-    });
+    window.open('https://calendly.com', '_blank');
   };
 
   const renderStep = () => {
@@ -203,6 +201,11 @@ export function OnboardingWizard() {
   return (
     <div className="min-h-screen bg-gradient-soft">
       <div className="container max-w-4xl mx-auto px-4 py-8">
+        {/* Header with logo */}
+        <div className="flex items-center justify-between mb-6">
+          <Logo chefLogo={profile.logoUrl} size="sm" />
+        </div>
+
         {showProgress && (
           <div className="mb-8 animate-fade-in">
             <ProgressBar
@@ -213,7 +216,7 @@ export function OnboardingWizard() {
           </div>
         )}
 
-        <div className="min-h-[calc(100vh-12rem)]">
+        <div className="min-h-[calc(100vh-16rem)]">
           {renderStep()}
         </div>
       </div>
