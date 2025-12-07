@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Welcome to NanaBanana",
+    "title": "Home-Made-Chef",
     "subtitle": "Start your journey as a home chef",
     "getStarted": "Get Started",
     "alreadyHaveAccount": "Already have an account?",
@@ -100,7 +100,7 @@
   },
   "logo": {
     "title": "Your restaurant logo",
-    "subtitle": "Create a logo that stands out",
+    "subtitle": "Make your brand stand out",
     "generateWithAI": "Generate with AI ✨",
     "uploadOwn": "Upload your own",
     "generating": "Creating your logo with AI magic... 🎨",
@@ -165,14 +165,37 @@
     "title": "You're almost there!",
     "subtitle": "Creating your chef profile...",
     "creating": "Setting up your restaurant...",
-    "ready": "Your profile is ready! 🎉",
+    "ready": "Your profile is ready!",
     "whatNext": "What happens next:",
     "reviewProfile": "We'll review your profile",
     "getApproved": "Get approved within 24 hours",
     "startSelling": "Start receiving orders",
-    "goToDashboard": "Go to Dashboard",
+    "goToDashboard": "Add your dishes",
     "yourRestaurant": "Your Restaurant",
-    "basedIn": "Based in"
+    "basedIn": "Based in",
+    "bookCall": "Book a call",
+    "checklist": {
+      "location": "Location & contact",
+      "branding": "Branding (name & logo)",
+      "foodSafety": "Food safety plan",
+      "menu": "Menu & prices",
+      "hours": "Opening hours"
+    }
+  },
+  "dashboard": {
+    "addDishes": "Add your dishes",
+    "addDishesSubtitle": "What delicious meals will you offer?",
+    "dishName": "Dish name",
+    "price": "€ Price",
+    "description": "Short description (optional)",
+    "addAnother": "Add another dish",
+    "saveMenu": "Save menu",
+    "addAtLeastOne": "Add at least one dish with a name and price",
+    "dishesSaved": "Menu saved!",
+    "dishesAdded": "dishes added to your menu",
+    "packagingSuppliers": "Packaging suppliers near you",
+    "supplierSubtitle": "Get food containers and packaging materials",
+    "findingSuppliers": "Finding suppliers near you..."
   },
   "common": {
     "loading": "Loading...",

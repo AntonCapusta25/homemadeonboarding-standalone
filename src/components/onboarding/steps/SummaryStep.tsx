@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
-import { Check, Square, ChefHat, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles } from 'lucide-react';
+import { Check, Square, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { fireCelebration } from '@/components/confetti';
 
 interface SummaryStepProps { profile: ChefProfile; onGoToDashboard: () => void; onBookCall: () => void; }
 
@@ -11,22 +12,36 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall }: SummarySte
   const [isCreating, setIsCreating] = useState(true);
   const [showContent, setShowContent] = useState(false);
 
-  useEffect(() => { const timer = setTimeout(() => { setIsCreating(false); setTimeout(() => setShowContent(true), 200); }, 2000); return () => clearTimeout(timer); }, []);
+  useEffect(() => { 
+    const timer = setTimeout(() => { 
+      setIsCreating(false); 
+      fireCelebration();
+      setTimeout(() => setShowContent(true), 200); 
+    }, 2000); 
+    return () => clearTimeout(timer); 
+  }, []);
 
   const checklist = [
-    { label: 'Location & contact', completed: true },
-    { label: 'Branding (name & logo)', completed: true },
-    { label: 'Food safety plan', completed: true },
-    { label: 'Training videos', completed: false },
-    { label: 'Menu & prices', completed: false },
-    { label: 'Opening hours', completed: false },
+    { label: t('summary.checklist.location'), completed: true },
+    { label: t('summary.checklist.branding'), completed: true },
+    { label: t('summary.checklist.foodSafety'), completed: true },
+    { label: t('summary.checklist.menu'), completed: false },
+    { label: t('summary.checklist.hours'), completed: false },
   ];
 
   if (isCreating) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in px-4">
-        <div className="mb-8"><div className="w-24 h-24 bg-gradient-warm rounded-3xl flex items-center justify-center shadow-glow animate-pulse-soft"><Loader2 className="w-12 h-12 text-primary-foreground animate-spin" /></div></div>
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">{t('summary.creating')}</h1>
+        <div className="mb-8">
+          {profile.logoUrl ? (
+            <img src={profile.logoUrl} alt="Your logo" className="w-24 h-24 rounded-3xl shadow-glow animate-pulse-soft object-cover" />
+          ) : (
+            <div className="w-24 h-24 bg-gradient-warm rounded-3xl flex items-center justify-center shadow-glow animate-pulse-soft">
+              <Loader2 className="w-12 h-12 text-primary-foreground animate-spin" />
+            </div>
+          )}
+        </div>
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">{t('summary.creating')} ✨</h1>
         <p className="text-lg text-muted-foreground max-w-md">{profile.restaurantName}</p>
       </div>
     );
@@ -34,20 +49,70 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall }: SummarySte
 
   return (
     <div className={`flex flex-col items-center justify-center min-h-[70vh] text-center px-4 ${showContent ? 'animate-fade-in' : 'opacity-0'}`}>
-      <div className="mb-8 relative"><div className="w-24 h-24 bg-forest rounded-3xl flex items-center justify-center shadow-glow animate-scale-in"><ChefHat className="w-12 h-12 text-accent-foreground" /></div><div className="absolute -top-2 -right-2 w-10 h-10 bg-gradient-warm rounded-full flex items-center justify-center animate-pulse-soft"><Check className="w-5 h-5 text-primary-foreground" /></div></div>
-      <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4 animate-slide-up">{t('summary.ready')}</h1>
+      <div className="mb-8 relative">
+        {profile.logoUrl ? (
+          <img src={profile.logoUrl} alt="Your logo" className="w-24 h-24 rounded-3xl shadow-glow animate-scale-in object-cover border-4 border-primary/20" />
+        ) : (
+          <div className="w-24 h-24 bg-gradient-warm rounded-3xl flex items-center justify-center shadow-glow animate-scale-in">
+            <Store className="w-12 h-12 text-primary-foreground" />
+          </div>
+        )}
+        <div className="absolute -top-2 -right-2 w-10 h-10 bg-forest rounded-full flex items-center justify-center animate-pulse-soft">
+          <Check className="w-5 h-5 text-accent-foreground" />
+        </div>
+      </div>
+
+      <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4 animate-slide-up">{t('summary.ready')} 🎉</h1>
+      
       <div className="bg-card border border-border rounded-2xl p-6 mb-8 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.15s' }}>
         <div className="flex items-center gap-4 mb-4 pb-4 border-b border-border">
-          {profile.logoUrl ? <img src={profile.logoUrl} alt="Your logo" className="w-20 h-20 rounded-xl object-cover shadow-soft" /> : <div className="w-20 h-20 bg-gradient-warm rounded-xl flex items-center justify-center"><Store className="w-10 h-10 text-primary-foreground" /></div>}
-          <div className="text-left flex-1"><h3 className="font-display font-bold text-xl text-foreground">{profile.restaurantName || t('summary.yourRestaurant')}</h3><p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" />{t('summary.basedIn')} {profile.city}</p>{profile.firstName && <p className="text-sm text-muted-foreground mt-1">by {profile.firstName} {profile.lastName}</p>}</div>
+          {profile.logoUrl ? (
+            <img src={profile.logoUrl} alt="Your logo" className="w-20 h-20 rounded-xl object-cover shadow-soft" />
+          ) : (
+            <div className="w-20 h-20 bg-gradient-warm rounded-xl flex items-center justify-center">
+              <Store className="w-10 h-10 text-primary-foreground" />
+            </div>
+          )}
+          <div className="text-left flex-1">
+            <h3 className="font-display font-bold text-xl text-foreground">{profile.restaurantName || t('summary.yourRestaurant')}</h3>
+            <p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" />{t('summary.basedIn')} {profile.city}</p>
+            {profile.firstName && <p className="text-sm text-muted-foreground mt-1">by {profile.firstName} {profile.lastName}</p>}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 justify-center">{profile.primaryCuisines.slice(0, 3).map(c => <span key={c} className="bg-terracotta-light text-primary px-3 py-1 rounded-full text-sm font-medium">{c}</span>)}</div>
+        <div className="flex flex-wrap gap-2 justify-center">
+          {profile.primaryCuisines.slice(0, 3).map(c => (
+            <span key={c} className="bg-terracotta-light text-primary px-3 py-1 rounded-full text-sm font-medium">{c}</span>
+          ))}
+        </div>
       </div>
+
       <div className="bg-card border border-border rounded-2xl p-6 mb-8 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.2s' }}>
-        <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" />{t('summary.whatNext')}</h3>
-        <ul className="space-y-3">{checklist.map((item, idx) => <li key={idx} className="flex items-center gap-3 text-left">{item.completed ? <div className="w-6 h-6 bg-forest rounded-md flex items-center justify-center"><Check className="w-4 h-4 text-accent-foreground" /></div> : <Square className="w-6 h-6 text-muted-foreground" />}<span className={item.completed ? 'text-foreground' : 'text-muted-foreground'}>{item.label}</span></li>)}</ul>
+        <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary" />{t('summary.whatNext')}
+        </h3>
+        <ul className="space-y-3">
+          {checklist.map((item, idx) => (
+            <li key={idx} className="flex items-center gap-3 text-left">
+              {item.completed ? (
+                <div className="w-6 h-6 bg-forest rounded-md flex items-center justify-center"><Check className="w-4 h-4 text-accent-foreground" /></div>
+              ) : (
+                <Square className="w-6 h-6 text-muted-foreground" />
+              )}
+              <span className={item.completed ? 'text-foreground' : 'text-muted-foreground'}>{item.label}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-      <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.3s' }}><Button size="xl" onClick={onGoToDashboard} className="shadow-glow">{t('summary.goToDashboard')}<ArrowRight className="w-5 h-5" /></Button><Button size="lg" variant="outline" onClick={onBookCall} className="gap-2"><Phone className="w-4 h-4" />Book a call</Button></div>
+
+      <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+        <Button size="xl" onClick={onGoToDashboard} className="shadow-glow">
+          {t('summary.goToDashboard')} 🚀
+          <ArrowRight className="w-5 h-5" />
+        </Button>
+        <Button size="lg" variant="outline" onClick={onBookCall} className="gap-2">
+          <Phone className="w-4 h-4" />{t('summary.bookCall')}
+        </Button>
+      </div>
     </div>
   );
 }

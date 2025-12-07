@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
-import { ChefHat, ArrowRight, Sparkles, Clock, Shield } from 'lucide-react';
+import { ArrowRight, Sparkles, Clock, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Logo } from '@/components/Logo';
 
 interface WelcomeStepProps {
   onStart: () => void;
@@ -12,16 +13,14 @@ export function WelcomeStep({ onStart }: WelcomeStepProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in px-4">
       <div className="mb-8 relative">
-        <div className="w-24 h-24 bg-gradient-warm rounded-3xl flex items-center justify-center shadow-glow animate-scale-in">
-          <ChefHat className="w-12 h-12 text-primary-foreground" />
-        </div>
+        <Logo size="lg" showText={false} />
         <div className="absolute -top-2 -right-2 w-8 h-8 bg-forest rounded-full flex items-center justify-center animate-pulse-soft">
           <Sparkles className="w-4 h-4 text-accent-foreground" />
         </div>
       </div>
 
-      <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4 animate-slide-up">
-        {t('welcome.title')}
+      <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-2 animate-slide-up">
+        Home-Made-Chef
       </h1>
       
       <p className="text-xl text-muted-foreground mb-8 max-w-lg animate-slide-up" style={{ animationDelay: '0.1s' }}>
@@ -45,7 +44,7 @@ export function WelcomeStep({ onStart }: WelcomeStepProps) {
         className="animate-slide-up shadow-glow hover:shadow-medium"
         style={{ animationDelay: '0.3s' }}
       >
-        {t('welcome.getStarted')}
+        {t('welcome.getStarted')} 👨‍🍳
         <ArrowRight className="w-5 h-5" />
       </Button>
     </div>

@@ -1,6 +1,6 @@
 {
   "welcome": {
-    "title": "Welkom bij NanaBanana",
+    "title": "Home-Made-Chef",
     "subtitle": "Begin je reis als thuiskok",
     "getStarted": "Aan de slag",
     "alreadyHaveAccount": "Heb je al een account?",
@@ -100,7 +100,7 @@
   },
   "logo": {
     "title": "Je restaurant logo",
-    "subtitle": "Maak een logo dat opvalt",
+    "subtitle": "Laat je merk opvallen",
     "generateWithAI": "Genereer met AI ✨",
     "uploadOwn": "Upload je eigen",
     "generating": "Je logo maken met AI magie... 🎨",
@@ -165,14 +165,37 @@
     "title": "Je bent er bijna!",
     "subtitle": "Je koksprofiel aanmaken...",
     "creating": "Je restaurant opzetten...",
-    "ready": "Je profiel is klaar! 🎉",
+    "ready": "Je profiel is klaar!",
     "whatNext": "Wat gebeurt er nu:",
     "reviewProfile": "We bekijken je profiel",
     "getApproved": "Word binnen 24 uur goedgekeurd",
     "startSelling": "Begin met het ontvangen van bestellingen",
-    "goToDashboard": "Ga naar Dashboard",
+    "goToDashboard": "Voeg je gerechten toe",
     "yourRestaurant": "Jouw Restaurant",
-    "basedIn": "Gevestigd in"
+    "basedIn": "Gevestigd in",
+    "bookCall": "Plan een gesprek",
+    "checklist": {
+      "location": "Locatie & contact",
+      "branding": "Branding (naam & logo)",
+      "foodSafety": "Voedselveiligheidsplan",
+      "menu": "Menu & prijzen",
+      "hours": "Openingstijden"
+    }
+  },
+  "dashboard": {
+    "addDishes": "Voeg je gerechten toe",
+    "addDishesSubtitle": "Welke heerlijke maaltijden ga je aanbieden?",
+    "dishName": "Naam gerecht",
+    "price": "€ Prijs",
+    "description": "Korte beschrijving (optioneel)",
+    "addAnother": "Nog een gerecht toevoegen",
+    "saveMenu": "Menu opslaan",
+    "addAtLeastOne": "Voeg minimaal één gerecht toe met naam en prijs",
+    "dishesSaved": "Menu opgeslagen!",
+    "dishesAdded": "gerechten toegevoegd aan je menu",
+    "packagingSuppliers": "Verpakkingsleveranciers bij jou in de buurt",
+    "supplierSubtitle": "Haal voedselverpakkingen en materialen",
+    "findingSuppliers": "Leveranciers zoeken bij jou in de buurt..."
   },
   "common": {
     "loading": "Laden...",
