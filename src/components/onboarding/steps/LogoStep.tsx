@@ -139,15 +139,6 @@ export function LogoStep({
 
   const currentLogo = generatedLogo || logoUrl;
 
-  // Auto-advance after logo is generated
-  useEffect(() => {
-    if (currentLogo && method === 'ai' && !isGenerating) {
-      const timer = setTimeout(() => {
-        onNext();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [currentLogo, method, isGenerating, onNext]);
 
   return (
     <StepLayout
@@ -161,20 +152,29 @@ export function LogoStep({
         {/* Logo Preview */}
         {isGenerating ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Generating your logo with AI...</p>
+            <div className="relative">
+              <Loader2 className="w-16 h-16 animate-spin text-primary mb-4" />
+              <span className="absolute -top-2 -right-2 text-2xl animate-bounce">✨</span>
+            </div>
+            <p className="text-muted-foreground text-lg">Creating your logo with AI magic... 🎨</p>
           </div>
         ) : currentLogo ? (
           <div className="flex flex-col items-center mb-8 animate-scale-in">
-            <img 
-              src={currentLogo} 
-              alt="Your logo" 
-              className="w-32 h-32 rounded-2xl shadow-glow mb-4 object-cover"
-            />
-            <div className="flex items-center gap-2 text-forest">
-              <Check className="w-5 h-5" />
-              <span className="font-medium">Logo ready!</span>
+            <div className="relative">
+              <img 
+                src={currentLogo} 
+                alt="Your logo" 
+                className="w-40 h-40 rounded-2xl shadow-glow object-cover border-4 border-primary/20"
+              />
+              <span className="absolute -top-3 -right-3 text-3xl animate-bounce">🎉</span>
             </div>
+            <div className="flex items-center gap-2 text-forest mt-4">
+              <Check className="w-6 h-6" />
+              <span className="font-semibold text-lg">Looking great! 🔥</span>
+            </div>
+            <p className="text-muted-foreground mt-2 text-center">
+              This is your restaurant's first impression!
+            </p>
           </div>
         ) : null}
 
