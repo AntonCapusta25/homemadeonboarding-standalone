@@ -1,0 +1,186 @@
+{
+  "welcome": {
+    "title": "Welcome to NanaBanana",
+    "subtitle": "Start your journey as a home chef",
+    "getStarted": "Get Started",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign in"
+  },
+  "steps": {
+    "back": "Back",
+    "next": "Next",
+    "continue": "Continue",
+    "skip": "Skip",
+    "finish": "Finish"
+  },
+  "city": {
+    "title": "Where are you based?",
+    "subtitle": "Select your city to get started",
+    "amsterdam": "Amsterdam",
+    "rotterdam": "Rotterdam",
+    "denHaag": "Den Haag",
+    "utrecht": "Utrecht",
+    "otherCity": "Other city",
+    "enterCity": "Enter your city"
+  },
+  "cuisine": {
+    "title": "What cuisine do you cook?",
+    "subtitle": "Select all that apply",
+    "dutch": "Dutch",
+    "italian": "Italian",
+    "french": "French",
+    "asian": "Asian",
+    "mexican": "Mexican",
+    "indian": "Indian",
+    "mediterranean": "Mediterranean",
+    "american": "American",
+    "middleEastern": "Middle Eastern",
+    "african": "African",
+    "other": "Other"
+  },
+  "dishTypes": {
+    "title": "What types of dishes do you offer?",
+    "subtitle": "Select all that apply",
+    "appetizers": "Appetizers",
+    "mainCourses": "Main Courses",
+    "desserts": "Desserts",
+    "snacks": "Snacks",
+    "beverages": "Beverages",
+    "breakfast": "Breakfast",
+    "lunch": "Lunch",
+    "dinner": "Dinner"
+  },
+  "serviceType": {
+    "title": "How do you want to serve?",
+    "subtitle": "Choose your service style",
+    "delivery": "Delivery",
+    "pickup": "Pickup",
+    "both": "Both"
+  },
+  "availability": {
+    "title": "When are you available?",
+    "subtitle": "Set your working hours",
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday",
+    "sunday": "Sunday"
+  },
+  "contact": {
+    "title": "Your contact details",
+    "subtitle": "How can customers reach you?",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "phone": "Phone number",
+    "firstNamePlaceholder": "Your first name",
+    "lastNamePlaceholder": "Your last name",
+    "emailPlaceholder": "your@email.com",
+    "phonePlaceholder": "+31 6 12345678"
+  },
+  "address": {
+    "title": "Where will you cook?",
+    "subtitle": "Your kitchen address",
+    "street": "Street address",
+    "city": "City",
+    "postalCode": "Postal code",
+    "streetPlaceholder": "Enter your street address",
+    "postalCodePlaceholder": "1234 AB"
+  },
+  "businessName": {
+    "title": "Name your restaurant",
+    "subtitle": "Choose a name that represents you",
+    "generateWithAI": "Generate with AI ✨",
+    "orEnterManually": "Or enter your own name",
+    "placeholder": "Your restaurant name",
+    "generating": "Creating names based on your cuisine...",
+    "pickOne": "Pick one or enter your own:"
+  },
+  "logo": {
+    "title": "Your restaurant logo",
+    "subtitle": "Create a logo that stands out",
+    "generateWithAI": "Generate with AI ✨",
+    "uploadOwn": "Upload your own",
+    "generating": "Creating your logo with AI magic... 🎨",
+    "ready": "Looking great! 🔥",
+    "firstImpression": "This is your restaurant's first impression!",
+    "regenerate": "Generate new logo ✨"
+  },
+  "kvk": {
+    "title": "Business registration",
+    "subtitle": "Your legal status",
+    "haveKvkNvwa": "I have KVK & NVWA registration",
+    "haveKvk": "I have a KVK number",
+    "noKvk": "I don't have registration yet",
+    "tryFirst": "I want to try it out first",
+    "uploadDocs": "Upload your documents",
+    "tryFirstNote": "No problem! You can add this later"
+  },
+  "foodSafety": {
+    "title": "Food safety",
+    "subtitle": "Your qualifications",
+    "haveCertificate": "I have a food safety certificate",
+    "noCertificate": "I don't have a certificate yet",
+    "uploadCertificate": "Upload certificate"
+  },
+  "plan": {
+    "title": "Choose your plan",
+    "subtitle": "Start earning as a home chef",
+    "noUpfrontFees": "No upfront fees • Only pay when you earn",
+    "recommended": "Recommended",
+    "popular": "Most Popular",
+    "viewOtherPlans": "View other plans",
+    "hidePlans": "Hide other plans",
+    "starter": {
+      "name": "Starter Chef",
+      "description": "Perfect for beginners",
+      "commission": "18%",
+      "commissionLabel": "commission"
+    },
+    "advanced": {
+      "name": "Advanced Chef",
+      "description": "Best value for growing chefs",
+      "commission": "14%",
+      "commissionLabel": "commission"
+    },
+    "pro": {
+      "name": "Pro Chef",
+      "description": "For established businesses",
+      "commission": "10%",
+      "commissionLabel": "commission"
+    },
+    "features": {
+      "title": "What's included:",
+      "onlineProfile": "Your own online restaurant profile",
+      "orderManagement": "Order management system",
+      "payments": "Secure payment processing",
+      "support": "Customer support",
+      "marketing": "Marketing & promotion",
+      "analytics": "Sales analytics"
+    }
+  },
+  "summary": {
+    "title": "You're almost there!",
+    "subtitle": "Creating your chef profile...",
+    "creating": "Setting up your restaurant...",
+    "ready": "Your profile is ready! 🎉",
+    "whatNext": "What happens next:",
+    "reviewProfile": "We'll review your profile",
+    "getApproved": "Get approved within 24 hours",
+    "startSelling": "Start receiving orders",
+    "goToDashboard": "Go to Dashboard",
+    "yourRestaurant": "Your Restaurant",
+    "basedIn": "Based in"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "selected": "Selected"
+  }
+}

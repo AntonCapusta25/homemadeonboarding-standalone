@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
 import { CUISINES } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface CuisineStepProps {
   value: string[];
@@ -13,6 +14,7 @@ interface CuisineStepProps {
 }
 
 export function CuisineStep({ value, onChange, onNext, onPrevious }: CuisineStepProps) {
+  const { t } = useTranslation();
   const [otherCuisine, setOtherCuisine] = useState('');
 
   const toggleCuisine = (cuisine: string) => {
@@ -35,8 +37,8 @@ export function CuisineStep({ value, onChange, onNext, onPrevious }: CuisineStep
 
   return (
     <StepLayout
-      title="What kind of food do you cook?"
-      subtitle="Choose 1–3 cuisines that describe your food best."
+      title={t('cuisine.title')}
+      subtitle={t('cuisine.subtitle')}
       onNext={handleNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
@@ -68,17 +70,17 @@ export function CuisineStep({ value, onChange, onNext, onPrevious }: CuisineStep
 
         {isMaxSelected && (
           <p className="text-sm text-muted-foreground mb-4 text-center">
-            You can select up to 3 cuisines.
+            {t('cuisine.subtitle')}
           </p>
         )}
 
         <div className="border-t border-border pt-6">
           <label className="block text-sm font-medium text-foreground mb-2">
-            Other cuisine (optional)
+            {t('cuisine.other')} (optional)
           </label>
           <Input
             type="text"
-            placeholder="Describe your cuisine"
+            placeholder={t('cuisine.other')}
             value={otherCuisine}
             onChange={(e) => setOtherCuisine(e.target.value)}
             className="max-w-sm"
@@ -87,7 +89,7 @@ export function CuisineStep({ value, onChange, onNext, onPrevious }: CuisineStep
 
         {value.length > 0 && (
           <div className="mt-6 p-4 bg-terracotta-light rounded-xl">
-            <p className="text-sm font-medium text-foreground mb-2">Selected cuisines:</p>
+            <p className="text-sm font-medium text-foreground mb-2">{t('common.selected')}:</p>
             <div className="flex flex-wrap gap-2">
               {value.map(c => (
                 <span key={c} className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm">

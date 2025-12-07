@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
 import { Home } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AddressStepProps {
   zipCode: string;
@@ -22,13 +23,14 @@ export function AddressStep({
   onNext, 
   onPrevious 
 }: AddressStepProps) {
+  const { t } = useTranslation();
   const [errors, setErrors] = useState<{ streetAddress?: string }>({});
 
   const validate = () => {
     const newErrors: { streetAddress?: string } = {};
     
     if (!streetAddress.trim()) {
-      newErrors.streetAddress = 'Please enter your street address.';
+      newErrors.streetAddress = t('address.street');
     }
     
     setErrors(newErrors);
@@ -45,8 +47,8 @@ export function AddressStep({
 
   return (
     <StepLayout
-      title="Where is your kitchen?"
-      subtitle="Required for deliveries and legal setup."
+      title={t('address.title')}
+      subtitle={t('address.subtitle')}
       onNext={handleNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
@@ -54,11 +56,11 @@ export function AddressStep({
       <div className="max-w-md mx-auto space-y-6">
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            Zip code (optional)
+            {t('address.postalCode')} (optional)
           </label>
           <Input
             type="text"
-            placeholder="1234 AB"
+            placeholder={t('address.postalCodePlaceholder')}
             value={zipCode}
             onChange={(e) => onChange('zipCode', e.target.value)}
           />
@@ -66,13 +68,13 @@ export function AddressStep({
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            Street & number <span className="text-destructive">*</span>
+            {t('address.street')} <span className="text-destructive">*</span>
           </label>
           <div className="relative">
             <Home className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="e.g. Main Street 123"
+              placeholder={t('address.streetPlaceholder')}
               value={streetAddress}
               onChange={(e) => {
                 onChange('streetAddress', e.target.value);
@@ -86,10 +88,9 @@ export function AddressStep({
           )}
         </div>
 
-        {/* City is shown as read-only, pre-filled from earlier step */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            City
+            {t('address.city')}
           </label>
           <Input
             type="text"
@@ -97,7 +98,6 @@ export function AddressStep({
             disabled
             className="bg-secondary"
           />
-          <p className="text-xs text-muted-foreground mt-1">Set in an earlier step</p>
         </div>
 
         <div>

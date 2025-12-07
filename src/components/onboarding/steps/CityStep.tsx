@@ -5,6 +5,7 @@ import { StepLayout } from '../StepLayout';
 import { CITIES } from '@/types/onboarding';
 import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface CityStepProps {
   value: string;
@@ -14,6 +15,7 @@ interface CityStepProps {
 }
 
 export function CityStep({ value, onChange, onNext, onPrevious }: CityStepProps) {
+  const { t } = useTranslation();
   const [showOther, setShowOther] = useState(false);
   const [otherCity, setOtherCity] = useState('');
 
@@ -46,8 +48,8 @@ export function CityStep({ value, onChange, onNext, onPrevious }: CityStepProps)
 
   return (
     <StepLayout
-      title="Where do you cook from?"
-      subtitle="This helps us match you with nearby customers."
+      title={t('city.title')}
+      subtitle={t('city.subtitle')}
       onNext={onNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
@@ -78,14 +80,14 @@ export function CityStep({ value, onChange, onNext, onPrevious }: CityStepProps)
               showOther && "border-primary bg-terracotta-light"
             )}
           >
-            Other city
+            {t('city.otherCity')}
           </Button>
         </div>
 
         {showOther && (
           <div className="animate-slide-up">
             <label className="block text-sm font-medium text-foreground mb-2">
-              Enter your city
+              {t('city.enterCity')}
             </label>
             <Input
               type="text"

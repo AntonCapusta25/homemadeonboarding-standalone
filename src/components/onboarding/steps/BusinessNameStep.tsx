@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
 import { Sparkles, Loader2, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface BusinessNameStepProps {
   value: string;
@@ -24,6 +25,7 @@ export function BusinessNameStep({
   onNext, 
   onPrevious 
 }: BusinessNameStepProps) {
+  const { t } = useTranslation();
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedNames, setGeneratedNames] = useState<string[]>([]);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -33,7 +35,6 @@ export function BusinessNameStep({
   const generateNames = async () => {
     setIsGenerating(true);
     
-    // Generate names based on cuisine and chef name
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const cuisineStr = cuisines.slice(0, 2).join(' & ');
@@ -50,7 +51,6 @@ export function BusinessNameStep({
     setIsGenerating(false);
   };
 
-  // Auto-generate names on mount if we have cuisines
   useEffect(() => {
     if (cuisines.length > 0 && generatedNames.length === 0 && !isGenerating) {
       generateNames();
@@ -63,7 +63,6 @@ export function BusinessNameStep({
     onChange(name, 'ai');
   };
 
-  // Auto-advance after selecting a name
   useEffect(() => {
     if (selectedOption && selectedOption !== 'manual' && value) {
       const timer = setTimeout(() => {
@@ -88,8 +87,8 @@ export function BusinessNameStep({
 
   return (
     <StepLayout
-      title="Let's name your restaurant"
-      subtitle="We'll suggest a few names based on your cuisine. You can change them anytime."
+      title={t('businessName.title')}
+      subtitle={t('businessName.subtitle')}
       onNext={onNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
@@ -102,18 +101,18 @@ export function BusinessNameStep({
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h3 className="font-display font-semibold text-foreground">AI-suggested names</h3>
-              <p className="text-sm text-muted-foreground">Based on your cuisine{chefName ? ` and name` : ''}</p>
+              <h3 className="font-display font-semibold text-foreground">{t('businessName.generateWithAI')}</h3>
             </div>
           </div>
 
           {isGenerating ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <span className="ml-2 text-muted-foreground">Generating names...</span>
+              <span className="ml-2 text-muted-foreground">{t('businessName.generating')}</span>
             </div>
           ) : generatedNames.length > 0 ? (
             <div className="space-y-3">
+              <p className="text-sm text-muted-foreground mb-3">{t('businessName.pickOne')}</p>
               {generatedNames.map((name, idx) => (
                 <label
                   key={idx}
@@ -166,7 +165,7 @@ export function BusinessNameStep({
                     <div className="w-2 h-2 rounded-full bg-primary-foreground" />
                   )}
                 </div>
-                <span className="font-medium text-foreground">I want to type my own name</span>
+                <span className="font-medium text-foreground">{t('businessName.orEnterManually')}</span>
               </label>
             </div>
           ) : (
@@ -177,7 +176,7 @@ export function BusinessNameStep({
               className="w-full"
             >
               <Sparkles className="w-4 h-4" />
-              Generate names
+              {t('businessName.generateWithAI')}
             </Button>
           )}
         </div>
@@ -187,12 +186,12 @@ export function BusinessNameStep({
             <div className="flex items-center gap-2 mb-3">
               <Store className="w-5 h-5 text-muted-foreground" />
               <label className="text-sm font-medium text-foreground">
-                Restaurant name
+                {t('businessName.placeholder')}
               </label>
             </div>
             <Input
               type="text"
-              placeholder="Enter your restaurant name"
+              placeholder={t('businessName.placeholder')}
               value={manualName}
               onChange={(e) => handleManualChange(e.target.value)}
               autoFocus
