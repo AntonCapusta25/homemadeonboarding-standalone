@@ -54,8 +54,13 @@
     "title": "How do you want to serve?",
     "subtitle": "Choose your service style",
     "delivery": "Delivery",
+    "deliveryDesc": "You bring meals to customers' homes",
     "pickup": "Pickup",
-    "both": "Both"
+    "pickupDesc": "Customers come to collect their orders",
+    "both": "Both",
+    "bothDesc": "Offer delivery and pickup options",
+    "unsure": "Not sure yet",
+    "unsureDesc": "We'll help you decide later!"
   },
   "availability": {
     "title": "When are you available?",
@@ -110,19 +115,25 @@
   },
   "kvk": {
     "title": "Business registration",
-    "subtitle": "Your legal status",
+    "subtitle": "Your legal status — we'll guide you through this!",
     "haveKvkNvwa": "I have KVK & NVWA registration",
+    "haveKvkNvwaDesc": "Perfect! You're all set to start selling",
     "haveKvk": "I have a KVK number",
+    "haveKvkDesc": "Good start! We'll help you with NVWA registration",
     "noKvk": "I don't have registration yet",
+    "noKvkDesc": "No problem! We'll guide you step by step",
     "tryFirst": "I want to try it out first",
+    "tryFirstDesc": "Test the platform, add documents later",
     "uploadDocs": "Upload your documents",
     "tryFirstNote": "No problem! You can add this later"
   },
   "foodSafety": {
     "title": "Food safety",
-    "subtitle": "Your qualifications",
+    "subtitle": "Your qualifications — we're here to help!",
     "haveCertificate": "I have a food safety certificate",
+    "haveCertificateDesc": "Great! Upload it and you're ready to go",
     "noCertificate": "I don't have a certificate yet",
+    "noCertificateDesc": "No worries! We'll help you get certified",
     "uploadCertificate": "Upload certificate"
   },
   "plan": {
@@ -165,6 +176,7 @@
     "title": "You're almost there!",
     "subtitle": "Creating your chef profile...",
     "creating": "Setting up your restaurant...",
+    "generatingMenu": "Creating your personalized menu with AI...",
     "ready": "Your profile is ready!",
     "whatNext": "What happens next:",
     "reviewProfile": "We'll review your profile",
@@ -182,6 +194,26 @@
       "hours": "Opening hours"
     }
   },
+  "menu": {
+    "seeMenu": "See your menu",
+    "yourMenu": "Your AI-Generated Menu",
+    "aiGenerated": "AI-Generated Menu 🤖",
+    "dishesGenerated": "{{count}} dishes created for you",
+    "avgMargin": "Average profit margin",
+    "avgMarginShort": "avg. margin",
+    "marginExplainer": "Keep more of what you earn as a home chef",
+    "profit": "profit",
+    "mainDishes": "Main Dishes",
+    "extras": "Extras & Upsells",
+    "cost": "Cost",
+    "margin": "margin",
+    "cheaper": "cheaper than restaurants",
+    "editMenu": "Edit menu in dashboard"
+  },
+  "disclaimer": {
+    "ip": "Logo & menu designs are Home-Made-Chef IP. Use requires active membership.",
+    "menuIp": "Menu suggestions are AI-generated. Edit freely in your dashboard."
+  },
   "dashboard": {
     "addDishes": "Add your dishes",
     "addDishesSubtitle": "What delicious meals will you offer?",
@@ -195,7 +227,10 @@
     "dishesAdded": "dishes added to your menu",
     "packagingSuppliers": "Packaging suppliers near you",
     "supplierSubtitle": "Get food containers and packaging materials",
-    "findingSuppliers": "Finding suppliers near you..."
+    "findingSuppliers": "Finding suppliers near you...",
+    "aiSuggestions": "AI Menu Suggestions",
+    "yourMargin": "Your profit margin",
+    "vsRestaurants": "vs. restaurant prices"
   },
   "common": {
     "loading": "Loading...",

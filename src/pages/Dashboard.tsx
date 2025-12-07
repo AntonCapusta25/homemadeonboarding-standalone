@@ -4,16 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { Plus, Trash2, Package, ExternalLink, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Package, ExternalLink, Loader2, TrendingUp, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { GeneratedMenu } from '@/types/onboarding';
 
 interface Dish {
   id: string;
   name: string;
   price: string;
   description: string;
+  estimatedCost?: number;
+  margin?: number;
 }
 
 interface Supplier {
@@ -28,7 +31,7 @@ export default function Dashboard() {
   const [dishes, setDishes] = useState<Dish[]>([{ id: '1', name: '', price: '', description: '' }]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
-  const [chefData, setChefData] = useState<{ logoUrl?: string; restaurantName?: string; city?: string } | null>(null);
+  const [chefData, setChefData] = useState<{ logoUrl?: string; restaurantName?: string; city?: string; generatedMenu?: GeneratedMenu } | null>(null);
 
   useEffect(() => {
     // Load chef data from localStorage
@@ -37,6 +40,19 @@ export default function Dashboard() {
       const profile = JSON.parse(savedProfile);
       setChefData(profile);
       fetchSuppliers(profile.city);
+      
+      // Pre-populate dishes from AI-generated menu
+      if (profile.generatedMenu?.dishes && profile.generatedMenu.dishes.length > 0) {
+        const aiDishes = profile.generatedMenu.dishes.map((dish: any, idx: number) => ({
+          id: `ai-${idx}`,
+          name: dish.name,
+          price: dish.price.toString(),
+          description: dish.description,
+          estimatedCost: dish.estimatedCost,
+          margin: dish.margin
+        }));
+        setDishes(aiDishes);
+      }
     } else {
       setLoadingSuppliers(false);
     }
@@ -90,6 +106,8 @@ export default function Dashboard() {
     toast({ title: t('dashboard.dishesSaved'), description: `${validDishes.length} ${t('dashboard.dishesAdded')}` });
   };
 
+  const avgMargin = chefData?.generatedMenu?.avgMargin;
+
   return (
     <div className="min-h-screen bg-gradient-soft">
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
@@ -100,9 +118,37 @@ export default function Dashboard() {
       </header>
 
       <main className="container max-w-4xl mx-auto px-4 py-8">
+        {/* Margin highlight card */}
+        {avgMargin && (
+          <Card className="p-4 mb-8 bg-forest-light/50 border-forest/20 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-forest rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-accent-foreground" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">{t('dashboard.yourMargin')}</p>
+                  <p className="text-sm text-muted-foreground">{t('dashboard.vsRestaurants')}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-3xl font-bold text-forest">{avgMargin}%</span>
+                <p className="text-xs text-muted-foreground">{t('menu.profit')}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <div className="mb-8 animate-fade-in">
-          <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-            {t('dashboard.addDishes')} 🍽️
+          <h1 className="font-display text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
+            {chefData?.generatedMenu ? (
+              <>
+                <Sparkles className="w-6 h-6 text-primary" />
+                {t('dashboard.aiSuggestions')} 🍽️
+              </>
+            ) : (
+              <>{t('dashboard.addDishes')} 🍽️</>
+            )}
           </h1>
           <p className="text-muted-foreground">{t('dashboard.addDishesSubtitle')}</p>
         </div>
@@ -134,6 +180,12 @@ export default function Dashboard() {
                       className="flex-1"
                     />
                   </div>
+                  {dish.margin && (
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-muted-foreground">{t('menu.cost')}: €{dish.estimatedCost?.toFixed(2)}</span>
+                      <span className="text-forest font-medium">{dish.margin}% {t('menu.margin')}</span>
+                    </div>
+                  )}
                 </div>
                 <Button 
                   variant="ghost" 
@@ -195,6 +247,11 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* IP Disclaimer */}
+        <p className="text-[10px] text-muted-foreground/60 mt-12 text-center">
+          {t('disclaimer.ip')}
+        </p>
       </main>
     </div>
   );
