@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
@@ -22,6 +22,16 @@ export function CityStep({ value, onChange, onNext, onPrevious }: CityStepProps)
     onChange(city);
   };
 
+  // Auto-advance when a predefined city is selected
+  useEffect(() => {
+    if (value && CITIES.includes(value as any) && !showOther) {
+      const timer = setTimeout(() => {
+        onNext();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [value, showOther, onNext]);
+
   const handleOtherClick = () => {
     setShowOther(true);
     onChange('');
@@ -41,6 +51,7 @@ export function CityStep({ value, onChange, onNext, onPrevious }: CityStepProps)
       onNext={onNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
+      showNext={showOther}
     >
       <div className="max-w-2xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">

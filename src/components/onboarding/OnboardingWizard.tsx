@@ -74,6 +74,8 @@ export function OnboardingWizard() {
           <ContactStep
             email={profile.email}
             phone={profile.phone}
+            firstName={profile.firstName}
+            lastName={profile.lastName}
             onChange={(field, value) => updateProfile({ [field]: value })}
             onNext={goToNext}
             onPrevious={goToPrevious}
@@ -99,6 +101,7 @@ export function OnboardingWizard() {
             value={profile.restaurantName}
             city={profile.city}
             cuisines={profile.primaryCuisines}
+            chefName={profile.firstName}
             onChange={(name, method) => updateProfile({ restaurantName: name, nameGenerationMethod: method })}
             onNext={goToNext}
             onPrevious={goToPrevious}
@@ -109,6 +112,8 @@ export function OnboardingWizard() {
         return (
           <LogoStep
             restaurantName={profile.restaurantName}
+            cuisines={profile.primaryCuisines}
+            chefName={profile.firstName}
             logoUrl={profile.logoUrl}
             method={profile.logoGenerationMethod}
             onChange={(url, method) => updateProfile({ logoUrl: url, logoGenerationMethod: method })}

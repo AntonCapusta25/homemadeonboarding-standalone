@@ -1,12 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { StepLayout } from '../StepLayout';
 import { Sparkles, Upload, SkipForward, Loader2, Image as ImageIcon, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LogoMethod } from '@/types/onboarding';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface LogoStepProps {
   restaurantName: string;
+  cuisines: string[];
+  chefName?: string;
   logoUrl?: string;
   method: LogoMethod;
   onChange: (url: string | undefined, method: LogoMethod) => void;
@@ -15,7 +19,9 @@ interface LogoStepProps {
 }
 
 export function LogoStep({ 
-  restaurantName, 
+  restaurantName,
+  cuisines,
+  chefName,
   logoUrl, 
   method, 
   onChange, 
@@ -27,13 +33,53 @@ export function LogoStep({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-generate logo on mount
+  useEffect(() => {
+    if (restaurantName && cuisines.length > 0 && !generatedLogo && !isGenerating && method === 'placeholder') {
+      generateLogo();
+    }
+  }, [restaurantName, cuisines]);
+
   const generateLogo = async () => {
     setIsGenerating(true);
     
-    // Simulate AI logo generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Generate a simple placeholder logo
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-logo', {
+        body: { 
+          restaurantName, 
+          cuisines,
+          chefName 
+        }
+      });
+
+      if (error) {
+        console.error('Logo generation error:', error);
+        // Fall back to placeholder
+        generatePlaceholderLogo();
+        return;
+      }
+
+      if (data?.logoUrl) {
+        setGeneratedLogo(data.logoUrl);
+        onChange(data.logoUrl, 'ai');
+      } else {
+        generatePlaceholderLogo();
+      }
+    } catch (err) {
+      console.error('Logo generation failed:', err);
+      toast({
+        title: "Couldn't generate AI logo",
+        description: "Using a simple logo instead. You can upload your own later.",
+        variant: "destructive"
+      });
+      generatePlaceholderLogo();
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generatePlaceholderLogo = () => {
+    // Generate a simple placeholder logo using canvas
     const canvas = document.createElement('canvas');
     canvas.width = 200;
     canvas.height = 200;
@@ -61,14 +107,17 @@ export function LogoStep({
     const logoDataUrl = canvas.toDataURL('image/png');
     setGeneratedLogo(logoDataUrl);
     onChange(logoDataUrl, 'ai');
-    setIsGenerating(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        toast({
+          title: "File too large",
+          description: "Please choose a file under 5MB",
+          variant: "destructive"
+        });
         return;
       }
       
@@ -89,66 +138,59 @@ export function LogoStep({
   };
 
   const currentLogo = generatedLogo || logoUrl;
-  const hasLogo = method !== 'placeholder' && currentLogo;
+
+  // Auto-advance after logo is generated
+  useEffect(() => {
+    if (currentLogo && method === 'ai' && !isGenerating) {
+      const timer = setTimeout(() => {
+        onNext();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentLogo, method, isGenerating, onNext]);
 
   return (
     <StepLayout
       title="Create your logo"
-      subtitle="Get a simple logo now – you can upgrade it later."
+      subtitle="We're generating a logo based on your restaurant. You can change it anytime."
       onNext={onNext}
       onPrevious={onPrevious}
+      showNext={!isGenerating}
     >
       <div className="max-w-xl mx-auto">
-        <div className="grid gap-4">
-          {/* AI Generation Option */}
-          <div className={cn(
-            "bg-card border-2 rounded-2xl p-6 transition-all",
-            method === 'ai' ? "border-primary shadow-soft" : "border-border hover:border-primary/50"
-          )}>
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-gradient-warm rounded-xl flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-display font-semibold text-foreground mb-1">Generate a simple logo</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  We'll create a clean logo with your restaurant name and Homemade colors.
-                </p>
-                
-                {generatedLogo ? (
-                  <div className="flex items-center gap-4">
-                    <img 
-                      src={generatedLogo} 
-                      alt="Generated logo" 
-                      className="w-20 h-20 rounded-xl shadow-soft"
-                    />
-                    <div className="flex items-center gap-2 text-forest">
-                      <Check className="w-5 h-5" />
-                      <span className="font-medium">Logo generated!</span>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={generateLogo}
-                    disabled={isGenerating}
-                    variant="outline"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        Generate logo
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+        {/* Logo Preview */}
+        {isGenerating ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Generating your logo with AI...</p>
+          </div>
+        ) : currentLogo ? (
+          <div className="flex flex-col items-center mb-8 animate-scale-in">
+            <img 
+              src={currentLogo} 
+              alt="Your logo" 
+              className="w-32 h-32 rounded-2xl shadow-glow mb-4 object-cover"
+            />
+            <div className="flex items-center gap-2 text-forest">
+              <Check className="w-5 h-5" />
+              <span className="font-medium">Logo ready!</span>
             </div>
           </div>
+        ) : null}
+
+        <div className="grid gap-4">
+          {/* Regenerate Option */}
+          {currentLogo && (
+            <Button
+              onClick={generateLogo}
+              disabled={isGenerating}
+              variant="outline"
+              className="w-full"
+            >
+              <Sparkles className="w-4 h-4" />
+              Generate a different logo
+            </Button>
+          )}
 
           {/* Upload Option */}
           <div className={cn(

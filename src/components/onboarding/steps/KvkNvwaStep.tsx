@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { StepLayout } from '../StepLayout';
-import { Building2, AlertCircle, FileText, Upload, Check } from 'lucide-react';
+import { Building2, AlertCircle, FileText, Upload, Check, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KvkStatus } from '@/types/onboarding';
 import { Button } from '@/components/ui/button';
@@ -13,21 +13,30 @@ interface KvkNvwaStepProps {
   onPrevious: () => void;
 }
 
-const OPTIONS: { value: KvkStatus; title: string; description: string }[] = [
+const OPTIONS: { value: KvkStatus; title: string; description: string; icon: React.ReactNode }[] = [
   {
     value: 'kvk_nvwa_both',
     title: 'I already have KVK & NVWA',
     description: 'Great! You\'re ready to start selling.',
+    icon: <Check className="w-6 h-6" />,
   },
   {
     value: 'kvk_only',
     title: 'I have KVK but not NVWA',
     description: 'You\'re halfway there. We\'ll help you complete NVWA registration.',
+    icon: <Building2 className="w-6 h-6" />,
   },
   {
     value: 'none',
     title: 'I\'m not registered yet',
     description: 'No problem. Homemade will guide you step by step before you start selling.',
+    icon: <AlertCircle className="w-6 h-6" />,
+  },
+  {
+    value: 'try_first',
+    title: 'I want to try it out first',
+    description: 'Explore the platform before starting registration. We\'ll remind you later.',
+    icon: <Clock className="w-6 h-6" />,
   },
 ];
 
@@ -47,6 +56,20 @@ export function KvkNvwaStep({ value, docsUrl, onChange, onNext, onPrevious }: Kv
       reader.readAsDataURL(file);
     }
   };
+
+  const handleSelect = (status: KvkStatus) => {
+    onChange(status, status === 'kvk_nvwa_both' ? docsUrl : undefined);
+  };
+
+  // Auto-advance for simple options
+  useEffect(() => {
+    if (value && value !== 'kvk_nvwa_both') {
+      const timer = setTimeout(() => {
+        onNext();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [value, onNext]);
 
   return (
     <StepLayout
@@ -77,7 +100,7 @@ export function KvkNvwaStep({ value, docsUrl, onChange, onNext, onPrevious }: Kv
                   name="kvk-status"
                   value={option.value}
                   checked={value === option.value}
-                  onChange={() => onChange(option.value, option.value === 'kvk_nvwa_both' ? docsUrl : undefined)}
+                  onChange={() => handleSelect(option.value)}
                   className="sr-only"
                 />
                 
@@ -87,11 +110,7 @@ export function KvkNvwaStep({ value, docsUrl, onChange, onNext, onPrevious }: Kv
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-muted-foreground"
                 )}>
-                  {option.value === 'none' ? (
-                    <AlertCircle className="w-6 h-6" />
-                  ) : (
-                    <Building2 className="w-6 h-6" />
-                  )}
+                  {option.icon}
                 </div>
                 
                 <div className="flex-1">
