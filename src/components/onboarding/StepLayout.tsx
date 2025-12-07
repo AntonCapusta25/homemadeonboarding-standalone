@@ -13,6 +13,7 @@ interface StepLayoutProps {
   canGoPrevious?: boolean;
   nextLabel?: string;
   isNextDisabled?: boolean;
+  showNext?: boolean;
   className?: string;
 }
 
@@ -26,6 +27,7 @@ export function StepLayout({
   canGoPrevious = true,
   nextLabel = 'Next',
   isNextDisabled = false,
+  showNext = true,
   className,
 }: StepLayoutProps) {
   return (
@@ -51,13 +53,13 @@ export function StepLayout({
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            Previous
+            Back
           </Button>
         ) : (
           <div />
         )}
 
-        {canGoNext && onNext && (
+        {canGoNext && onNext && showNext && (
           <Button
             onClick={onNext}
             disabled={isNextDisabled}

@@ -33,8 +33,8 @@ const initialProfile: ChefProfile = {
   logoGenerationMethod: 'placeholder',
   nameGenerationMethod: 'manual',
   foodSafetyStatus: 'needs_training',
-  kvkStatus: 'none',
-  plan: 'pro',
+  kvkStatus: 'try_first',
+  plan: 'advanced', // Default to 14% plan
   onboardingCompleted: false,
 };
 

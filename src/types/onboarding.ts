@@ -1,6 +1,6 @@
 export type ServiceType = 'delivery' | 'pickup' | 'both' | 'unsure';
 export type FoodSafetyStatus = 'has_certificate' | 'needs_training';
-export type KvkStatus = 'kvk_nvwa_both' | 'kvk_only' | 'none';
+export type KvkStatus = 'kvk_nvwa_both' | 'kvk_only' | 'none' | 'try_first';
 export type PlanType = 'basic' | 'pro' | 'advanced' | 'auto_recommend';
 export type LogoMethod = 'ai' | 'upload' | 'placeholder';
 export type NameMethod = 'ai' | 'manual';

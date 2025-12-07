@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
@@ -9,6 +9,7 @@ interface BusinessNameStepProps {
   value: string;
   city: string;
   cuisines: string[];
+  chefName?: string;
   onChange: (name: string, method: 'ai' | 'manual') => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -17,7 +18,8 @@ interface BusinessNameStepProps {
 export function BusinessNameStep({ 
   value, 
   city, 
-  cuisines, 
+  cuisines,
+  chefName = '',
   onChange, 
   onNext, 
   onPrevious 
@@ -31,25 +33,45 @@ export function BusinessNameStep({
   const generateNames = async () => {
     setIsGenerating(true);
     
-    // Simulating AI generation - in production this would call an API
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Generate names based on cuisine and chef name
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const cuisineStr = cuisines.slice(0, 2).join(' & ');
+    const primaryCuisine = cuisines[0] || 'Home';
+    const namePrefix = chefName ? `${chefName}'s` : 'Chef\'s';
+    
     const mockNames = [
-      `${cuisineStr} Kitchen ${city}`,
-      `The ${city} ${cuisines[0] || 'Home'} Table`,
-      `Homemade ${cuisines[0] || 'Flavors'} by Chef`,
+      `${namePrefix} ${primaryCuisine} Kitchen`,
+      `${cuisineStr} by ${chefName || 'Chef'}`,
+      `The ${city} ${primaryCuisine} Table`,
     ];
     
     setGeneratedNames(mockNames);
     setIsGenerating(false);
   };
 
+  // Auto-generate names on mount if we have cuisines
+  useEffect(() => {
+    if (cuisines.length > 0 && generatedNames.length === 0 && !isGenerating) {
+      generateNames();
+    }
+  }, [cuisines]);
+
   const handleSelectName = (name: string) => {
     setSelectedOption(name);
     setShowManual(false);
     onChange(name, 'ai');
   };
+
+  // Auto-advance after selecting a name
+  useEffect(() => {
+    if (selectedOption && selectedOption !== 'manual' && value) {
+      const timer = setTimeout(() => {
+        onNext();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedOption, value, onNext]);
 
   const handleManualSelect = () => {
     setSelectedOption('manual');
@@ -71,6 +93,7 @@ export function BusinessNameStep({
       onNext={onNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
+      showNext={showManual || generatedNames.length === 0}
     >
       <div className="max-w-xl mx-auto">
         <div className="bg-card border border-border rounded-2xl p-6 mb-6 shadow-soft">
@@ -79,31 +102,17 @@ export function BusinessNameStep({
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h3 className="font-display font-semibold text-foreground">Let AI suggest your name</h3>
-              <p className="text-sm text-muted-foreground">Based on your city and cuisine</p>
+              <h3 className="font-display font-semibold text-foreground">AI-suggested names</h3>
+              <p className="text-sm text-muted-foreground">Based on your cuisine{chefName ? ` and name` : ''}</p>
             </div>
           </div>
 
-          {generatedNames.length === 0 ? (
-            <Button
-              onClick={generateNames}
-              disabled={isGenerating}
-              variant="outline"
-              className="w-full"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating names...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate names
-                </>
-              )}
-            </Button>
-          ) : (
+          {isGenerating ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Generating names...</span>
+            </div>
+          ) : generatedNames.length > 0 ? (
             <div className="space-y-3">
               {generatedNames.map((name, idx) => (
                 <label
@@ -160,10 +169,20 @@ export function BusinessNameStep({
                 <span className="font-medium text-foreground">I want to type my own name</span>
               </label>
             </div>
+          ) : (
+            <Button
+              onClick={generateNames}
+              disabled={isGenerating}
+              variant="outline"
+              className="w-full"
+            >
+              <Sparkles className="w-4 h-4" />
+              Generate names
+            </Button>
           )}
         </div>
 
-        {(showManual || generatedNames.length === 0) && (
+        {showManual && (
           <div className="animate-slide-up">
             <div className="flex items-center gap-2 mb-3">
               <Store className="w-5 h-5 text-muted-foreground" />
@@ -176,13 +195,8 @@ export function BusinessNameStep({
               placeholder="Enter your restaurant name"
               value={manualName}
               onChange={(e) => handleManualChange(e.target.value)}
-              autoFocus={showManual}
+              autoFocus
             />
-            {generatedNames.length === 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Or <button onClick={generateNames} className="text-primary hover:underline">generate AI suggestions</button>
-              </p>
-            )}
           </div>
         )}
       </div>

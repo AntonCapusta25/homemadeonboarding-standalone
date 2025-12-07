@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
-import { Home, MapPin } from 'lucide-react';
+import { Home } from 'lucide-react';
 
 interface AddressStepProps {
   zipCode: string;
@@ -22,17 +22,13 @@ export function AddressStep({
   onNext, 
   onPrevious 
 }: AddressStepProps) {
-  const [errors, setErrors] = useState<{ streetAddress?: string; city?: string }>({});
+  const [errors, setErrors] = useState<{ streetAddress?: string }>({});
 
   const validate = () => {
-    const newErrors: { streetAddress?: string; city?: string } = {};
+    const newErrors: { streetAddress?: string } = {};
     
     if (!streetAddress.trim()) {
       newErrors.streetAddress = 'Please enter your street address.';
-    }
-    
-    if (!city.trim()) {
-      newErrors.city = 'Please enter your city.';
     }
     
     setErrors(newErrors);
@@ -45,7 +41,7 @@ export function AddressStep({
     }
   };
 
-  const isValid = streetAddress.trim().length > 0 && city.trim().length > 0;
+  const isValid = streetAddress.trim().length > 0;
 
   return (
     <StepLayout
@@ -90,26 +86,18 @@ export function AddressStep({
           )}
         </div>
 
+        {/* City is shown as read-only, pre-filled from earlier step */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            City <span className="text-destructive">*</span>
+            City
           </label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Your city"
-              value={city}
-              onChange={(e) => {
-                onChange('city', e.target.value);
-                if (errors.city) setErrors(prev => ({ ...prev, city: undefined }));
-              }}
-              className="pl-10"
-            />
-          </div>
-          {errors.city && (
-            <p className="text-sm text-destructive mt-1">{errors.city}</p>
-          )}
+          <Input
+            type="text"
+            value={city}
+            disabled
+            className="bg-secondary"
+          />
+          <p className="text-xs text-muted-foreground mt-1">Set in an earlier step</p>
         </div>
 
         <div>
@@ -119,7 +107,6 @@ export function AddressStep({
           <Input
             type="text"
             value={country}
-            onChange={(e) => onChange('country', e.target.value)}
             disabled
             className="bg-secondary"
           />
