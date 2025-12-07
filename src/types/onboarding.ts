@@ -5,6 +5,30 @@ export type PlanType = 'basic' | 'pro' | 'advanced' | 'auto_recommend';
 export type LogoMethod = 'ai' | 'upload' | 'placeholder';
 export type NameMethod = 'ai' | 'manual';
 
+export interface MenuDish {
+  name: string;
+  description: string;
+  price: number;
+  estimatedCost: number;
+  margin: number;
+  category: 'main' | 'side' | 'drink' | 'dessert';
+  restaurantPrice?: number;
+}
+
+export interface MenuUpsell {
+  name: string;
+  price: number;
+  type: 'drink' | 'side' | 'dessert' | 'extra';
+}
+
+export interface GeneratedMenu {
+  dishes: MenuDish[];
+  upsells: MenuUpsell[];
+  avgMargin: number;
+  summary?: string;
+  generatedAt?: string;
+}
+
 export interface ChefProfile {
   id?: string;
   firstName?: string;
@@ -30,6 +54,7 @@ export interface ChefProfile {
   plan: PlanType;
   onboardingCompleted: boolean;
   onboardingCompletedAt?: Date;
+  generatedMenu?: GeneratedMenu;
 }
 
 export type StepId = 

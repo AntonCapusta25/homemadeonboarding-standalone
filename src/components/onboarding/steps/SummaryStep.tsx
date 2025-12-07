@@ -1,23 +1,69 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
-import { Check, Square, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles } from 'lucide-react';
+import { Check, Square, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, UtensilsCrossed } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { fireCelebration } from '@/components/confetti';
+import { supabase } from '@/integrations/supabase/client';
+import { MenuPreview } from '@/components/menu/MenuPreview';
 
-interface SummaryStepProps { profile: ChefProfile; onGoToDashboard: () => void; onBookCall: () => void; }
+interface SummaryStepProps { 
+  profile: ChefProfile; 
+  onGoToDashboard: () => void; 
+  onBookCall: () => void;
+  onUpdateProfile?: (updates: Partial<ChefProfile>) => void;
+}
 
-export function SummaryStep({ profile, onGoToDashboard, onBookCall }: SummaryStepProps) {
+export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProfile }: SummaryStepProps) {
   const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(true);
   const [showContent, setShowContent] = useState(false);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [generatedMenu, setGeneratedMenu] = useState(profile.generatedMenu);
 
   useEffect(() => { 
+    const generateMenu = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-menu', {
+          body: {
+            city: profile.city,
+            cuisines: profile.primaryCuisines,
+            dishTypes: profile.dishTypes,
+            serviceType: profile.serviceType,
+            restaurantName: profile.restaurantName,
+            chefName: profile.firstName
+          }
+        });
+
+        if (error) {
+          console.error('Menu generation error:', error);
+        } else if (data?.menu) {
+          setGeneratedMenu(data.menu);
+          if (onUpdateProfile) {
+            onUpdateProfile({ generatedMenu: data.menu });
+          }
+          // Save to localStorage
+          const savedProfile = localStorage.getItem('chefProfile');
+          if (savedProfile) {
+            const parsed = JSON.parse(savedProfile);
+            parsed.generatedMenu = data.menu;
+            localStorage.setItem('chefProfile', JSON.stringify(parsed));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to generate menu:', err);
+      } finally {
+        setMenuLoading(false);
+      }
+    };
+
+    generateMenu();
+
     const timer = setTimeout(() => { 
       setIsCreating(false); 
       fireCelebration();
       setTimeout(() => setShowContent(true), 200); 
-    }, 2000); 
+    }, 2500); 
     return () => clearTimeout(timer); 
   }, []);
 
@@ -25,7 +71,7 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall }: SummarySte
     { label: t('summary.checklist.location'), completed: true },
     { label: t('summary.checklist.branding'), completed: true },
     { label: t('summary.checklist.foodSafety'), completed: true },
-    { label: t('summary.checklist.menu'), completed: false },
+    { label: t('summary.checklist.menu'), completed: !!generatedMenu },
     { label: t('summary.checklist.hours'), completed: false },
   ];
 
@@ -43,6 +89,10 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall }: SummarySte
         </div>
         <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">{t('summary.creating')} ✨</h1>
         <p className="text-lg text-muted-foreground max-w-md">{profile.restaurantName}</p>
+        <p className="text-sm text-muted-foreground mt-4 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 animate-pulse" />
+          {t('summary.generatingMenu')}
+        </p>
       </div>
     );
   }
@@ -86,6 +136,24 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall }: SummarySte
         </div>
       </div>
 
+      {/* AI Generated Menu Preview */}
+      {generatedMenu && (
+        <div className="bg-card border border-border rounded-2xl p-6 mb-8 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.18s' }}>
+          <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2">
+            <UtensilsCrossed className="w-5 h-5 text-primary" />
+            {t('menu.aiGenerated')}
+          </h3>
+          <div className="text-left mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-muted-foreground">{t('menu.dishesGenerated', { count: generatedMenu.dishes.length })}</span>
+              <span className="text-sm font-medium text-forest">{generatedMenu.avgMargin}% {t('menu.avgMarginShort')}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{generatedMenu.summary}</p>
+          </div>
+          <MenuPreview menu={generatedMenu} compact onEdit={onGoToDashboard} />
+        </div>
+      )}
+
       <div className="bg-card border border-border rounded-2xl p-6 mb-8 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.2s' }}>
         <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />{t('summary.whatNext')}
@@ -113,6 +181,11 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall }: SummarySte
           <Phone className="w-4 h-4" />{t('summary.bookCall')}
         </Button>
       </div>
+
+      {/* IP Disclaimer */}
+      <p className="text-[10px] text-muted-foreground/60 mt-8 max-w-sm text-center">
+        {t('disclaimer.ip')}
+      </p>
     </div>
   );
 }

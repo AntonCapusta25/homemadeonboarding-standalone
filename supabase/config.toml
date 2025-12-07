@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.find-suppliers]
 verify_jwt = false
+
+[functions.generate-menu]
+verify_jwt = false

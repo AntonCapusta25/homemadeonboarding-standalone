@@ -54,8 +54,13 @@
     "title": "Hoe wil je serveren?",
     "subtitle": "Kies je servicestijl",
     "delivery": "Bezorging",
+    "deliveryDesc": "Breng maaltijden naar klanten thuis",
     "pickup": "Afhalen",
-    "both": "Beide"
+    "pickupDesc": "Klanten komen hun bestelling ophalen",
+    "both": "Beide",
+    "bothDesc": "Bied bezorging en afhalen aan",
+    "unsure": "Nog niet zeker",
+    "unsureDesc": "We helpen je later beslissen!"
   },
   "availability": {
     "title": "Wanneer ben je beschikbaar?",
@@ -110,19 +115,25 @@
   },
   "kvk": {
     "title": "Bedrijfsregistratie",
-    "subtitle": "Je juridische status",
+    "subtitle": "Je juridische status — wij begeleiden je hierbij!",
     "haveKvkNvwa": "Ik heb KVK & NVWA registratie",
+    "haveKvkNvwaDesc": "Perfect! Je bent klaar om te beginnen",
     "haveKvk": "Ik heb een KVK-nummer",
+    "haveKvkDesc": "Goed begin! We helpen je met NVWA registratie",
     "noKvk": "Ik heb nog geen registratie",
+    "noKvkDesc": "Geen probleem! We begeleiden je stap voor stap",
     "tryFirst": "Ik wil het eerst uitproberen",
+    "tryFirstDesc": "Test het platform, voeg documenten later toe",
     "uploadDocs": "Upload je documenten",
     "tryFirstNote": "Geen probleem! Je kunt dit later toevoegen"
   },
   "foodSafety": {
     "title": "Voedselveiligheid",
-    "subtitle": "Je kwalificaties",
+    "subtitle": "Je kwalificaties — wij staan voor je klaar!",
     "haveCertificate": "Ik heb een voedselveiligheidscertificaat",
+    "haveCertificateDesc": "Top! Upload het en je kunt beginnen",
     "noCertificate": "Ik heb nog geen certificaat",
+    "noCertificateDesc": "Geen zorgen! We helpen je gecertificeerd te worden",
     "uploadCertificate": "Certificaat uploaden"
   },
   "plan": {
@@ -165,6 +176,7 @@
     "title": "Je bent er bijna!",
     "subtitle": "Je koksprofiel aanmaken...",
     "creating": "Je restaurant opzetten...",
+    "generatingMenu": "Je persoonlijke menu maken met AI...",
     "ready": "Je profiel is klaar!",
     "whatNext": "Wat gebeurt er nu:",
     "reviewProfile": "We bekijken je profiel",
@@ -182,6 +194,26 @@
       "hours": "Openingstijden"
     }
   },
+  "menu": {
+    "seeMenu": "Bekijk je menu",
+    "yourMenu": "Je AI-Gegenereerd Menu",
+    "aiGenerated": "AI-Gegenereerd Menu 🤖",
+    "dishesGenerated": "{{count}} gerechten voor je gemaakt",
+    "avgMargin": "Gemiddelde winstmarge",
+    "avgMarginShort": "gem. marge",
+    "marginExplainer": "Houd meer over als thuiskok",
+    "profit": "winst",
+    "mainDishes": "Hoofdgerechten",
+    "extras": "Extra's & Upsells",
+    "cost": "Kosten",
+    "margin": "marge",
+    "cheaper": "goedkoper dan restaurants",
+    "editMenu": "Menu bewerken in dashboard"
+  },
+  "disclaimer": {
+    "ip": "Logo & menu ontwerpen zijn Home-Made-Chef eigendom. Gebruik vereist actief lidmaatschap.",
+    "menuIp": "Menu suggesties zijn AI-gegenereerd. Bewerk vrij in je dashboard."
+  },
   "dashboard": {
     "addDishes": "Voeg je gerechten toe",
     "addDishesSubtitle": "Welke heerlijke maaltijden ga je aanbieden?",
@@ -195,7 +227,10 @@
     "dishesAdded": "gerechten toegevoegd aan je menu",
     "packagingSuppliers": "Verpakkingsleveranciers bij jou in de buurt",
     "supplierSubtitle": "Haal voedselverpakkingen en materialen",
-    "findingSuppliers": "Leveranciers zoeken bij jou in de buurt..."
+    "findingSuppliers": "Leveranciers zoeken bij jou in de buurt...",
+    "aiSuggestions": "AI Menu Suggesties",
+    "yourMargin": "Je winstmarge",
+    "vsRestaurants": "vs. restaurantprijzen"
   },
   "common": {
     "loading": "Laden...",
