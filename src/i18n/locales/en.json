@@ -215,6 +215,9 @@
     "menuIp": "Menu suggestions are AI-generated. Edit freely in your dashboard."
   },
   "dashboard": {
+    "loading": "Loading...",
+    "buyPackaging": "Need Food Packaging?",
+    "packagingDesc": "Find suppliers near you for containers, bags, and more",
     "addDishes": "Add your dishes",
     "addDishesSubtitle": "What delicious meals will you offer?",
     "dishName": "Dish name",
