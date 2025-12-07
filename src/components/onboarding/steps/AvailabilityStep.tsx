@@ -2,7 +2,8 @@ import { Button } from '@/components/ui/button';
 import { StepLayout } from '../StepLayout';
 import { AVAILABILITY_OPTIONS } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
-import { Moon, Sun, Coffee, Clock } from 'lucide-react';
+import { Moon, Sun, Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AvailabilityStepProps {
   value: string[];
@@ -19,6 +20,8 @@ const ICONS: Record<string, React.ReactNode> = {
 };
 
 export function AvailabilityStep({ value, onChange, onNext, onPrevious }: AvailabilityStepProps) {
+  const { t } = useTranslation();
+  
   const toggleOption = (option: string) => {
     if (value.includes(option)) {
       onChange(value.filter(v => v !== option));
@@ -31,8 +34,8 @@ export function AvailabilityStep({ value, onChange, onNext, onPrevious }: Availa
 
   return (
     <StepLayout
-      title="When are you usually available to cook?"
-      subtitle="We'll use this to suggest opening times. You can fine-tune later."
+      title={t('availability.title')}
+      subtitle={t('availability.subtitle')}
       onNext={onNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
@@ -60,14 +63,14 @@ export function AvailabilityStep({ value, onChange, onNext, onPrevious }: Availa
 
         {value.length === 0 && (
           <p className="text-sm text-muted-foreground text-center mt-6">
-            Please select at least one time slot.
+            {t('availability.subtitle')}
           </p>
         )}
 
         {value.length > 0 && (
           <div className="mt-8 p-4 bg-forest-light rounded-xl text-center">
             <p className="text-sm text-forest font-medium">
-              Great! You'll be available during: {value.join(', ')}
+              ✓ {value.join(', ')}
             </p>
           </div>
         )}

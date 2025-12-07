@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
 import { Mail, Phone, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ContactStepProps {
   email: string;
@@ -14,6 +15,7 @@ interface ContactStepProps {
 }
 
 export function ContactStep({ email, phone, firstName = '', lastName = '', onChange, onNext, onPrevious }: ContactStepProps) {
+  const { t } = useTranslation();
   const [errors, setErrors] = useState<{ email?: string; phone?: string; firstName?: string }>({});
 
   const validateEmail = (value: string) => {
@@ -25,17 +27,17 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
     const newErrors: { email?: string; phone?: string; firstName?: string } = {};
     
     if (!firstName.trim()) {
-      newErrors.firstName = 'Please enter your first name.';
+      newErrors.firstName = t('contact.firstName');
     }
     
     if (!email.trim()) {
-      newErrors.email = 'Please enter your email.';
+      newErrors.email = t('contact.email');
     } else if (!validateEmail(email)) {
-      newErrors.email = 'Please enter a valid email address.';
+      newErrors.email = t('contact.email');
     }
     
     if (!phone.trim()) {
-      newErrors.phone = 'Please enter your phone number.';
+      newErrors.phone = t('contact.phone');
     }
     
     setErrors(newErrors);
@@ -52,8 +54,8 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
 
   return (
     <StepLayout
-      title="How can we reach you?"
-      subtitle="We'll only use this to help you get started and for important updates."
+      title={t('contact.title')}
+      subtitle={t('contact.subtitle')}
       onNext={handleNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
@@ -62,13 +64,13 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              First name <span className="text-destructive">*</span>
+              {t('contact.firstName')} <span className="text-destructive">*</span>
             </label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Your first name"
+                placeholder={t('contact.firstNamePlaceholder')}
                 value={firstName}
                 onChange={(e) => {
                   onChange('firstName', e.target.value);
@@ -84,11 +86,11 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Last name
+              {t('contact.lastName')}
             </label>
             <Input
               type="text"
-              placeholder="Your last name"
+              placeholder={t('contact.lastNamePlaceholder')}
               value={lastName}
               onChange={(e) => onChange('lastName', e.target.value)}
             />
@@ -97,13 +99,13 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            Email <span className="text-destructive">*</span>
+            {t('contact.email')} <span className="text-destructive">*</span>
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               type="email"
-              placeholder="name@example.com"
+              placeholder={t('contact.emailPlaceholder')}
               value={email}
               onChange={(e) => {
                 onChange('email', e.target.value);
@@ -119,13 +121,13 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            Phone number <span className="text-destructive">*</span>
+            {t('contact.phone')} <span className="text-destructive">*</span>
           </label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               type="tel"
-              placeholder="e.g. +31 6 12345678"
+              placeholder={t('contact.phonePlaceholder')}
               value={phone}
               onChange={(e) => {
                 onChange('phone', e.target.value);

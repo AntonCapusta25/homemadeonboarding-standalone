@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface StepLayoutProps {
   title: string;
@@ -25,11 +26,13 @@ export function StepLayout({
   onPrevious,
   canGoNext = true,
   canGoPrevious = true,
-  nextLabel = 'Next',
+  nextLabel,
   isNextDisabled = false,
   showNext = true,
   className,
 }: StepLayoutProps) {
+  const { t } = useTranslation();
+  
   return (
     <div className={cn("flex flex-col h-full animate-fade-in", className)}>
       <div className="mb-8 text-center">
@@ -53,7 +56,7 @@ export function StepLayout({
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t('steps.back')}
           </Button>
         ) : (
           <div />
@@ -66,7 +69,7 @@ export function StepLayout({
             size="lg"
             className="gap-2 min-w-[140px]"
           >
-            {nextLabel}
+            {nextLabel || t('steps.next')}
             <ArrowRight className="w-4 h-4" />
           </Button>
         )}

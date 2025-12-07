@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
 import { DISH_TYPES } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface DishTypesStepProps {
   value: string[];
@@ -13,6 +14,7 @@ interface DishTypesStepProps {
 }
 
 export function DishTypesStep({ value, onChange, onNext, onPrevious }: DishTypesStepProps) {
+  const { t } = useTranslation();
   const [otherDish, setOtherDish] = useState('');
   const [showOtherInput, setShowOtherInput] = useState(false);
 
@@ -20,7 +22,6 @@ export function DishTypesStep({ value, onChange, onNext, onPrevious }: DishTypes
     if (dish === 'Other') {
       setShowOtherInput(!showOtherInput);
       if (showOtherInput) {
-        // Remove "Other" related items
         onChange(value.filter(v => DISH_TYPES.includes(v as typeof DISH_TYPES[number])));
         setOtherDish('');
       }
@@ -46,8 +47,8 @@ export function DishTypesStep({ value, onChange, onNext, onPrevious }: DishTypes
 
   return (
     <StepLayout
-      title="What kind of dishes will you sell?"
-      subtitle="This helps us generate a menu suggestion for you."
+      title={t('dishTypes.title')}
+      subtitle={t('dishTypes.subtitle')}
       onNext={handleNext}
       onPrevious={onPrevious}
       isNextDisabled={!isValid}
@@ -79,14 +80,14 @@ export function DishTypesStep({ value, onChange, onNext, onPrevious }: DishTypes
 
         {isMaxSelected && (
           <p className="text-sm text-muted-foreground mb-4 text-center">
-            You can select up to 5 dish types.
+            {t('dishTypes.subtitle')}
           </p>
         )}
 
         {showOtherInput && (
           <div className="animate-slide-up max-w-sm mx-auto">
             <label className="block text-sm font-medium text-foreground mb-2">
-              Describe other dish types
+              {t('cuisine.other')}
             </label>
             <Input
               type="text"
@@ -100,7 +101,7 @@ export function DishTypesStep({ value, onChange, onNext, onPrevious }: DishTypes
 
         {value.length > 0 && (
           <div className="mt-6 p-4 bg-terracotta-light rounded-xl text-center">
-            <p className="text-sm font-medium text-foreground mb-2">Your dishes:</p>
+            <p className="text-sm font-medium text-foreground mb-2">{t('common.selected')}:</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {value.map(d => (
                 <span key={d} className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm">

@@ -1,0 +1,186 @@
+{
+  "welcome": {
+    "title": "Welkom bij NanaBanana",
+    "subtitle": "Begin je reis als thuiskok",
+    "getStarted": "Aan de slag",
+    "alreadyHaveAccount": "Heb je al een account?",
+    "signIn": "Inloggen"
+  },
+  "steps": {
+    "back": "Terug",
+    "next": "Volgende",
+    "continue": "Doorgaan",
+    "skip": "Overslaan",
+    "finish": "Voltooien"
+  },
+  "city": {
+    "title": "Waar ben je gevestigd?",
+    "subtitle": "Selecteer je stad om te beginnen",
+    "amsterdam": "Amsterdam",
+    "rotterdam": "Rotterdam",
+    "denHaag": "Den Haag",
+    "utrecht": "Utrecht",
+    "otherCity": "Andere stad",
+    "enterCity": "Voer je stad in"
+  },
+  "cuisine": {
+    "title": "Welke keuken kook je?",
+    "subtitle": "Selecteer alles wat van toepassing is",
+    "dutch": "Nederlands",
+    "italian": "Italiaans",
+    "french": "Frans",
+    "asian": "Aziatisch",
+    "mexican": "Mexicaans",
+    "indian": "Indiaas",
+    "mediterranean": "Mediterraans",
+    "american": "Amerikaans",
+    "middleEastern": "Midden-Oosters",
+    "african": "Afrikaans",
+    "other": "Anders"
+  },
+  "dishTypes": {
+    "title": "Welke soorten gerechten bied je aan?",
+    "subtitle": "Selecteer alles wat van toepassing is",
+    "appetizers": "Voorgerechten",
+    "mainCourses": "Hoofdgerechten",
+    "desserts": "Desserts",
+    "snacks": "Snacks",
+    "beverages": "Dranken",
+    "breakfast": "Ontbijt",
+    "lunch": "Lunch",
+    "dinner": "Diner"
+  },
+  "serviceType": {
+    "title": "Hoe wil je serveren?",
+    "subtitle": "Kies je servicestijl",
+    "delivery": "Bezorging",
+    "pickup": "Afhalen",
+    "both": "Beide"
+  },
+  "availability": {
+    "title": "Wanneer ben je beschikbaar?",
+    "subtitle": "Stel je werktijden in",
+    "monday": "Maandag",
+    "tuesday": "Dinsdag",
+    "wednesday": "Woensdag",
+    "thursday": "Donderdag",
+    "friday": "Vrijdag",
+    "saturday": "Zaterdag",
+    "sunday": "Zondag"
+  },
+  "contact": {
+    "title": "Je contactgegevens",
+    "subtitle": "Hoe kunnen klanten je bereiken?",
+    "firstName": "Voornaam",
+    "lastName": "Achternaam",
+    "email": "E-mail",
+    "phone": "Telefoonnummer",
+    "firstNamePlaceholder": "Je voornaam",
+    "lastNamePlaceholder": "Je achternaam",
+    "emailPlaceholder": "jouw@email.nl",
+    "phonePlaceholder": "+31 6 12345678"
+  },
+  "address": {
+    "title": "Waar ga je koken?",
+    "subtitle": "Je keukenadres",
+    "street": "Straatnaam",
+    "city": "Stad",
+    "postalCode": "Postcode",
+    "streetPlaceholder": "Voer je straatnaam in",
+    "postalCodePlaceholder": "1234 AB"
+  },
+  "businessName": {
+    "title": "Geef je restaurant een naam",
+    "subtitle": "Kies een naam die bij je past",
+    "generateWithAI": "Genereer met AI ✨",
+    "orEnterManually": "Of voer je eigen naam in",
+    "placeholder": "Je restaurantnaam",
+    "generating": "Namen maken op basis van je keuken...",
+    "pickOne": "Kies er een of voer je eigen in:"
+  },
+  "logo": {
+    "title": "Je restaurant logo",
+    "subtitle": "Maak een logo dat opvalt",
+    "generateWithAI": "Genereer met AI ✨",
+    "uploadOwn": "Upload je eigen",
+    "generating": "Je logo maken met AI magie... 🎨",
+    "ready": "Ziet er geweldig uit! 🔥",
+    "firstImpression": "Dit is de eerste indruk van je restaurant!",
+    "regenerate": "Nieuw logo genereren ✨"
+  },
+  "kvk": {
+    "title": "Bedrijfsregistratie",
+    "subtitle": "Je juridische status",
+    "haveKvkNvwa": "Ik heb KVK & NVWA registratie",
+    "haveKvk": "Ik heb een KVK-nummer",
+    "noKvk": "Ik heb nog geen registratie",
+    "tryFirst": "Ik wil het eerst uitproberen",
+    "uploadDocs": "Upload je documenten",
+    "tryFirstNote": "Geen probleem! Je kunt dit later toevoegen"
+  },
+  "foodSafety": {
+    "title": "Voedselveiligheid",
+    "subtitle": "Je kwalificaties",
+    "haveCertificate": "Ik heb een voedselveiligheidscertificaat",
+    "noCertificate": "Ik heb nog geen certificaat",
+    "uploadCertificate": "Certificaat uploaden"
+  },
+  "plan": {
+    "title": "Kies je plan",
+    "subtitle": "Begin met verdienen als thuiskok",
+    "noUpfrontFees": "Geen vooraf kosten • Betaal alleen als je verdient",
+    "recommended": "Aanbevolen",
+    "popular": "Meest Populair",
+    "viewOtherPlans": "Bekijk andere plannen",
+    "hidePlans": "Verberg andere plannen",
+    "starter": {
+      "name": "Starter Kok",
+      "description": "Perfect voor beginners",
+      "commission": "18%",
+      "commissionLabel": "commissie"
+    },
+    "advanced": {
+      "name": "Gevorderde Kok",
+      "description": "Beste waarde voor groeiende koks",
+      "commission": "14%",
+      "commissionLabel": "commissie"
+    },
+    "pro": {
+      "name": "Pro Kok",
+      "description": "Voor gevestigde bedrijven",
+      "commission": "10%",
+      "commissionLabel": "commissie"
+    },
+    "features": {
+      "title": "Wat is inbegrepen:",
+      "onlineProfile": "Je eigen online restaurantprofiel",
+      "orderManagement": "Orderbeheersysteem",
+      "payments": "Veilige betalingsverwerking",
+      "support": "Klantenservice",
+      "marketing": "Marketing & promotie",
+      "analytics": "Verkoopanalyses"
+    }
+  },
+  "summary": {
+    "title": "Je bent er bijna!",
+    "subtitle": "Je koksprofiel aanmaken...",
+    "creating": "Je restaurant opzetten...",
+    "ready": "Je profiel is klaar! 🎉",
+    "whatNext": "Wat gebeurt er nu:",
+    "reviewProfile": "We bekijken je profiel",
+    "getApproved": "Word binnen 24 uur goedgekeurd",
+    "startSelling": "Begin met het ontvangen van bestellingen",
+    "goToDashboard": "Ga naar Dashboard",
+    "yourRestaurant": "Jouw Restaurant",
+    "basedIn": "Gevestigd in"
+  },
+  "common": {
+    "loading": "Laden...",
+    "error": "Er ging iets mis",
+    "retry": "Probeer opnieuw",
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "confirm": "Bevestigen",
+    "selected": "Geselecteerd"
+  }
+}

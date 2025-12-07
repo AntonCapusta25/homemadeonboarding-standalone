@@ -2,6 +2,7 @@ import { StepLayout } from '../StepLayout';
 import { Truck, Store, Package, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ServiceType } from '@/types/onboarding';
+import { useTranslation } from 'react-i18next';
 
 interface ServiceTypeStepProps {
   value: ServiceType;
@@ -10,38 +11,40 @@ interface ServiceTypeStepProps {
   onPrevious: () => void;
 }
 
-const SERVICE_OPTIONS: { value: ServiceType; label: string; description: string; icon: React.ReactNode }[] = [
-  {
-    value: 'delivery',
-    label: 'Delivery only',
-    description: 'Customers order online, you deliver',
-    icon: <Truck className="w-6 h-6" />,
-  },
-  {
-    value: 'pickup',
-    label: 'Pickup only',
-    description: 'Customers come to collect their order',
-    icon: <Store className="w-6 h-6" />,
-  },
-  {
-    value: 'both',
-    label: 'Delivery & pickup',
-    description: 'Offer both options to your customers',
-    icon: <Package className="w-6 h-6" />,
-  },
-  {
-    value: 'unsure',
-    label: "I'm not sure yet",
-    description: "We'll help you decide later",
-    icon: <HelpCircle className="w-6 h-6" />,
-  },
-];
-
 export function ServiceTypeStep({ value, onChange, onNext, onPrevious }: ServiceTypeStepProps) {
+  const { t } = useTranslation();
+
+  const SERVICE_OPTIONS: { value: ServiceType; labelKey: string; descriptionKey: string; icon: React.ReactNode }[] = [
+    {
+      value: 'delivery',
+      labelKey: 'serviceType.delivery',
+      descriptionKey: 'serviceType.delivery',
+      icon: <Truck className="w-6 h-6" />,
+    },
+    {
+      value: 'pickup',
+      labelKey: 'serviceType.pickup',
+      descriptionKey: 'serviceType.pickup',
+      icon: <Store className="w-6 h-6" />,
+    },
+    {
+      value: 'both',
+      labelKey: 'serviceType.both',
+      descriptionKey: 'serviceType.both',
+      icon: <Package className="w-6 h-6" />,
+    },
+    {
+      value: 'unsure',
+      labelKey: 'serviceType.both',
+      descriptionKey: 'serviceType.both',
+      icon: <HelpCircle className="w-6 h-6" />,
+    },
+  ];
+
   return (
     <StepLayout
-      title="How do you want to sell?"
-      subtitle="You can always change this later in your dashboard."
+      title={t('serviceType.title')}
+      subtitle={t('serviceType.subtitle')}
       onNext={onNext}
       onPrevious={onPrevious}
     >
@@ -76,8 +79,7 @@ export function ServiceTypeStep({ value, onChange, onNext, onPrevious }: Service
               </div>
               
               <div className="flex-1">
-                <h3 className="font-display font-semibold text-foreground">{option.label}</h3>
-                <p className="text-sm text-muted-foreground">{option.description}</p>
+                <h3 className="font-display font-semibold text-foreground">{t(option.labelKey)}</h3>
               </div>
               
               <div className={cn(

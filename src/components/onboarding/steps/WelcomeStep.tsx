@@ -1,11 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { ChefHat, ArrowRight, Sparkles, Clock, Shield } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface WelcomeStepProps {
   onStart: () => void;
 }
 
 export function WelcomeStep({ onStart }: WelcomeStepProps) {
+  const { t } = useTranslation();
+  
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in px-4">
       <div className="mb-8 relative">
@@ -18,21 +21,21 @@ export function WelcomeStep({ onStart }: WelcomeStepProps) {
       </div>
 
       <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4 animate-slide-up">
-        Welcome to Homemade Chefs
+        {t('welcome.title')}
       </h1>
       
       <p className="text-xl text-muted-foreground mb-8 max-w-lg animate-slide-up" style={{ animationDelay: '0.1s' }}>
-        Launch your home restaurant in a few simple steps. You can always edit details later.
+        {t('welcome.subtitle')}
       </p>
 
       <div className="flex flex-wrap justify-center gap-6 mb-12 animate-slide-up" style={{ animationDelay: '0.2s' }}>
         <div className="flex items-center gap-2 text-muted-foreground">
           <Clock className="w-5 h-5 text-primary" />
-          <span>Takes ~5 minutes</span>
+          <span>~5 min</span>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <Shield className="w-5 h-5 text-forest" />
-          <span>Save & continue anytime</span>
+          <span>✓</span>
         </div>
       </div>
 
@@ -42,7 +45,7 @@ export function WelcomeStep({ onStart }: WelcomeStepProps) {
         className="animate-slide-up shadow-glow hover:shadow-medium"
         style={{ animationDelay: '0.3s' }}
       >
-        Start
+        {t('welcome.getStarted')}
         <ArrowRight className="w-5 h-5" />
       </Button>
     </div>
