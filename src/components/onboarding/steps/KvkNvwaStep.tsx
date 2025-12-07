@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { StepLayout } from '../StepLayout';
 import { Building2, AlertCircle, FileText, Upload, Check, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -61,15 +61,6 @@ export function KvkNvwaStep({ value, docsUrl, onChange, onNext, onPrevious }: Kv
     onChange(status, status === 'kvk_nvwa_both' ? docsUrl : undefined);
   };
 
-  // Auto-advance for simple options
-  useEffect(() => {
-    if (value && value !== 'kvk_nvwa_both') {
-      const timer = setTimeout(() => {
-        onNext();
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [value, onNext]);
 
   return (
     <StepLayout
