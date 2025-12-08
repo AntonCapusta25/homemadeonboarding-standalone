@@ -27,7 +27,7 @@ const Index = () => {
   }, [user, authLoading, profileLoading, hasCompletedOnboarding, navigate]);
 
   const handleGetStarted = () => {
-    navigate('/auth');
+    navigate('/onboarding');
   };
 
   const handleSignIn = () => {
