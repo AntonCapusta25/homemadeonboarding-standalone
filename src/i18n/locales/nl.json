@@ -268,6 +268,7 @@
     "description": "Korte beschrijving (optioneel)",
     "addAnother": "Nog een gerecht toevoegen",
     "saveMenu": "Menu opslaan",
+    "saving": "Opslaan...",
     "addAtLeastOne": "Voeg minimaal één gerecht toe met naam en prijs",
     "dishesSaved": "Menu opgeslagen!",
     "dishesAdded": "gerechten toegevoegd aan je menu",
@@ -276,7 +277,11 @@
     "findingSuppliers": "Leveranciers zoeken bij jou in de buurt...",
     "aiSuggestions": "AI Menu Suggesties",
     "yourMargin": "Je winstmarge",
-    "vsRestaurants": "vs. restaurantprijzen"
+    "vsRestaurants": "vs. restaurantprijzen",
+    "newDish": "Nieuw gerecht - wordt opgeslagen bij Opslaan",
+    "noMenuFound": "Geen menu gevonden. Voltooi eerst de onboarding.",
+    "errorDeleting": "Fout bij verwijderen gerecht",
+    "errorSaving": "Fout bij opslaan menu"
   },
   "common": {
     "loading": "Laden...",

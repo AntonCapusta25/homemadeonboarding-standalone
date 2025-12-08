@@ -34,9 +34,22 @@ function mapCategory(category: string | null): MenuDish['category'] {
   return 'main'; // default
 }
 
+export interface DashboardDish {
+  id: string;
+  name: string;
+  price: string;
+  description: string;
+  estimatedCost?: number;
+  margin?: number;
+  menuId?: string;
+  isNew?: boolean;
+  isDeleted?: boolean;
+}
+
 export function useMenu() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
 
   const saveMenu = useCallback(async (
     chefProfileId: string,
@@ -156,6 +169,136 @@ export function useMenu() {
     }
   }, []);
 
+  // Update a single dish optimistically (fires DB update in background)
+  const updateDish = useCallback(async (
+    dishId: string,
+    updates: { name?: string; price?: number; description?: string },
+    isNewDish: boolean = false
+  ): Promise<boolean> => {
+    // Skip DB update for new dishes that haven't been saved yet
+    if (isNewDish || dishId.startsWith('new-')) {
+      return true;
+    }
+
+    setPendingChanges(prev => new Set(prev).add(dishId));
+
+    try {
+      const { error } = await supabase
+        .from('dishes')
+        .update({
+          ...(updates.name !== undefined && { name: updates.name }),
+          ...(updates.price !== undefined && { price: updates.price }),
+          ...(updates.description !== undefined && { description: updates.description }),
+        })
+        .eq('id', dishId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating dish:', err);
+      return false;
+    } finally {
+      setPendingChanges(prev => {
+        const next = new Set(prev);
+        next.delete(dishId);
+        return next;
+      });
+    }
+  }, []);
+
+  // Add a new dish to the database
+  const addDish = useCallback(async (
+    menuId: string,
+    dish: { name: string; price: number; description: string },
+    sortOrder: number
+  ): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('dishes')
+        .insert({
+          menu_id: menuId,
+          name: dish.name,
+          price: dish.price,
+          description: dish.description,
+          sort_order: sortOrder,
+          is_upsell: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data.id;
+    } catch (err) {
+      console.error('Error adding dish:', err);
+      return null;
+    }
+  }, []);
+
+  // Delete a dish from the database
+  const deleteDish = useCallback(async (dishId: string): Promise<boolean> => {
+    // Skip for new dishes that haven't been saved
+    if (dishId.startsWith('new-')) {
+      return true;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('dishes')
+        .delete()
+        .eq('id', dishId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error deleting dish:', err);
+      return false;
+    }
+  }, []);
+
+  // Batch save all dishes (for manual save button)
+  const saveDishes = useCallback(async (
+    menuId: string,
+    dishes: DashboardDish[]
+  ): Promise<boolean> => {
+    setLoading(true);
+    
+    try {
+      // Process deletions
+      const deletedDishes = dishes.filter(d => d.isDeleted && !d.id.startsWith('new-'));
+      for (const dish of deletedDishes) {
+        await deleteDish(dish.id);
+      }
+
+      // Process new dishes
+      const newDishes = dishes.filter(d => d.isNew && d.name && d.price);
+      for (let i = 0; i < newDishes.length; i++) {
+        const dish = newDishes[i];
+        await addDish(menuId, {
+          name: dish.name,
+          price: parseFloat(dish.price) || 0,
+          description: dish.description,
+        }, dishes.length + i);
+      }
+
+      // Process updates for existing dishes
+      const existingDishes = dishes.filter(d => !d.isNew && !d.isDeleted && d.name && d.price);
+      for (const dish of existingDishes) {
+        await updateDish(dish.id, {
+          name: dish.name,
+          price: parseFloat(dish.price) || 0,
+          description: dish.description,
+        });
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Error saving dishes:', err);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [addDish, deleteDish, updateDish]);
+
   // Convert DB format to GeneratedMenu format for display
   const toGeneratedMenu = (menu: DbMenu, dishes: DbDish[]): GeneratedMenu => {
     const regularDishes = dishes.filter(d => !d.is_upsell);
@@ -185,7 +328,12 @@ export function useMenu() {
     saveMenu,
     loadActiveMenu,
     toGeneratedMenu,
+    updateDish,
+    addDish,
+    deleteDish,
+    saveDishes,
     loading,
     error,
+    pendingChanges,
   };
 }

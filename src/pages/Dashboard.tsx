@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Logo } from '@/components/Logo';
-import { Plus, Trash2, Package, ExternalLink, TrendingUp, Sparkles, ChevronDown, ChevronUp, Loader2, LogOut } from 'lucide-react';
+import { Plus, Trash2, Package, ExternalLink, TrendingUp, Sparkles, ChevronDown, ChevronUp, Loader2, LogOut, Check, Cloud } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,16 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { GeneratedMenu } from '@/types/onboarding';
 import { CoolLoader } from '@/components/dashboard/CoolLoader';
 import { useChefProfile } from '@/hooks/useChefProfile';
-import { useMenu } from '@/hooks/useMenu';
-
-interface Dish {
-  id: string;
-  name: string;
-  price: string;
-  description: string;
-  estimatedCost?: number;
-  margin?: number;
-}
+import { useMenu, DashboardDish } from '@/hooks/useMenu';
 
 interface Supplier {
   name: string;
@@ -35,14 +26,19 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { profile: dbProfile, loading: profileLoading } = useChefProfile();
   const { signOut } = useAuth();
-  const { loadActiveMenu, toGeneratedMenu, loading: menuLoading } = useMenu();
+  const { loadActiveMenu, toGeneratedMenu, updateDish, saveDishes, deleteDish, pendingChanges, loading: menuSaving } = useMenu();
   
-  const [dishes, setDishes] = useState<Dish[]>([{ id: '1', name: '', price: '', description: '' }]);
+  const [dishes, setDishes] = useState<DashboardDish[]>([{ id: 'new-1', name: '', price: '', description: '', isNew: true }]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [chefData, setChefData] = useState<{ logoUrl?: string; restaurantName?: string; city?: string; generatedMenu?: GeneratedMenu } | null>(null);
   const [showPackaging, setShowPackaging] = useState(false);
   const [packagingExpanded, setPackagingExpanded] = useState(false);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [savedStatus, setSavedStatus] = useState<Record<string, 'saving' | 'saved' | 'error'>>({});
+  
+  // Debounce timers for auto-save
+  const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -60,16 +56,20 @@ export default function Dashboard() {
       if (menuResult) {
         const generatedMenu = toGeneratedMenu(menuResult.menu, menuResult.dishes);
         newChefData.generatedMenu = generatedMenu;
+        setMenuId(menuResult.menu.id);
         
         // Pre-populate dishes from database menu
-        const dbDishes = menuResult.dishes.map((dish) => ({
-          id: dish.id,
-          name: dish.name,
-          price: dish.price.toString(),
-          description: dish.description || '',
-          estimatedCost: dish.estimated_cost || undefined,
-          margin: dish.margin || undefined
-        }));
+        const dbDishes: DashboardDish[] = menuResult.dishes
+          .filter(d => !d.is_upsell)
+          .map((dish) => ({
+            id: dish.id,
+            name: dish.name,
+            price: dish.price.toString(),
+            description: dish.description || '',
+            estimatedCost: dish.estimated_cost || undefined,
+            margin: dish.margin || undefined,
+            menuId: menuResult.menu.id,
+          }));
         
         if (dbDishes.length > 0) {
           setDishes(dbDishes);
@@ -81,6 +81,34 @@ export default function Dashboard() {
     
     loadData();
   }, [dbProfile, loadActiveMenu, toGeneratedMenu]);
+
+  // Debounced auto-save for dish updates
+  const debouncedSave = useCallback((dishId: string, updates: { name?: string; price?: number; description?: string }, isNew: boolean) => {
+    // Clear existing timer
+    if (debounceTimers.current[dishId]) {
+      clearTimeout(debounceTimers.current[dishId]);
+    }
+    
+    // Skip auto-save for new dishes
+    if (isNew) return;
+    
+    setSavedStatus(prev => ({ ...prev, [dishId]: 'saving' }));
+    
+    // Set new timer
+    debounceTimers.current[dishId] = setTimeout(async () => {
+      const success = await updateDish(dishId, updates);
+      setSavedStatus(prev => ({ ...prev, [dishId]: success ? 'saved' : 'error' }));
+      
+      // Clear saved status after 2 seconds
+      setTimeout(() => {
+        setSavedStatus(prev => {
+          const next = { ...prev };
+          delete next[dishId];
+          return next;
+        });
+      }, 2000);
+    }, 800);
+  }, [updateDish]);
 
   const fetchSuppliers = async (city: string) => {
     setLoadingSuppliers(true);
@@ -115,27 +143,85 @@ export default function Dashboard() {
   };
 
   const addDish = () => {
-    setDishes([...dishes, { id: Date.now().toString(), name: '', price: '', description: '' }]);
+    const newDish: DashboardDish = { 
+      id: `new-${Date.now()}`, 
+      name: '', 
+      price: '', 
+      description: '',
+      isNew: true 
+    };
+    setDishes([...dishes, newDish]);
   };
 
-  const updateDish = (id: string, field: keyof Dish, value: string) => {
+  const handleDishChange = (id: string, field: keyof DashboardDish, value: string) => {
+    // Optimistic update - immediately update UI
     setDishes(dishes.map(d => d.id === id ? { ...d, [field]: value } : d));
+    
+    // Find the dish to check if it's new
+    const dish = dishes.find(d => d.id === id);
+    const isNew = dish?.isNew || id.startsWith('new-');
+    
+    // Debounced background save
+    const updates: { name?: string; price?: number; description?: string } = {};
+    if (field === 'name') updates.name = value;
+    if (field === 'price') updates.price = parseFloat(value) || 0;
+    if (field === 'description') updates.description = value;
+    
+    debouncedSave(id, updates, isNew);
   };
 
-  const removeDish = (id: string) => {
+  const removeDish = async (id: string) => {
     if (dishes.length > 1) {
+      // Optimistic update
       setDishes(dishes.filter(d => d.id !== id));
+      
+      // Background delete (only for existing dishes)
+      if (!id.startsWith('new-')) {
+        const success = await deleteDish(id);
+        if (!success) {
+          toast({ title: t('dashboard.errorDeleting'), variant: 'destructive' });
+        }
+      }
     }
   };
 
-  const saveDishes = () => {
+  const handleSaveAll = async () => {
+    if (!menuId) {
+      toast({ title: t('dashboard.noMenuFound'), variant: 'destructive' });
+      return;
+    }
+    
     const validDishes = dishes.filter(d => d.name && d.price);
     if (validDishes.length === 0) {
       toast({ title: t('dashboard.addAtLeastOne'), variant: 'destructive' });
       return;
     }
-    localStorage.setItem('chefDishes', JSON.stringify(validDishes));
-    toast({ title: t('dashboard.dishesSaved'), description: `${validDishes.length} ${t('dashboard.dishesAdded')}` });
+    
+    const success = await saveDishes(menuId, dishes);
+    if (success) {
+      toast({ title: t('dashboard.dishesSaved'), description: `${validDishes.length} ${t('dashboard.dishesAdded')}` });
+      
+      // Reload to get proper IDs for new dishes
+      if (dbProfile) {
+        const menuResult = await loadActiveMenu(dbProfile.id);
+        if (menuResult) {
+          const dbDishes: DashboardDish[] = menuResult.dishes
+            .filter(d => !d.is_upsell)
+            .map((dish) => ({
+              id: dish.id,
+              name: dish.name,
+              price: dish.price.toString(),
+              description: dish.description || '',
+              estimatedCost: dish.estimated_cost || undefined,
+              margin: dish.margin || undefined,
+              menuId: menuResult.menu.id,
+            }));
+          setDishes(dbDishes);
+        }
+      }
+    } else {
+      toast({ title: t('dashboard.errorSaving'), variant: 'destructive' });
+    }
   };
 
   const avgMargin = chefData?.generatedMenu?.avgMargin;
@@ -212,20 +298,37 @@ export default function Dashboard() {
 
           <div className="space-y-4 mb-8">
             {dishes.map((dish, index) => (
-              <Card key={dish.id} className="p-4 animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
+              <Card 
+                key={dish.id} 
+                className={`p-4 animate-fade-in transition-all ${dish.isNew ? 'border-dashed border-primary/30' : ''}`} 
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
                 <div className="flex gap-4 items-start">
                   <div className="flex-1 space-y-3">
-                    <Input
-                      placeholder={t('dashboard.dishName')}
-                      value={dish.name}
-                      onChange={(e) => updateDish(dish.id, 'name', e.target.value)}
-                      className="font-medium"
-                    />
+                    <div className="relative">
+                      <Input
+                        placeholder={t('dashboard.dishName')}
+                        value={dish.name}
+                        onChange={(e) => handleDishChange(dish.id, 'name', e.target.value)}
+                        className="font-medium pr-8"
+                      />
+                      {/* Save status indicator */}
+                      {savedStatus[dish.id] === 'saving' && (
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                          <Cloud className="w-4 h-4 text-muted-foreground animate-pulse" />
+                        </div>
+                      )}
+                      {savedStatus[dish.id] === 'saved' && (
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                          <Check className="w-4 h-4 text-forest" />
+                        </div>
+                      )}
+                    </div>
                     <div className="flex gap-3">
                       <Input
                         placeholder={t('dashboard.price')}
                         value={dish.price}
-                        onChange={(e) => updateDish(dish.id, 'price', e.target.value)}
+                        onChange={(e) => handleDishChange(dish.id, 'price', e.target.value)}
                         className="w-28"
                         type="number"
                         step="0.50"
@@ -233,7 +336,7 @@ export default function Dashboard() {
                       <Input
                         placeholder={t('dashboard.description')}
                         value={dish.description}
-                        onChange={(e) => updateDish(dish.id, 'description', e.target.value)}
+                        onChange={(e) => handleDishChange(dish.id, 'description', e.target.value)}
                         className="flex-1"
                       />
                     </div>
@@ -242,6 +345,9 @@ export default function Dashboard() {
                         <span className="text-muted-foreground">{t('menu.cost')}: €{dish.estimatedCost?.toFixed(2)}</span>
                         <span className="text-forest font-medium">{dish.margin}% {t('menu.margin')}</span>
                       </div>
+                    )}
+                    {dish.isNew && (
+                      <span className="text-xs text-muted-foreground italic">{t('dashboard.newDish')}</span>
                     )}
                   </div>
                   <Button 
@@ -261,8 +367,15 @@ export default function Dashboard() {
             <Button variant="outline" onClick={addDish} className="gap-2">
               <Plus className="w-4 h-4" /> {t('dashboard.addAnother')}
             </Button>
-            <Button onClick={saveDishes} className="shadow-glow">
-              {t('dashboard.saveMenu')}
+            <Button onClick={handleSaveAll} className="shadow-glow" disabled={menuSaving}>
+              {menuSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  {t('dashboard.saving')}
+                </>
+              ) : (
+                t('dashboard.saveMenu')
+              )}
             </Button>
           </div>
         </section>
