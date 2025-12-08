@@ -136,6 +136,15 @@ export default function Dashboard() {
 
   const avgMargin = chefData?.generatedMenu?.avgMargin;
 
+  // Show loading state
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-soft">
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
