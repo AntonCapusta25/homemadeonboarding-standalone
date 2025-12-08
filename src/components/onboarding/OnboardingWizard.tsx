@@ -159,7 +159,7 @@ export function OnboardingWizard() {
       setPendingProfileId(profileId);
 
       // Call edge function to create account and send magic link
-      const redirectTo = `${window.location.origin}/dashboard`;
+      const redirectTo = `${window.location.origin}/summary`;
       
       const { data, error } = await supabase.functions.invoke('create-chef-account', {
         body: {
@@ -197,7 +197,7 @@ export function OnboardingWizard() {
     
     setResending(true);
     try {
-      const redirectTo = `${window.location.origin}/dashboard`;
+      const redirectTo = `${window.location.origin}/summary`;
       
       const { error } = await supabase.functions.invoke('create-chef-account', {
         body: {
