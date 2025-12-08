@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/hooks/useAuth';
+import { useChefProfile } from '@/hooks/useChefProfile';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, ChefHat, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
@@ -18,9 +19,11 @@ const authSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading: authLoading, signUp, signIn, role } = useAuth();
+  const { hasCompletedOnboarding, loading: profileLoading } = useChefProfile();
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(searchParams.get('mode') !== 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -29,14 +32,16 @@ export default function Auth() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && !profileLoading) {
       if (role === 'admin') {
         navigate('/admin');
-      } else {
+      } else if (hasCompletedOnboarding) {
         navigate('/dashboard');
+      } else {
+        navigate('/onboarding');
       }
     }
-  }, [user, authLoading, role, navigate]);
+  }, [user, authLoading, profileLoading, role, hasCompletedOnboarding, navigate]);
 
   const validateForm = () => {
     try {
@@ -142,7 +147,7 @@ export default function Auth() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-soft">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
