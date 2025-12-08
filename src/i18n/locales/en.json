@@ -268,6 +268,7 @@
     "description": "Short description (optional)",
     "addAnother": "Add another dish",
     "saveMenu": "Save menu",
+    "saving": "Saving...",
     "addAtLeastOne": "Add at least one dish with a name and price",
     "dishesSaved": "Menu saved!",
     "dishesAdded": "dishes added to your menu",
@@ -276,7 +277,11 @@
     "findingSuppliers": "Finding suppliers near you...",
     "aiSuggestions": "AI Menu Suggestions",
     "yourMargin": "Your profit margin",
-    "vsRestaurants": "vs. restaurant prices"
+    "vsRestaurants": "vs. restaurant prices",
+    "newDish": "New dish - will be saved when you click Save",
+    "noMenuFound": "No menu found. Please complete onboarding first.",
+    "errorDeleting": "Error deleting dish",
+    "errorSaving": "Error saving menu"
   },
   "common": {
     "loading": "Loading...",
