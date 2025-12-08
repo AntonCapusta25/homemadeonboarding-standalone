@@ -1,4 +1,9 @@
 {
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out"
+  },
   "congrats": {
     "title": "Congratulations!",
     "subtitle": "Your profile is complete!",
