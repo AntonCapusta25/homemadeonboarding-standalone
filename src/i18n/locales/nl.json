@@ -1,4 +1,9 @@
 {
+  "auth": {
+    "signIn": "Inloggen",
+    "signUp": "Registreren",
+    "signOut": "Uitloggen"
+  },
   "congrats": {
     "title": "Gefeliciteerd!",
     "subtitle": "Je profiel is compleet!",

@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Logo } from '@/components/Logo';
-import { Plus, Trash2, Package, ExternalLink, TrendingUp, Sparkles, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Package, ExternalLink, TrendingUp, Sparkles, ChevronDown, ChevronUp, Loader2, LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { profile: dbProfile, loading: profileLoading } = useChefProfile();
+  const { signOut } = useAuth();
   
   const [dishes, setDishes] = useState<Dish[]>([{ id: '1', name: '', price: '', description: '' }]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -150,7 +152,21 @@ export default function Dashboard() {
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Logo chefLogo={chefData?.logoUrl} size="sm" />
-          <span className="text-sm text-muted-foreground">{chefData?.restaurantName}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">{chefData?.restaurantName}</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={async () => {
+                await signOut();
+                navigate('/auth');
+              }}
+              className="gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="w-4 h-4" />
+              {t('auth.signOut')}
+            </Button>
+          </div>
         </div>
       </header>
 
