@@ -108,7 +108,22 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
       if (fetchError) throw fetchError;
 
-      setChefs(data || []);
+      // Deduplicate by contact_email - keep only the most recent profile per email
+      const deduplicatedChefs = (data || []).reduce((acc: ChefWithStats[], chef) => {
+        if (!chef.contact_email) {
+          acc.push(chef);
+          return acc;
+        }
+        const existingIndex = acc.findIndex(c => c.contact_email === chef.contact_email);
+        if (existingIndex === -1) {
+          acc.push(chef);
+        } else if (new Date(chef.created_at) > new Date(acc[existingIndex].created_at)) {
+          acc[existingIndex] = chef;
+        }
+        return acc;
+      }, []);
+
+      setChefs(deduplicatedChefs);
       setTotalCount(count || 0);
 
       // Fetch analytics
