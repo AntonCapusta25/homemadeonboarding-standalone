@@ -177,11 +177,12 @@
     "subtitle": "Je koksprofiel aanmaken...",
     "creating": "Je restaurant opzetten...",
     "generatingMenu": "Je persoonlijke menu maken met AI...",
-    "ready": "Je profiel is klaar!",
+    "ready": "Bijna klaar!",
     "whatNext": "Wat gebeurt er nu:",
     "reviewProfile": "We bekijken je profiel",
     "getApproved": "Word binnen 24 uur goedgekeurd",
     "startSelling": "Begin met het ontvangen van bestellingen",
+    "complete": "Profiel voltooien",
     "goToDashboard": "Voeg je gerechten toe",
     "yourRestaurant": "Jouw Restaurant",
     "basedIn": "Gevestigd in",
@@ -227,6 +228,15 @@
     "margin": "marge",
     "cheaper": "goedkoper dan restaurants",
     "editMenu": "Menu bewerken in dashboard"
+  },
+  "congrats": {
+    "title": "Gefeliciteerd!",
+    "subtitle": "Je profiel is compleet!",
+    "whatsNext": "Wat nu?",
+    "step1": "Bekijk en pas je AI-gegenereerde menu aan",
+    "step2": "Stel je prijzen en beschikbaarheid in",
+    "step3": "Begin met het ontvangen van bestellingen!",
+    "goToDashboard": "Naar Dashboard"
   },
   "disclaimer": {
     "ip": "Logo & menu ontwerpen zijn Home-Made-Chef eigendom. Gebruik vereist actief lidmaatschap.",

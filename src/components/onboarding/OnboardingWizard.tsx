@@ -5,7 +5,6 @@ import { useChefProfile } from '@/hooks/useChefProfile';
 import { useAuth } from '@/hooks/useAuth';
 import { ProgressBar } from './ProgressBar';
 import { Logo } from '@/components/Logo';
-import { WelcomeStep } from './steps/WelcomeStep';
 import { CityStep } from './steps/CityStep';
 import { CuisineStep } from './steps/CuisineStep';
 import { ContactStep } from './steps/ContactStep';
@@ -19,6 +18,7 @@ import { FoodSafetyStep } from './steps/FoodSafetyStep';
 import { KvkNvwaStep } from './steps/KvkNvwaStep';
 import { PlanStep } from './steps/PlanStep';
 import { SummaryStep } from './steps/SummaryStep';
+import { CongratsStep } from './steps/CongratsStep';
 import { Loader2 } from 'lucide-react';
 
 export function OnboardingWizard() {
@@ -26,6 +26,7 @@ export function OnboardingWizard() {
   const { user, loading: authLoading } = useAuth();
   const { profile: dbProfile, loading: profileLoading, hasCompletedOnboarding, createProfile } = useChefProfile();
   const [saving, setSaving] = useState(false);
+  const [showCongrats, setShowCongrats] = useState(false);
   
   const {
     currentStep,
@@ -47,10 +48,8 @@ export function OnboardingWizard() {
     }
   }, [authLoading, profileLoading, hasCompletedOnboarding, navigate]);
 
-  const handleGoToDashboard = async () => {
+  const handleCompleteOnboarding = async () => {
     if (!user) {
-      // If not logged in, save to localStorage and go to auth
-      localStorage.setItem('chefProfile', JSON.stringify(profile));
       navigate('/auth');
       return;
     }
@@ -64,11 +63,16 @@ export function OnboardingWizard() {
         clearOnboardingProgress();
         // Also save to localStorage for dashboard to use generated menu
         localStorage.setItem('chefProfile', JSON.stringify(profile));
-        navigate('/dashboard');
+        // Show congrats screen
+        setShowCongrats(true);
       }
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleGoToDashboard = () => {
+    navigate('/dashboard');
   };
 
   const handleBookCall = () => {
@@ -84,10 +88,17 @@ export function OnboardingWizard() {
     );
   }
 
+  // Show congrats screen after successful save
+  if (showCongrats) {
+    return <CongratsStep profile={profile} onGoToDashboard={handleGoToDashboard} />;
+  }
+
   const renderStep = () => {
     switch (currentStep) {
       case 'welcome':
-        return <WelcomeStep onStart={goToNext} />;
+        // Skip welcome step since we have a landing page now
+        goToNext();
+        return null;
       
       case 'city':
         return (
@@ -228,7 +239,7 @@ export function OnboardingWizard() {
         return (
           <SummaryStep
             profile={profile}
-            onGoToDashboard={handleGoToDashboard}
+            onComplete={handleCompleteOnboarding}
             onBookCall={handleBookCall}
             onUpdateProfile={updateProfile}
             saving={saving}
@@ -240,7 +251,9 @@ export function OnboardingWizard() {
     }
   };
 
-  const showProgress = !isFirstStep && !isLastStep;
+  // Calculate progress excluding welcome step
+  const showProgress = currentStep !== 'welcome';
+  const adjustedProgress = currentStep === 'welcome' ? 0 : progress;
 
   return (
     <div className="min-h-screen bg-gradient-soft">
@@ -253,7 +266,7 @@ export function OnboardingWizard() {
         {showProgress && (
           <div className="mb-8 animate-fade-in">
             <ProgressBar
-              progress={progress}
+              progress={adjustedProgress}
               currentStep={displayStepNumber}
               totalSteps={totalSteps}
             />

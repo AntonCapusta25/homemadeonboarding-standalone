@@ -1,22 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
-import { Check, Square, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, UtensilsCrossed, CircleCheck, Circle } from 'lucide-react';
+import { Check, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, UtensilsCrossed, CircleCheck, Circle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { fireCelebration } from '@/components/confetti';
 import { supabase } from '@/integrations/supabase/client';
 import { MenuPreview } from '@/components/menu/MenuPreview';
-import { clearOnboardingProgress } from '@/hooks/useOnboarding';
 
 interface SummaryStepProps { 
   profile: ChefProfile; 
-  onGoToDashboard: () => void; 
+  onComplete: () => void; 
   onBookCall: () => void;
   onUpdateProfile?: (updates: Partial<ChefProfile>) => void;
   saving?: boolean;
 }
 
-export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProfile, saving = false }: SummaryStepProps) {
+export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, saving = false }: SummaryStepProps) {
   const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(true);
   const [showContent, setShowContent] = useState(false);
@@ -90,10 +89,8 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
     { label: t('summary.pending.goLive'), done: false },
   ];
 
-  const handleGoToDashboard = () => {
-    // Clear onboarding progress since it's complete
-    clearOnboardingProgress();
-    onGoToDashboard();
+  const handleComplete = () => {
+    onComplete();
   };
 
   if (isCreating) {
@@ -191,7 +188,7 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
             </div>
             <p className="text-sm text-muted-foreground">{generatedMenu.summary}</p>
           </div>
-          <MenuPreview menu={generatedMenu} compact onEdit={handleGoToDashboard} />
+          <MenuPreview menu={generatedMenu} compact onEdit={handleComplete} />
         </div>
       )}
 
@@ -215,7 +212,7 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-        <Button size="xl" onClick={handleGoToDashboard} className="shadow-glow" disabled={saving}>
+        <Button size="xl" onClick={handleComplete} className="shadow-glow" disabled={saving}>
           {saving ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -223,7 +220,7 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
             </>
           ) : (
             <>
-              {t('summary.goToDashboard')} 🚀
+              {t('summary.complete')} 🚀
               <ArrowRight className="w-5 h-5" />
             </>
           )}

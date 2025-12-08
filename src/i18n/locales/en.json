@@ -177,11 +177,12 @@
     "subtitle": "Creating your chef profile...",
     "creating": "Setting up your restaurant...",
     "generatingMenu": "Creating your personalized menu with AI...",
-    "ready": "Your profile is ready!",
+    "ready": "Almost there!",
     "whatNext": "What happens next:",
     "reviewProfile": "We'll review your profile",
     "getApproved": "Get approved within 24 hours",
     "startSelling": "Start receiving orders",
+    "complete": "Complete Profile",
     "goToDashboard": "Add your dishes",
     "yourRestaurant": "Your Restaurant",
     "basedIn": "Based in",
@@ -227,6 +228,15 @@
     "margin": "margin",
     "cheaper": "cheaper than restaurants",
     "editMenu": "Edit menu in dashboard"
+  },
+  "congrats": {
+    "title": "Congratulations!",
+    "subtitle": "Your profile is complete!",
+    "whatsNext": "What's next?",
+    "step1": "Review and customize your AI-generated menu",
+    "step2": "Set your dish prices and availability",
+    "step3": "Start receiving orders from customers!",
+    "goToDashboard": "Go to Dashboard"
   },
   "disclaimer": {
     "ip": "Logo & menu designs are Home-Made-Chef IP. Use requires active membership.",
