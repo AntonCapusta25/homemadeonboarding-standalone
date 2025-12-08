@@ -5,12 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Logo } from '@/components/Logo';
-import { Plus, Trash2, Package, ExternalLink, TrendingUp, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Package, ExternalLink, TrendingUp, Sparkles, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { GeneratedMenu } from '@/types/onboarding';
 import { CoolLoader } from '@/components/dashboard/CoolLoader';
+import { useChefProfile } from '@/hooks/useChefProfile';
 
 interface Dish {
   id: string;
@@ -30,6 +31,8 @@ interface Supplier {
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { profile: dbProfile, loading: profileLoading } = useChefProfile();
+  
   const [dishes, setDishes] = useState<Dish[]>([{ id: '1', name: '', price: '', description: '' }]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
@@ -38,11 +41,27 @@ export default function Dashboard() {
   const [packagingExpanded, setPackagingExpanded] = useState(false);
 
   useEffect(() => {
-    // Load chef data from localStorage
+    // First try to load from database profile
+    if (dbProfile) {
+      setChefData({
+        logoUrl: dbProfile.logo_url || undefined,
+        restaurantName: dbProfile.business_name || undefined,
+        city: dbProfile.city || undefined,
+      });
+    }
+    
+    // Also check localStorage for generated menu (not stored in DB yet)
     const savedProfile = localStorage.getItem('chefProfile');
     if (savedProfile) {
       const profile = JSON.parse(savedProfile);
-      setChefData(profile);
+      
+      // Merge with DB data, preferring DB for core fields
+      setChefData(prev => ({
+        logoUrl: prev?.logoUrl || profile.logoUrl,
+        restaurantName: prev?.restaurantName || profile.restaurantName,
+        city: prev?.city || profile.city,
+        generatedMenu: profile.generatedMenu, // Only from localStorage for now
+      }));
       
       // Pre-populate dishes from AI-generated menu
       if (profile.generatedMenu?.dishes && profile.generatedMenu.dishes.length > 0) {
@@ -57,7 +76,7 @@ export default function Dashboard() {
         setDishes(aiDishes);
       }
     }
-  }, []);
+  }, [dbProfile]);
 
   const fetchSuppliers = async (city: string) => {
     setLoadingSuppliers(true);

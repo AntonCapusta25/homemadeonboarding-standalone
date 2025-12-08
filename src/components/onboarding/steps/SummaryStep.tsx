@@ -13,9 +13,10 @@ interface SummaryStepProps {
   onGoToDashboard: () => void; 
   onBookCall: () => void;
   onUpdateProfile?: (updates: Partial<ChefProfile>) => void;
+  saving?: boolean;
 }
 
-export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProfile }: SummaryStepProps) {
+export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProfile, saving = false }: SummaryStepProps) {
   const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(true);
   const [showContent, setShowContent] = useState(false);
@@ -214,11 +215,20 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-        <Button size="xl" onClick={handleGoToDashboard} className="shadow-glow">
-          {t('summary.goToDashboard')} 🚀
-          <ArrowRight className="w-5 h-5" />
+        <Button size="xl" onClick={handleGoToDashboard} className="shadow-glow" disabled={saving}>
+          {saving ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              Saving...
+            </>
+          ) : (
+            <>
+              {t('summary.goToDashboard')} 🚀
+              <ArrowRight className="w-5 h-5" />
+            </>
+          )}
         </Button>
-        <Button size="lg" variant="outline" onClick={onBookCall} className="gap-2">
+        <Button size="lg" variant="outline" onClick={onBookCall} className="gap-2" disabled={saving}>
           <Phone className="w-4 h-4" />{t('summary.bookCall')}
         </Button>
       </div>
