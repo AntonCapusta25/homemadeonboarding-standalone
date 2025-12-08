@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { fireCelebration } from '@/components/confetti';
 import { supabase } from '@/integrations/supabase/client';
 import { MenuPreview } from '@/components/menu/MenuPreview';
+import { useMenu } from '@/hooks/useMenu';
+import { useChefProfile } from '@/hooks/useChefProfile';
 
 interface SummaryStepProps { 
   profile: ChefProfile; 
@@ -21,6 +23,8 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
   const [showContent, setShowContent] = useState(false);
   const [menuLoading, setMenuLoading] = useState(true);
   const [generatedMenu, setGeneratedMenu] = useState(profile.generatedMenu);
+  const { saveMenu } = useMenu();
+  const { profile: dbProfile } = useChefProfile();
 
   useEffect(() => { 
     const generateMenu = async () => {
@@ -43,12 +47,10 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
           if (onUpdateProfile) {
             onUpdateProfile({ generatedMenu: data.menu });
           }
-          // Save to localStorage
-          const savedProfile = localStorage.getItem('chefProfile');
-          if (savedProfile) {
-            const parsed = JSON.parse(savedProfile);
-            parsed.generatedMenu = data.menu;
-            localStorage.setItem('chefProfile', JSON.stringify(parsed));
+          
+          // Save menu to database if we have the chef profile
+          if (dbProfile?.id) {
+            await saveMenu(dbProfile.id, data.menu);
           }
         }
       } catch (err) {
@@ -66,7 +68,7 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
       setTimeout(() => setShowContent(true), 200); 
     }, 2500); 
     return () => clearTimeout(timer); 
-  }, []);
+  }, [dbProfile?.id]);
 
   // Summary of completed steps
   const completedItems = [

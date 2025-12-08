@@ -13,6 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { GeneratedMenu } from '@/types/onboarding';
 import { CoolLoader } from '@/components/dashboard/CoolLoader';
 import { useChefProfile } from '@/hooks/useChefProfile';
+import { useMenu } from '@/hooks/useMenu';
 
 interface Dish {
   id: string;
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { profile: dbProfile, loading: profileLoading } = useChefProfile();
   const { signOut } = useAuth();
+  const { loadActiveMenu, toGeneratedMenu, loading: menuLoading } = useMenu();
   
   const [dishes, setDishes] = useState<Dish[]>([{ id: '1', name: '', price: '', description: '' }]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -43,42 +45,42 @@ export default function Dashboard() {
   const [packagingExpanded, setPackagingExpanded] = useState(false);
 
   useEffect(() => {
-    // First try to load from database profile
-    if (dbProfile) {
-      setChefData({
+    const loadData = async () => {
+      if (!dbProfile) return;
+      
+      // Set chef data from DB profile
+      const newChefData: typeof chefData = {
         logoUrl: dbProfile.logo_url || undefined,
         restaurantName: dbProfile.business_name || undefined,
         city: dbProfile.city || undefined,
-      });
-    }
-    
-    // Also check localStorage for generated menu (not stored in DB yet)
-    const savedProfile = localStorage.getItem('chefProfile');
-    if (savedProfile) {
-      const profile = JSON.parse(savedProfile);
+      };
       
-      // Merge with DB data, preferring DB for core fields
-      setChefData(prev => ({
-        logoUrl: prev?.logoUrl || profile.logoUrl,
-        restaurantName: prev?.restaurantName || profile.restaurantName,
-        city: prev?.city || profile.city,
-        generatedMenu: profile.generatedMenu, // Only from localStorage for now
-      }));
-      
-      // Pre-populate dishes from AI-generated menu
-      if (profile.generatedMenu?.dishes && profile.generatedMenu.dishes.length > 0) {
-        const aiDishes = profile.generatedMenu.dishes.map((dish: any, idx: number) => ({
-          id: `ai-${idx}`,
+      // Load menu from database
+      const menuResult = await loadActiveMenu(dbProfile.id);
+      if (menuResult) {
+        const generatedMenu = toGeneratedMenu(menuResult.menu, menuResult.dishes);
+        newChefData.generatedMenu = generatedMenu;
+        
+        // Pre-populate dishes from database menu
+        const dbDishes = menuResult.dishes.map((dish) => ({
+          id: dish.id,
           name: dish.name,
           price: dish.price.toString(),
-          description: dish.description,
-          estimatedCost: dish.estimatedCost,
-          margin: dish.margin
+          description: dish.description || '',
+          estimatedCost: dish.estimated_cost || undefined,
+          margin: dish.margin || undefined
         }));
-        setDishes(aiDishes);
+        
+        if (dbDishes.length > 0) {
+          setDishes(dbDishes);
+        }
       }
-    }
-  }, [dbProfile]);
+      
+      setChefData(newChefData);
+    };
+    
+    loadData();
+  }, [dbProfile, loadActiveMenu, toGeneratedMenu]);
 
   const fetchSuppliers = async (city: string) => {
     setLoadingSuppliers(true);
