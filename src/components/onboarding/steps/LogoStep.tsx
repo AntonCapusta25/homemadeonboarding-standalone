@@ -29,6 +29,40 @@ export function LogoStep({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Helper to upload base64 to storage and get public URL
+  const uploadToStorage = async (base64Data: string, fileType: 'png' | 'svg' | 'jpg'): Promise<string | null> => {
+    try {
+      const fileName = `${Date.now()}-${restaurantName.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.${fileType}`;
+      const filePath = `onboarding/${fileName}`;
+      
+      // Convert base64 to blob
+      const base64Response = await fetch(base64Data);
+      const blob = await base64Response.blob();
+      
+      const { data, error } = await supabase.storage
+        .from('logos')
+        .upload(filePath, blob, {
+          contentType: `image/${fileType === 'svg' ? 'svg+xml' : fileType}`,
+          upsert: true
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return null;
+      }
+
+      // Get public URL
+      const { data: publicUrl } = supabase.storage
+        .from('logos')
+        .getPublicUrl(data.path);
+
+      return publicUrl.publicUrl;
+    } catch (err) {
+      console.error('Upload to storage failed:', err);
+      return null;
+    }
+  };
+
   const generateLogo = async () => {
     setIsGenerating(true);
     try {
@@ -39,25 +73,48 @@ export function LogoStep({
           tagline: chefName ? `By Chef ${chefName}` : undefined,
           logoStyle: 'modern minimal',
           primaryColor: '#C65D3B',
-          secondaryColor: '#F2A35E'
+          secondaryColor: '#F2A35E',
+          uploadToStorage: true,
+          storageBucket: 'logos',
+          storagePath: `generated/${Date.now()}-${restaurantName.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.png`,
+          publicUrl: true
         }
       });
-      if (error) { generatePlaceholderLogo(); return; }
-      // Handle both base64 response and logoUrl response
-      const logoData = data?.base64 
-        ? `data:image/${data.type === 'svg' ? 'svg+xml' : 'png'};base64,${data.base64}`
-        : data?.logoUrl;
+
+      if (error) { 
+        console.error('Logo generation error:', error);
+        generatePlaceholderLogo(); 
+        return; 
+      }
+
+      // Prefer uploaded URL if available, otherwise use base64
+      let logoData: string | null = null;
+      
+      if (data?.uploaded?.url) {
+        logoData = data.uploaded.url;
+      } else if (data?.base64) {
+        // Upload base64 to storage
+        const dataUrl = `data:image/${data.type === 'svg' ? 'svg+xml' : 'png'};base64,${data.base64}`;
+        logoData = await uploadToStorage(dataUrl, data.type === 'svg' ? 'svg' : 'png') || dataUrl;
+      }
+
       if (logoData) { 
         setGeneratedLogo(logoData); 
         onChange(logoData, 'ai');
         fireConfetti();
+        toast({ title: "Logo generated!", description: "Your brand logo is ready" });
+      } else { 
+        generatePlaceholderLogo(); 
       }
-      else { generatePlaceholderLogo(); }
-    } catch { generatePlaceholderLogo(); }
-    finally { setIsGenerating(false); }
+    } catch (err) { 
+      console.error('Logo generation failed:', err);
+      generatePlaceholderLogo(); 
+    } finally { 
+      setIsGenerating(false); 
+    }
   };
 
-  const generatePlaceholderLogo = () => {
+  const generatePlaceholderLogo = async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 200; canvas.height = 200;
     const ctx = canvas.getContext('2d');
@@ -71,21 +128,40 @@ export function LogoStep({
       ctx.fillText(initials || 'HC', 100, 100);
     }
     const logoDataUrl = canvas.toDataURL('image/png');
-    setGeneratedLogo(logoDataUrl); 
-    onChange(logoDataUrl, 'ai');
+    
+    // Try to upload placeholder to storage
+    const storedUrl = await uploadToStorage(logoDataUrl, 'png');
+    const finalUrl = storedUrl || logoDataUrl;
+    
+    setGeneratedLogo(finalUrl); 
+    onChange(finalUrl, 'ai');
     fireConfetti();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { toast({ title: "File too large", variant: "destructive" }); return; }
+      if (file.size > 5 * 1024 * 1024) { 
+        toast({ title: "File too large", description: "Maximum file size is 5MB", variant: "destructive" }); 
+        return; 
+      }
+      
       const reader = new FileReader();
-      reader.onload = (event) => { 
-        setUploadedFile(file); 
-        setGeneratedLogo(null); 
-        onChange(event.target?.result as string, 'upload'); 
+      reader.onload = async (event) => { 
+        const base64Data = event.target?.result as string;
+        setUploadedFile(file);
+        setGeneratedLogo(null);
+        
+        // Upload to storage
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const normalizedExt = fileExt === 'jpeg' ? 'jpg' : (fileExt as 'png' | 'jpg' | 'svg') || 'png';
+        const storedUrl = await uploadToStorage(base64Data, normalizedExt);
+        const finalUrl = storedUrl || base64Data;
+        
+        onChange(finalUrl, 'upload'); 
+        setGeneratedLogo(finalUrl);
         fireConfetti();
+        toast({ title: "Logo uploaded!", description: "Your logo has been saved" });
       };
       reader.readAsDataURL(file);
     }
@@ -144,7 +220,7 @@ export function LogoStep({
                 <input ref={fileInputRef} type="file" accept=".png,.jpg,.jpeg,.svg" onChange={handleFileChange} className="hidden" />
                 {uploadedFile && method === 'upload' ? (
                   <div className="flex items-center gap-4">
-                    {logoUrl && <img src={logoUrl} alt="Uploaded logo" className="w-20 h-20 rounded-xl shadow-soft object-cover" />}
+                    {currentLogo && <img src={currentLogo} alt="Uploaded logo" className="w-20 h-20 rounded-xl shadow-soft object-cover" />}
                     <button onClick={() => fileInputRef.current?.click()} className="text-primary hover:underline text-sm">Replace</button>
                   </div>
                 ) : (
