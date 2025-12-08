@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useOnboarding } from '@/hooks/useOnboarding';
+import { useOnboarding, clearOnboardingProgress } from '@/hooks/useOnboarding';
+import { useChefProfile } from '@/hooks/useChefProfile';
+import { useAuth } from '@/hooks/useAuth';
 import { ProgressBar } from './ProgressBar';
 import { Logo } from '@/components/Logo';
 import { WelcomeStep } from './steps/WelcomeStep';
@@ -16,9 +19,14 @@ import { FoodSafetyStep } from './steps/FoodSafetyStep';
 import { KvkNvwaStep } from './steps/KvkNvwaStep';
 import { PlanStep } from './steps/PlanStep';
 import { SummaryStep } from './steps/SummaryStep';
+import { Loader2 } from 'lucide-react';
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { profile: dbProfile, loading: profileLoading, hasCompletedOnboarding, createProfile } = useChefProfile();
+  const [saving, setSaving] = useState(false);
+  
   const {
     currentStep,
     displayStepNumber,
@@ -32,15 +40,49 @@ export function OnboardingWizard() {
     isLastStep,
   } = useOnboarding();
 
-  const handleGoToDashboard = () => {
-    // Save profile to localStorage for dashboard
-    localStorage.setItem('chefProfile', JSON.stringify(profile));
-    navigate('/dashboard');
+  // Redirect to dashboard if already completed onboarding
+  useEffect(() => {
+    if (!authLoading && !profileLoading && hasCompletedOnboarding) {
+      navigate('/dashboard');
+    }
+  }, [authLoading, profileLoading, hasCompletedOnboarding, navigate]);
+
+  const handleGoToDashboard = async () => {
+    if (!user) {
+      // If not logged in, save to localStorage and go to auth
+      localStorage.setItem('chefProfile', JSON.stringify(profile));
+      navigate('/auth');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Save to database
+      const savedProfile = await createProfile(profile);
+      if (savedProfile) {
+        // Clear localStorage onboarding progress
+        clearOnboardingProgress();
+        // Also save to localStorage for dashboard to use generated menu
+        localStorage.setItem('chefProfile', JSON.stringify(profile));
+        navigate('/dashboard');
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleBookCall = () => {
     window.open('https://calendly.com', '_blank');
   };
+
+  // Show loading while checking auth/profile status
+  if (authLoading || profileLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const renderStep = () => {
     switch (currentStep) {
@@ -188,6 +230,8 @@ export function OnboardingWizard() {
             profile={profile}
             onGoToDashboard={handleGoToDashboard}
             onBookCall={handleBookCall}
+            onUpdateProfile={updateProfile}
+            saving={saving}
           />
         );
       
