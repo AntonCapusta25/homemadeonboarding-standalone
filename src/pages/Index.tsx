@@ -30,10 +30,6 @@ const Index = () => {
     navigate('/onboarding');
   };
 
-  const handleSignIn = () => {
-    navigate('/auth?mode=login');
-  };
-
   // Show loading while checking auth
   if (authLoading || profileLoading) {
     return (
@@ -91,12 +87,12 @@ const Index = () => {
             </div>
 
             <p className="mt-6 text-sm text-muted-foreground animate-slide-up" style={{ animationDelay: '0.4s' }}>
-              {t('welcome.alreadyHaveAccount', 'Already signed up?')}{' '}
+              {t('welcome.alreadyHaveAccount', 'Already a chef?')}{' '}
               <button 
-                onClick={handleSignIn}
+                onClick={handleGetStarted}
                 className="text-primary hover:underline font-medium"
               >
-                {t('welcome.signIn', 'Request login link')}
+                {t('welcome.signIn', 'Continue your journey')}
               </button>
             </p>
           </div>
