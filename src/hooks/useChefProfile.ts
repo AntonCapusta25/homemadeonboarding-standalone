@@ -83,13 +83,8 @@ export function useChefProfile() {
     }
   }, [authLoading, fetchProfile]);
 
-  const createProfile = useCallback(async (onboardingData: OnboardingChefProfile) => {
+  const saveProgress = useCallback(async (onboardingData: OnboardingChefProfile, completed: boolean = false) => {
     if (!user) {
-      toast({ 
-        title: 'Not logged in', 
-        description: 'Please log in to save your profile',
-        variant: 'destructive' 
-      });
       return null;
     }
 
@@ -99,7 +94,7 @@ export function useChefProfile() {
         business_name: onboardingData.restaurantName || null,
         chef_name: `${onboardingData.firstName || ''} ${onboardingData.lastName || ''}`.trim() || null,
         city: onboardingData.city || null,
-        address: `${onboardingData.streetAddress || ''}, ${onboardingData.zipCode || ''} ${onboardingData.city || ''}`.trim() || null,
+        address: onboardingData.streetAddress ? `${onboardingData.streetAddress}, ${onboardingData.zipCode || ''} ${onboardingData.city || ''}`.trim() : null,
         cuisines: onboardingData.primaryCuisines || [],
         dish_types: onboardingData.dishTypes || [],
         availability: onboardingData.availabilityBuckets || [],
@@ -107,10 +102,10 @@ export function useChefProfile() {
         contact_phone: onboardingData.phone || null,
         logo_url: onboardingData.logoUrl || null,
         service_type: onboardingData.serviceType || 'unsure',
-        food_safety_status: mapFoodSafetyStatus(onboardingData.foodSafetyStatus),
-        kvk_status: mapKvkStatus(onboardingData.kvkStatus),
-        plan: mapPlanType(onboardingData.plan),
-        onboarding_completed: true,
+        food_safety_status: onboardingData.foodSafetyStatus ? mapFoodSafetyStatus(onboardingData.foodSafetyStatus) : null,
+        kvk_status: onboardingData.kvkStatus ? mapKvkStatus(onboardingData.kvkStatus) : null,
+        plan: onboardingData.plan ? mapPlanType(onboardingData.plan) : null,
+        onboarding_completed: completed,
       };
 
       const { data, error } = await supabase
@@ -125,22 +120,35 @@ export function useChefProfile() {
       if (error) throw error;
       
       setProfile(data);
+      return data;
+    } catch (err) {
+      console.error('Error saving chef profile progress:', err);
+      return null;
+    }
+  }, [user]);
+
+  const createProfile = useCallback(async (onboardingData: OnboardingChefProfile) => {
+    const result = await saveProgress(onboardingData, true);
+    if (result) {
       toast({ 
         title: 'Profile saved!', 
         description: 'Your chef profile has been created successfully.' 
       });
-      
-      return data;
-    } catch (err) {
-      console.error('Error creating chef profile:', err);
+    } else if (!user) {
+      toast({ 
+        title: 'Not logged in', 
+        description: 'Please log in to save your profile',
+        variant: 'destructive' 
+      });
+    } else {
       toast({ 
         title: 'Error saving profile', 
         description: 'Please try again.',
         variant: 'destructive' 
       });
-      return null;
     }
-  }, [user]);
+    return result;
+  }, [user, saveProgress]);
 
   const updateProfile = useCallback(async (updates: Partial<DbChefProfile>) => {
     if (!user || !profile) return null;
@@ -167,6 +175,7 @@ export function useChefProfile() {
     profile,
     loading: authLoading || loading,
     error,
+    saveProgress,
     createProfile,
     updateProfile,
     refetch: fetchProfile,

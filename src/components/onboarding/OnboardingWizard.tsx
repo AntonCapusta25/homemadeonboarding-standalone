@@ -24,7 +24,7 @@ import { Loader2 } from 'lucide-react';
 export function OnboardingWizard() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { profile: dbProfile, loading: profileLoading, hasCompletedOnboarding, createProfile } = useChefProfile();
+  const { profile: dbProfile, loading: profileLoading, hasCompletedOnboarding, createProfile, saveProgress } = useChefProfile();
   const [saving, setSaving] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   
@@ -40,6 +40,15 @@ export function OnboardingWizard() {
     isFirstStep,
     isLastStep,
   } = useOnboarding();
+
+  // Save progress to DB whenever profile changes (debounced via step completion)
+  const handleStepComplete = async (nextFn: () => void) => {
+    // Save progress to database silently
+    if (user) {
+      saveProgress(profile, false);
+    }
+    nextFn();
+  };
 
   // Redirect to dashboard if already completed onboarding
   useEffect(() => {
@@ -105,7 +114,7 @@ export function OnboardingWizard() {
           <CityStep
             value={profile.city}
             onChange={(city) => updateProfile({ city })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -115,7 +124,7 @@ export function OnboardingWizard() {
           <CuisineStep
             value={profile.primaryCuisines}
             onChange={(cuisines) => updateProfile({ primaryCuisines: cuisines })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -128,7 +137,7 @@ export function OnboardingWizard() {
             firstName={profile.firstName}
             lastName={profile.lastName}
             onChange={(field, value) => updateProfile({ [field]: value })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -141,7 +150,7 @@ export function OnboardingWizard() {
             city={profile.city}
             country={profile.country}
             onChange={(field, value) => updateProfile({ [field]: value })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -154,7 +163,7 @@ export function OnboardingWizard() {
             cuisines={profile.primaryCuisines}
             chefName={profile.firstName}
             onChange={(name, method) => updateProfile({ restaurantName: name, nameGenerationMethod: method })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -168,7 +177,7 @@ export function OnboardingWizard() {
             logoUrl={profile.logoUrl}
             method={profile.logoGenerationMethod}
             onChange={(url, method) => updateProfile({ logoUrl: url, logoGenerationMethod: method })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -178,7 +187,7 @@ export function OnboardingWizard() {
           <ServiceTypeStep
             value={profile.serviceType}
             onChange={(type) => updateProfile({ serviceType: type })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -188,7 +197,7 @@ export function OnboardingWizard() {
           <AvailabilityStep
             value={profile.availabilityBuckets}
             onChange={(availability) => updateProfile({ availabilityBuckets: availability })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -198,7 +207,7 @@ export function OnboardingWizard() {
           <DishTypesStep
             value={profile.dishTypes}
             onChange={(types) => updateProfile({ dishTypes: types })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -209,7 +218,7 @@ export function OnboardingWizard() {
             value={profile.foodSafetyStatus}
             certificateUrl={profile.haccpCertificateUrl}
             onChange={(status, url) => updateProfile({ foodSafetyStatus: status, haccpCertificateUrl: url })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -220,7 +229,7 @@ export function OnboardingWizard() {
             value={profile.kvkStatus}
             docsUrl={profile.kvkDocsUrl}
             onChange={(status, url) => updateProfile({ kvkStatus: status, kvkDocsUrl: url })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
@@ -230,7 +239,7 @@ export function OnboardingWizard() {
           <PlanStep
             value={profile.plan}
             onChange={(plan) => updateProfile({ plan })}
-            onNext={goToNext}
+            onNext={() => handleStepComplete(goToNext)}
             onPrevious={goToPrevious}
           />
         );
