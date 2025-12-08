@@ -33,12 +33,23 @@ export function LogoStep({
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-logo', {
-        body: { restaurantName, cuisines, chefName }
+        body: { 
+          name: restaurantName, 
+          cuisine: cuisines?.join(', '),
+          tagline: chefName ? `By Chef ${chefName}` : undefined,
+          logoStyle: 'modern minimal',
+          primaryColor: '#C65D3B',
+          secondaryColor: '#F2A35E'
+        }
       });
       if (error) { generatePlaceholderLogo(); return; }
-      if (data?.logoUrl) { 
-        setGeneratedLogo(data.logoUrl); 
-        onChange(data.logoUrl, 'ai');
+      // Handle both base64 response and logoUrl response
+      const logoData = data?.base64 
+        ? `data:image/${data.type === 'svg' ? 'svg+xml' : 'png'};base64,${data.base64}`
+        : data?.logoUrl;
+      if (logoData) { 
+        setGeneratedLogo(logoData); 
+        onChange(logoData, 'ai');
         fireConfetti();
       }
       else { generatePlaceholderLogo(); }
