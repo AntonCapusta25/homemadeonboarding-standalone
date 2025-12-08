@@ -176,7 +176,7 @@ serve(async (req) => {
         type: 'magiclink',
         email: email,
         options: {
-          redirectTo: redirectTo,
+          redirectTo: 'https://chef-craft-flow.lovable.app/summary',
         },
       });
 
@@ -185,13 +185,21 @@ serve(async (req) => {
         throw linkError;
       }
 
+      // Replace preview URL with production URL in magic link
+      const productionUrl = 'https://chef-craft-flow.lovable.app';
+      let magicLinkUrl = linkData.properties.action_link;
+      magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovable\.app/gi, productionUrl);
+      magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovableproject\.com/gi, productionUrl);
+
+      console.log(`Generated magic link redirecting to: ${productionUrl}`);
+
       // Send via SendGrid
       try {
         await sendMagicLinkEmail(
           email,
           pendingProfile.chef_name || '',
           pendingProfile.business_name || '',
-          linkData.properties.action_link,
+          magicLinkUrl,
           supabaseUrl,
           serviceRoleKey
         );
@@ -266,7 +274,7 @@ serve(async (req) => {
       type: 'magiclink',
       email: email,
       options: {
-        redirectTo: redirectTo,
+        redirectTo: 'https://chef-craft-flow.lovable.app/summary',
       },
     });
 
@@ -275,13 +283,22 @@ serve(async (req) => {
       throw linkError;
     }
 
+    // Replace preview URL with production URL in magic link
+    const productionUrl = 'https://chef-craft-flow.lovable.app';
+    let magicLinkUrl = linkData.properties.action_link;
+    // Replace any lovable preview/project URLs with production URL
+    magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovable\.app/gi, productionUrl);
+    magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovableproject\.com/gi, productionUrl);
+
+    console.log(`Generated magic link redirecting to: ${productionUrl}`);
+
     // Send via SendGrid
     try {
       await sendMagicLinkEmail(
         email,
         pendingProfile.chef_name || '',
         pendingProfile.business_name || '',
-        linkData.properties.action_link,
+        magicLinkUrl,
         supabaseUrl,
         serviceRoleKey
       );
