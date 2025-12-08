@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useChefProfiles } from '@/hooks/useChefProfiles';
+import { useAdminStatistics } from '@/hooks/useAdminStatistics';
+import { AdminStatistics } from '@/components/admin/AdminStatistics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -75,6 +77,8 @@ export default function AdminDashboard() {
     statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
     adminId: user?.id,
   });
+
+  const { stats: adminStats, loading: statsLoading, error: statsError } = useAdminStatistics();
 
   // Redirect non-admins
   useEffect(() => {
@@ -232,6 +236,11 @@ export default function AdminDashboard() {
             </div>
           </Card>
         )}
+
+        {/* Admin Statistics */}
+        <div className="mb-8">
+          <AdminStatistics stats={adminStats} loading={statsLoading} error={statsError} />
+        </div>
 
         {/* Chef Pipeline */}
         <Card className="p-6">
