@@ -91,12 +91,12 @@ const Index = () => {
             </div>
 
             <p className="mt-6 text-sm text-muted-foreground animate-slide-up" style={{ animationDelay: '0.4s' }}>
-              {t('welcome.alreadyHaveAccount', 'Already have an account?')}{' '}
+              {t('welcome.alreadyHaveAccount', 'Already signed up?')}{' '}
               <button 
                 onClick={handleSignIn}
                 className="text-primary hover:underline font-medium"
               >
-                {t('welcome.signIn', 'Sign in')}
+                {t('welcome.signIn', 'Request login link')}
               </button>
             </p>
           </div>
