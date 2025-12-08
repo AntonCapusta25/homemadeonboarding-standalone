@@ -239,6 +239,72 @@ export type Database = {
           },
         ]
       }
+      pending_profiles: {
+        Row: {
+          address: string | null
+          availability: string[] | null
+          business_name: string | null
+          chef_name: string | null
+          city: string | null
+          created_at: string
+          cuisines: string[] | null
+          dish_types: string[] | null
+          email: string
+          expires_at: string
+          food_safety_status:
+            | Database["public"]["Enums"]["food_safety_status"]
+            | null
+          id: string
+          kvk_status: Database["public"]["Enums"]["kvk_status"] | null
+          logo_url: string | null
+          phone: string | null
+          plan: Database["public"]["Enums"]["plan_type"] | null
+          service_type: Database["public"]["Enums"]["service_type"] | null
+        }
+        Insert: {
+          address?: string | null
+          availability?: string[] | null
+          business_name?: string | null
+          chef_name?: string | null
+          city?: string | null
+          created_at?: string
+          cuisines?: string[] | null
+          dish_types?: string[] | null
+          email: string
+          expires_at?: string
+          food_safety_status?:
+            | Database["public"]["Enums"]["food_safety_status"]
+            | null
+          id?: string
+          kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
+          logo_url?: string | null
+          phone?: string | null
+          plan?: Database["public"]["Enums"]["plan_type"] | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
+        }
+        Update: {
+          address?: string | null
+          availability?: string[] | null
+          business_name?: string | null
+          chef_name?: string | null
+          city?: string | null
+          created_at?: string
+          cuisines?: string[] | null
+          dish_types?: string[] | null
+          email?: string
+          expires_at?: string
+          food_safety_status?:
+            | Database["public"]["Enums"]["food_safety_status"]
+            | null
+          id?: string
+          kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
+          logo_url?: string | null
+          phone?: string | null
+          plan?: Database["public"]["Enums"]["plan_type"] | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           cached_at: string
