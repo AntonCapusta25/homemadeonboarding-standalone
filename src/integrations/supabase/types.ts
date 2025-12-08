@@ -14,16 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      chef_activities: {
+        Row: {
+          activity_type: string
+          admin_name: string | null
+          admin_user_id: string | null
+          chef_id: string
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          activity_type: string
+          admin_name?: string | null
+          admin_user_id?: string | null
+          chef_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          activity_type?: string
+          admin_name?: string | null
+          admin_user_id?: string | null
+          chef_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chef_activities_chef_id_fkey"
+            columns: ["chef_id"]
+            isOneToOne: false
+            referencedRelation: "chef_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chef_profiles: {
         Row: {
           address: string | null
+          admin_notes: string | null
+          admin_status: string | null
+          assigned_admin_id: string | null
           availability: string[] | null
           business_name: string | null
+          call_attempts: number | null
           chef_name: string | null
           city: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
+          crm_follow_up_date: string | null
+          crm_last_contact_date: string | null
+          crm_updated_by: string | null
           cuisines: string[] | null
           dish_types: string[] | null
           food_safety_status:
@@ -40,13 +88,20 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          admin_notes?: string | null
+          admin_status?: string | null
+          assigned_admin_id?: string | null
           availability?: string[] | null
           business_name?: string | null
+          call_attempts?: number | null
           chef_name?: string | null
           city?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          crm_follow_up_date?: string | null
+          crm_last_contact_date?: string | null
+          crm_updated_by?: string | null
           cuisines?: string[] | null
           dish_types?: string[] | null
           food_safety_status?:
@@ -63,13 +118,20 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          admin_notes?: string | null
+          admin_status?: string | null
+          assigned_admin_id?: string | null
           availability?: string[] | null
           business_name?: string | null
+          call_attempts?: number | null
           chef_name?: string | null
           city?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          crm_follow_up_date?: string | null
+          crm_last_contact_date?: string | null
+          crm_updated_by?: string | null
           cuisines?: string[] | null
           dish_types?: string[] | null
           food_safety_status?:
@@ -204,14 +266,43 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      app_role: "admin" | "chef"
       food_safety_status:
         | "have_certificate"
         | "getting_certificate"
@@ -346,6 +437,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "chef"],
       food_safety_status: [
         "have_certificate",
         "getting_certificate",
