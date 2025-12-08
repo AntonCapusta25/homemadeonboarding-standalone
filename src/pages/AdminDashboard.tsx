@@ -501,7 +501,12 @@ export default function AdminDashboard() {
                                 : 'Set'}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
+                          <PopoverContent 
+                            className="w-auto p-0 z-[100] bg-popover" 
+                            align="start"
+                            side="bottom"
+                            sideOffset={5}
+                          >
                             <Calendar
                               mode="single"
                               selected={chef.crm_follow_up_date ? new Date(chef.crm_follow_up_date) : undefined}
