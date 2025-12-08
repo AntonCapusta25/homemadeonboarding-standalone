@@ -186,6 +186,24 @@
     "yourRestaurant": "Jouw Restaurant",
     "basedIn": "Gevestigd in",
     "bookCall": "Plan een gesprek",
+    "completedSteps": "Wat je hebt voltooid",
+    "completed": {
+      "city": "Locatie",
+      "cuisines": "Type keuken",
+      "contact": "Contactgegevens",
+      "address": "Keukenadres",
+      "businessName": "Bedrijfsnaam",
+      "serviceType": "Servicetype",
+      "availability": "Beschikbaarheid",
+      "dishTypes": "Soorten gerechten"
+    },
+    "pending": {
+      "verifyEmail": "Verifieer je e-mail",
+      "finalizeMenu": "Menu afronden",
+      "setHours": "Openingstijden instellen",
+      "addPhotos": "Foto's van gerechten toevoegen",
+      "goLive": "Ga live en begin met verkopen!"
+    },
     "checklist": {
       "location": "Locatie & contact",
       "branding": "Branding (naam & logo)",

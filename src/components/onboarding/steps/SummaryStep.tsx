@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
-import { Check, Square, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, UtensilsCrossed } from 'lucide-react';
+import { Check, Square, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, UtensilsCrossed, CircleCheck, Circle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { fireCelebration } from '@/components/confetti';
 import { supabase } from '@/integrations/supabase/client';
 import { MenuPreview } from '@/components/menu/MenuPreview';
+import { clearOnboardingProgress } from '@/hooks/useOnboarding';
 
 interface SummaryStepProps { 
   profile: ChefProfile; 
@@ -67,13 +68,32 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
     return () => clearTimeout(timer); 
   }, []);
 
-  const checklist = [
-    { label: t('summary.checklist.location'), completed: true },
-    { label: t('summary.checklist.branding'), completed: true },
-    { label: t('summary.checklist.foodSafety'), completed: true },
-    { label: t('summary.checklist.menu'), completed: !!generatedMenu },
-    { label: t('summary.checklist.hours'), completed: false },
+  // Summary of completed steps
+  const completedItems = [
+    { label: t('summary.completed.city', { city: profile.city }), value: profile.city },
+    { label: t('summary.completed.cuisines'), value: profile.primaryCuisines.join(', ') },
+    { label: t('summary.completed.contact'), value: `${profile.email} • ${profile.phone}` },
+    { label: t('summary.completed.address'), value: `${profile.streetAddress}, ${profile.zipCode} ${profile.city}` },
+    { label: t('summary.completed.businessName'), value: profile.restaurantName },
+    { label: t('summary.completed.serviceType'), value: profile.serviceType },
+    { label: t('summary.completed.availability'), value: profile.availabilityBuckets.join(', ') },
+    { label: t('summary.completed.dishTypes'), value: profile.dishTypes.join(', ') },
   ];
+
+  // Next steps / pending items
+  const pendingItems = [
+    { label: t('summary.pending.verifyEmail'), done: false },
+    { label: t('summary.pending.finalizeMenu'), done: !!generatedMenu },
+    { label: t('summary.pending.setHours'), done: false },
+    { label: t('summary.pending.addPhotos'), done: false },
+    { label: t('summary.pending.goLive'), done: false },
+  ];
+
+  const handleGoToDashboard = () => {
+    // Clear onboarding progress since it's complete
+    clearOnboardingProgress();
+    onGoToDashboard();
+  };
 
   if (isCreating) {
     return (
@@ -114,7 +134,8 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
 
       <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4 animate-slide-up">{t('summary.ready')} 🎉</h1>
       
-      <div className="bg-card border border-border rounded-2xl p-6 mb-8 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.15s' }}>
+      {/* Profile Card */}
+      <div className="bg-card border border-border rounded-2xl p-6 mb-6 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.1s' }}>
         <div className="flex items-center gap-4 mb-4 pb-4 border-b border-border">
           {profile.logoUrl ? (
             <img src={profile.logoUrl} alt="Your logo" className="w-20 h-20 rounded-xl object-cover shadow-soft" />
@@ -136,9 +157,28 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
         </div>
       </div>
 
+      {/* Completed Steps Summary */}
+      <div className="bg-card border border-border rounded-2xl p-6 mb-6 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.15s' }}>
+        <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2">
+          <CircleCheck className="w-5 h-5 text-forest" />
+          {t('summary.completedSteps')}
+        </h3>
+        <ul className="space-y-2 text-left">
+          {completedItems.filter(item => item.value).map((item, idx) => (
+            <li key={idx} className="flex items-start gap-2 text-sm">
+              <Check className="w-4 h-4 text-forest mt-0.5 shrink-0" />
+              <div>
+                <span className="text-muted-foreground">{item.label}:</span>{' '}
+                <span className="text-foreground font-medium">{item.value}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
       {/* AI Generated Menu Preview */}
       {generatedMenu && (
-        <div className="bg-card border border-border rounded-2xl p-6 mb-8 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.18s' }}>
+        <div className="bg-card border border-border rounded-2xl p-6 mb-6 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.18s' }}>
           <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2">
             <UtensilsCrossed className="w-5 h-5 text-primary" />
             {t('menu.aiGenerated')}
@@ -150,30 +190,31 @@ export function SummaryStep({ profile, onGoToDashboard, onBookCall, onUpdateProf
             </div>
             <p className="text-sm text-muted-foreground">{generatedMenu.summary}</p>
           </div>
-          <MenuPreview menu={generatedMenu} compact onEdit={onGoToDashboard} />
+          <MenuPreview menu={generatedMenu} compact onEdit={handleGoToDashboard} />
         </div>
       )}
 
+      {/* Pending / Next Steps */}
       <div className="bg-card border border-border rounded-2xl p-6 mb-8 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.2s' }}>
         <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />{t('summary.whatNext')}
         </h3>
         <ul className="space-y-3">
-          {checklist.map((item, idx) => (
+          {pendingItems.map((item, idx) => (
             <li key={idx} className="flex items-center gap-3 text-left">
-              {item.completed ? (
+              {item.done ? (
                 <div className="w-6 h-6 bg-forest rounded-md flex items-center justify-center"><Check className="w-4 h-4 text-accent-foreground" /></div>
               ) : (
-                <Square className="w-6 h-6 text-muted-foreground" />
+                <Circle className="w-6 h-6 text-muted-foreground" />
               )}
-              <span className={item.completed ? 'text-foreground' : 'text-muted-foreground'}>{item.label}</span>
+              <span className={item.done ? 'text-foreground' : 'text-muted-foreground'}>{item.label}</span>
             </li>
           ))}
         </ul>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-        <Button size="xl" onClick={onGoToDashboard} className="shadow-glow">
+        <Button size="xl" onClick={handleGoToDashboard} className="shadow-glow">
           {t('summary.goToDashboard')} 🚀
           <ArrowRight className="w-5 h-5" />
         </Button>

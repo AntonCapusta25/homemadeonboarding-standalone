@@ -186,6 +186,24 @@
     "yourRestaurant": "Your Restaurant",
     "basedIn": "Based in",
     "bookCall": "Book a call",
+    "completedSteps": "What you've completed",
+    "completed": {
+      "city": "Location",
+      "cuisines": "Cuisine type",
+      "contact": "Contact info",
+      "address": "Kitchen address",
+      "businessName": "Business name",
+      "serviceType": "Service type",
+      "availability": "Availability",
+      "dishTypes": "Dish types"
+    },
+    "pending": {
+      "verifyEmail": "Verify your email",
+      "finalizeMenu": "Finalize your menu",
+      "setHours": "Set your opening hours",
+      "addPhotos": "Add dish photos",
+      "goLive": "Go live and start selling!"
+    },
     "checklist": {
       "location": "Location & contact",
       "branding": "Branding (name & logo)",
