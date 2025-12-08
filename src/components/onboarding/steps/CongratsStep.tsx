@@ -64,14 +64,17 @@ export function CongratsStep({ profile, onGoToDashboard }: CongratsStepProps) {
               <Rocket className="w-5 h-5 text-primary" />
               {t('congrats.whatsNext', "What's next?")}
             </h2>
+            <p className="text-muted-foreground mb-4">
+              {t('congrats.teamReachOut', "You're all set! Our onboarding team will reach out to you shortly to help you get started.")}
+            </p>
             <ul className="space-y-3 text-muted-foreground">
               <li className="flex items-start gap-3">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                <span>{t('congrats.step1', 'Review and customize your AI-generated menu')}</span>
+                <span>{t('congrats.step1', 'Our team will call you within 24-48 hours')}</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                <span>{t('congrats.step2', 'Set your dish prices and availability')}</span>
+                <span>{t('congrats.step2', 'Review and customize your AI-generated menu')}</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
