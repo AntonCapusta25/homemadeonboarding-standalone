@@ -26,7 +26,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { profile: dbProfile, loading: profileLoading } = useChefProfile();
   const { signOut } = useAuth();
-  const { loadActiveMenu, toGeneratedMenu, updateDish, saveDishes, deleteDish, pendingChanges, loading: menuSaving } = useMenu();
+  const { loadActiveMenu, toGeneratedMenu, updateDish, saveDishes, deleteDish, pendingChanges, saving: menuSaving } = useMenu();
   
   const [dishes, setDishes] = useState<DashboardDish[]>([{ id: 'new-1', name: '', price: '', description: '', isNew: true }]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
