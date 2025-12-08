@@ -55,20 +55,7 @@ serve(async (req) => {
       // User exists - send magic link for login
       console.log(`User exists, sending login magic link to: ${email}`);
       
-      const { error: magicLinkError } = await supabaseAdmin.auth.admin.generateLink({
-        type: "magiclink",
-        email: email,
-        options: {
-          redirectTo: redirectTo,
-        },
-      });
-
-      if (magicLinkError) {
-        console.error("Error sending magic link:", magicLinkError);
-        throw magicLinkError;
-      }
-
-      // Also send the actual email using signInWithOtp
+      // Try to send the magic link email
       const { error: otpError } = await supabaseAdmin.auth.signInWithOtp({
         email: email,
         options: {
@@ -76,7 +63,19 @@ serve(async (req) => {
         },
       });
 
+      // Handle rate limit gracefully - email was likely already sent recently
       if (otpError) {
+        if (otpError.message.includes("security purposes") || otpError.status === 429) {
+          console.log("Rate limited, but user exists - magic link was likely sent recently");
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              isNewUser: false,
+              message: "Magic link was recently sent. Please check your email or wait a minute to request again." 
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         console.error("Error sending OTP email:", otpError);
         throw otpError;
       }
@@ -162,7 +161,25 @@ serve(async (req) => {
       },
     });
 
+    // Handle rate limit gracefully for new users too
     if (otpError) {
+      if (otpError.message.includes("security purposes") || otpError.status === 429) {
+        console.log("Rate limited for new user, but account was created successfully");
+        // Still delete pending profile and return success
+        await supabaseAdmin
+          .from("pending_profiles")
+          .delete()
+          .eq("id", pendingProfileId);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            isNewUser: true,
+            message: "Account created. Magic link will be sent shortly - please wait a minute then request again." 
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       console.error("Error sending magic link:", otpError);
       throw otpError;
     }
