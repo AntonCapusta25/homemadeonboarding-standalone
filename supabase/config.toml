@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.create-chef-account]
 verify_jwt = false
+
+[functions.send-magic-link]
+verify_jwt = false

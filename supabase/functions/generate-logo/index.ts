@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -16,15 +17,15 @@ serve(async (req) => {
     
     console.log('Generating logo for:', { restaurantName, cuisines, chefName });
     
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const cuisineStr = cuisines?.slice(0, 2).join(' and ') || 'homemade food';
     
     const prompt = `Create a professional, modern restaurant logo for "${restaurantName}". 
-The restaurant specializes in ${cuisineStr} cuisine. 
+The restaurant specializes in ${cuisineStr} cuisine${chefName ? `, run by chef ${chefName}` : ''}.
 The logo should be:
 - Clean and simple
 - Warm, inviting colors (terracotta, orange, warm browns)
@@ -34,29 +35,27 @@ The logo should be:
 - High contrast, readable at small sizes
 Style: Modern minimalist logo design, vector-like quality, warm color palette`;
 
-    console.log('Sending prompt to AI:', prompt);
+    console.log('Sending prompt to OpenAI GPT Image 1:', prompt);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        modalities: ["image", "text"]
+        model: 'gpt-image-1',
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'high',
+        output_format: 'png',
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
+      console.error('OpenAI API error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -64,28 +63,26 @@ Style: Modern minimalist logo design, vector-like quality, warm color palette`;
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Usage limit reached. Please add credits to continue.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
       
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('AI response received');
+    console.log('OpenAI response received');
     
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // GPT Image 1 returns base64 data
+    const imageBase64 = data.data?.[0]?.b64_json;
     
-    if (!imageUrl) {
+    if (!imageBase64) {
       console.error('No image in response:', JSON.stringify(data));
       throw new Error('No image generated');
     }
 
+    // Return as data URL
+    const logoUrl = `data:image/png;base64,${imageBase64}`;
+
     return new Response(
-      JSON.stringify({ logoUrl: imageUrl }),
+      JSON.stringify({ logoUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
