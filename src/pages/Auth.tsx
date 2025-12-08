@@ -72,10 +72,17 @@ export default function Auth() {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
+          const errorMessage = error.message.toLowerCase();
+          if (errorMessage.includes('invalid login credentials') || errorMessage.includes('invalid')) {
             toast({
               title: 'Login failed',
-              description: 'Invalid email or password. Please try again.',
+              description: 'Invalid email or password. Please check your credentials and try again.',
+              variant: 'destructive',
+            });
+          } else if (errorMessage.includes('email not confirmed')) {
+            toast({
+              title: 'Email not verified',
+              description: 'Please check your email and verify your account first.',
               variant: 'destructive',
             });
           } else {
@@ -85,19 +92,26 @@ export default function Auth() {
               variant: 'destructive',
             });
           }
-        } else {
-          toast({
-            title: 'Welcome back!',
-            description: 'You have successfully logged in.',
-          });
+          return; // Stop here on error - don't proceed
         }
+        toast({
+          title: 'Welcome back!',
+          description: 'You have successfully logged in.',
+        });
       } else {
         const { error, data } = await signUp(email, password, name);
         if (error) {
-          if (error.message.includes('already registered')) {
+          const errorMessage = error.message.toLowerCase();
+          if (errorMessage.includes('already registered') || errorMessage.includes('already exists')) {
             toast({
               title: 'Email already exists',
               description: 'This email is already registered. Please log in instead.',
+              variant: 'destructive',
+            });
+          } else if (errorMessage.includes('password')) {
+            toast({
+              title: 'Weak password',
+              description: 'Please choose a stronger password with at least 6 characters.',
               variant: 'destructive',
             });
           } else {
@@ -107,12 +121,14 @@ export default function Auth() {
               variant: 'destructive',
             });
           }
-        } else if (data.user) {
+          return; // Stop here on error
+        }
+        if (data.user) {
           toast({
             title: 'Account created!',
             description: 'Welcome to ChefStart! Please complete your profile.',
           });
-          navigate('/');
+          // Navigation will happen via useEffect when auth state changes
         }
       }
     } catch (err) {
