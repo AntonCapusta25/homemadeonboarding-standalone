@@ -185,13 +185,20 @@ serve(async (req) => {
         throw linkError;
       }
 
-      // Replace preview URL with production URL in magic link
+      // Replace preview URL with production URL in the redirect_to parameter
       const productionUrl = 'https://chef-craft-flow.lovable.app';
       let magicLinkUrl = linkData.properties.action_link;
+      
+      // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too
+      const encodedProductionUrl = encodeURIComponent(productionUrl);
+      
+      // Replace any lovable preview/project URLs (both encoded and non-encoded)
+      magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovable\.app/gi, encodedProductionUrl);
+      magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovableproject\.com/gi, encodedProductionUrl);
       magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovable\.app/gi, productionUrl);
       magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovableproject\.com/gi, productionUrl);
 
-      console.log(`Generated magic link redirecting to: ${productionUrl}`);
+      console.log(`Generated magic link: ${magicLinkUrl}`);
 
       // Send via SendGrid
       try {
@@ -283,14 +290,20 @@ serve(async (req) => {
       throw linkError;
     }
 
-    // Replace preview URL with production URL in magic link
+    // Replace preview URL with production URL in the redirect_to parameter
     const productionUrl = 'https://chef-craft-flow.lovable.app';
     let magicLinkUrl = linkData.properties.action_link;
-    // Replace any lovable preview/project URLs with production URL
+    
+    // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too
+    const encodedProductionUrl = encodeURIComponent(productionUrl);
+    
+    // Replace any lovable preview/project URLs (both encoded and non-encoded)
+    magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovable\.app/gi, encodedProductionUrl);
+    magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovableproject\.com/gi, encodedProductionUrl);
     magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovable\.app/gi, productionUrl);
     magicLinkUrl = magicLinkUrl.replace(/https:\/\/[a-z0-9-]+\.lovableproject\.com/gi, productionUrl);
 
-    console.log(`Generated magic link redirecting to: ${productionUrl}`);
+    console.log(`Generated magic link: ${magicLinkUrl}`);
 
     // Send via SendGrid
     try {
