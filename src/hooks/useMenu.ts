@@ -47,7 +47,7 @@ export interface DashboardDish {
 }
 
 export function useMenu() {
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Set<string>>(new Set());
 
@@ -55,7 +55,7 @@ export function useMenu() {
     chefProfileId: string,
     menu: GeneratedMenu
   ): Promise<DbMenu | null> => {
-    setLoading(true);
+    setSaving(true);
     setError(null);
 
     try {
@@ -125,14 +125,13 @@ export function useMenu() {
       setError(err as Error);
       return null;
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }, []);
 
   const loadActiveMenu = useCallback(async (
     chefProfileId: string
   ): Promise<{ menu: DbMenu; dishes: DbDish[] } | null> => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -164,8 +163,6 @@ export function useMenu() {
       console.error('Error loading menu:', err);
       setError(err as Error);
       return null;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -260,7 +257,7 @@ export function useMenu() {
     menuId: string,
     dishes: DashboardDish[]
   ): Promise<boolean> => {
-    setLoading(true);
+    setSaving(true);
     
     try {
       // Process deletions
@@ -295,7 +292,7 @@ export function useMenu() {
       console.error('Error saving dishes:', err);
       return false;
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }, [addDish, deleteDish, updateDish]);
 
@@ -332,7 +329,7 @@ export function useMenu() {
     addDish,
     deleteDish,
     saveDishes,
-    loading,
+    saving,
     error,
     pendingChanges,
   };
