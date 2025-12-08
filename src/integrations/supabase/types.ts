@@ -53,6 +53,13 @@ export type Database = {
             referencedRelation: "chef_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "chef_activities_chef_id_fkey"
+            columns: ["chef_id"]
+            isOneToOne: false
+            referencedRelation: "chef_profiles_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       chef_profiles: {
@@ -237,6 +244,13 @@ export type Database = {
             referencedRelation: "chef_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "menus_chef_profile_id_fkey"
+            columns: ["chef_profile_id"]
+            isOneToOne: false
+            referencedRelation: "chef_profiles_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       suppliers: {
@@ -289,7 +303,78 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      chef_profiles_safe: {
+        Row: {
+          address: string | null
+          availability: string[] | null
+          business_name: string | null
+          chef_name: string | null
+          city: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string | null
+          cuisines: string[] | null
+          dish_types: string[] | null
+          food_safety_status:
+            | Database["public"]["Enums"]["food_safety_status"]
+            | null
+          id: string | null
+          kvk_status: Database["public"]["Enums"]["kvk_status"] | null
+          logo_url: string | null
+          onboarding_completed: boolean | null
+          plan: Database["public"]["Enums"]["plan_type"] | null
+          service_type: Database["public"]["Enums"]["service_type"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          availability?: string[] | null
+          business_name?: string | null
+          chef_name?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          cuisines?: string[] | null
+          dish_types?: string[] | null
+          food_safety_status?:
+            | Database["public"]["Enums"]["food_safety_status"]
+            | null
+          id?: string | null
+          kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
+          logo_url?: string | null
+          onboarding_completed?: boolean | null
+          plan?: Database["public"]["Enums"]["plan_type"] | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          availability?: string[] | null
+          business_name?: string | null
+          chef_name?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          cuisines?: string[] | null
+          dish_types?: string[] | null
+          food_safety_status?:
+            | Database["public"]["Enums"]["food_safety_status"]
+            | null
+          id?: string | null
+          kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
+          logo_url?: string | null
+          onboarding_completed?: boolean | null
+          plan?: Database["public"]["Enums"]["plan_type"] | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
