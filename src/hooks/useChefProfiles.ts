@@ -4,9 +4,15 @@ import { Tables } from '@/integrations/supabase/types';
 
 type ChefProfile = Tables<'chef_profiles'>;
 
-interface ChefWithStats extends ChefProfile {
+export interface ChefWithStats extends ChefProfile {
   menuCount?: number;
   dishCount?: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string | null;
 }
 
 interface UseChefProfilesOptions {
@@ -30,10 +36,45 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId } = options;
 
   const [chefs, setChefs] = useState<ChefWithStats[]>([]);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+
+  const fetchAdmins = useCallback(async () => {
+    try {
+      // Get admin user IDs from user_roles
+      const { data: adminRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin');
+
+      if (rolesError) throw rolesError;
+
+      if (adminRoles && adminRoles.length > 0) {
+        // Get admin names from chef_activities (where they've logged activity)
+        const { data: activities } = await supabase
+          .from('chef_activities')
+          .select('admin_user_id, admin_name')
+          .in('admin_user_id', adminRoles.map(r => r.user_id));
+
+        const adminMap: Record<string, AdminUser> = {};
+        adminRoles.forEach(role => {
+          const activity = activities?.find(a => a.admin_user_id === role.user_id);
+          adminMap[role.user_id] = {
+            id: role.user_id,
+            email: '',
+            name: activity?.admin_name || `Admin ${role.user_id.slice(0, 8)}`,
+          };
+        });
+
+        setAdmins(Object.values(adminMap));
+      }
+    } catch (err) {
+      console.error('Error fetching admins:', err);
+    }
+  }, []);
 
   const fetchChefs = useCallback(async () => {
     setLoading(true);
@@ -113,15 +154,30 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
   useEffect(() => {
     fetchChefs();
-  }, [fetchChefs]);
+    fetchAdmins();
+  }, [fetchChefs, fetchAdmins]);
 
-  const updateChefStatus = async (chefId: string, status: string, adminId: string) => {
+  // Optimistic update helper
+  const optimisticUpdate = (chefId: string, updates: Partial<ChefWithStats>) => {
+    setChefs(prev => prev.map(chef => 
+      chef.id === chefId ? { ...chef, ...updates } : chef
+    ));
+  };
+
+  const updateChefStatus = async (chefId: string, status: string, currentAdminId: string, adminName?: string) => {
+    // Optimistic update
+    const previousChef = chefs.find(c => c.id === chefId);
+    optimisticUpdate(chefId, { 
+      admin_status: status, 
+      crm_last_contact_date: new Date().toISOString() 
+    });
+
     try {
       const { error } = await supabase
         .from('chef_profiles')
         .update({
           admin_status: status,
-          crm_updated_by: adminId,
+          crm_updated_by: currentAdminId,
           crm_last_contact_date: new Date().toISOString(),
         })
         .eq('id', chefId);
@@ -133,23 +189,30 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         chef_id: chefId,
         activity_type: 'status_change',
         description: `Status changed to ${status}`,
-        admin_user_id: adminId,
+        admin_user_id: currentAdminId,
+        admin_name: adminName,
       });
 
-      await fetchChefs();
       return { error: null };
     } catch (err) {
+      // Rollback on error
+      if (previousChef) {
+        optimisticUpdate(chefId, { admin_status: previousChef.admin_status });
+      }
       return { error: err };
     }
   };
 
-  const updateChefNotes = async (chefId: string, notes: string, adminId: string) => {
+  const updateChefNotes = async (chefId: string, notes: string, currentAdminId: string) => {
+    // Optimistic update
+    optimisticUpdate(chefId, { admin_notes: notes });
+
     try {
       const { error } = await supabase
         .from('chef_profiles')
         .update({
           admin_notes: notes,
-          crm_updated_by: adminId,
+          crm_updated_by: currentAdminId,
         })
         .eq('id', chefId);
 
@@ -160,7 +223,11 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     }
   };
 
-  const assignAdmin = async (chefId: string, newAdminId: string | null) => {
+  const assignAdmin = async (chefId: string, newAdminId: string | null, currentAdminId: string, adminName?: string) => {
+    // Optimistic update
+    const previousChef = chefs.find(c => c.id === chefId);
+    optimisticUpdate(chefId, { assigned_admin_id: newAdminId });
+
     try {
       const { error } = await supabase
         .from('chef_profiles')
@@ -169,15 +236,68 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
       if (error) throw error;
 
-      await fetchChefs();
+      // Log activity
+      await supabase.from('chef_activities').insert({
+        chef_id: chefId,
+        activity_type: 'admin_assigned',
+        description: newAdminId ? `Assigned to admin` : 'Unassigned from admin',
+        admin_user_id: currentAdminId,
+        admin_name: adminName,
+      });
+
       return { error: null };
     } catch (err) {
+      // Rollback on error
+      if (previousChef) {
+        optimisticUpdate(chefId, { assigned_admin_id: previousChef.assigned_admin_id });
+      }
+      return { error: err };
+    }
+  };
+
+  const incrementCallAttempts = async (chefId: string, currentAdminId: string, adminName?: string) => {
+    // Optimistic update
+    const chef = chefs.find(c => c.id === chefId);
+    const newCount = (chef?.call_attempts || 0) + 1;
+    optimisticUpdate(chefId, { 
+      call_attempts: newCount,
+      crm_last_contact_date: new Date().toISOString()
+    });
+
+    try {
+      const { error } = await supabase
+        .from('chef_profiles')
+        .update({
+          call_attempts: newCount,
+          crm_last_contact_date: new Date().toISOString(),
+          crm_updated_by: currentAdminId,
+        })
+        .eq('id', chefId);
+
+      if (error) throw error;
+
+      // Log activity
+      await supabase.from('chef_activities').insert({
+        chef_id: chefId,
+        activity_type: 'call_attempt',
+        description: `Call attempt #${newCount}`,
+        admin_user_id: currentAdminId,
+        admin_name: adminName,
+      });
+
+      return { error: null };
+    } catch (err) {
+      // Rollback on error
+      if (chef) {
+        optimisticUpdate(chefId, { call_attempts: chef.call_attempts });
+      }
       return { error: err };
     }
   };
 
   return {
     chefs,
+    admins,
     loading,
     error,
     totalCount,
@@ -188,5 +308,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     updateChefStatus,
     updateChefNotes,
     assignAdmin,
+    incrementCallAttempts,
   };
 }

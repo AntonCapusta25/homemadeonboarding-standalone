@@ -37,6 +37,8 @@ import {
   Mail,
   MapPin,
   Clock,
+  PhoneCall,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -63,6 +65,7 @@ export default function AdminDashboard() {
 
   const {
     chefs,
+    admins,
     loading: chefsLoading,
     error,
     totalCount,
@@ -71,6 +74,8 @@ export default function AdminDashboard() {
     refetch,
     updateChefStatus,
     updateChefNotes,
+    assignAdmin,
+    incrementCallAttempts,
   } = useChefProfiles({
     page,
     pageSize: 10,
@@ -90,7 +95,7 @@ export default function AdminDashboard() {
   const handleStatusChange = async (chefId: string, newStatus: string) => {
     if (!user) return;
 
-    const { error } = await updateChefStatus(chefId, newStatus, user.id);
+    const { error } = await updateChefStatus(chefId, newStatus, user.id, user.email || undefined);
     if (error) {
       toast({
         title: 'Error',
@@ -101,6 +106,43 @@ export default function AdminDashboard() {
       toast({
         title: 'Status Updated',
         description: `Status changed to ${CRM_STATUS_CONFIG[newStatus]?.label || newStatus}`,
+      });
+    }
+  };
+
+  const handleAssignAdmin = async (chefId: string, newAdminId: string) => {
+    if (!user) return;
+
+    const adminIdToAssign = newAdminId === 'unassigned' ? null : newAdminId;
+    const { error } = await assignAdmin(chefId, adminIdToAssign, user.id, user.email || undefined);
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to assign admin',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Admin Assigned',
+        description: adminIdToAssign ? 'Chef assigned to admin' : 'Chef unassigned',
+      });
+    }
+  };
+
+  const handleIncrementCalls = async (chefId: string) => {
+    if (!user) return;
+
+    const { error } = await incrementCallAttempts(chefId, user.id, user.email || undefined);
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to log call',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Call Logged',
+        description: 'Call attempt recorded',
       });
     }
   };
@@ -280,16 +322,17 @@ export default function AdminDashboard() {
                 <TableRow>
                   <TableHead className="min-w-[200px]">Chef</TableHead>
                   <TableHead className="min-w-[120px]">City</TableHead>
+                  <TableHead className="min-w-[150px]">Assigned To</TableHead>
                   <TableHead className="min-w-[180px]">Status</TableHead>
                   <TableHead className="min-w-[200px]">Notes</TableHead>
-                  <TableHead className="min-w-[120px]">Call Attempts</TableHead>
+                  <TableHead className="min-w-[120px]">Calls</TableHead>
                   <TableHead className="min-w-[140px]">Joined</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredChefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No chefs found
                     </TableCell>
                   </TableRow>
@@ -322,6 +365,33 @@ export default function AdminDashboard() {
                             {chef.city}
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={chef.assigned_admin_id || 'unassigned'}
+                          onValueChange={(value) => handleAssignAdmin(chef.id, value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue>
+                              <span className="flex items-center gap-1 text-sm">
+                                <UserPlus className="w-3 h-3" />
+                                {chef.assigned_admin_id 
+                                  ? admins.find(a => a.id === chef.assigned_admin_id)?.name || 'Assigned'
+                                  : 'Unassigned'}
+                              </span>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">
+                              <span className="text-muted-foreground">Unassigned</span>
+                            </SelectItem>
+                            {admins.map((admin) => (
+                              <SelectItem key={admin.id} value={admin.id}>
+                                {admin.name || admin.email || `Admin ${admin.id.slice(0, 8)}`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <Select
@@ -364,7 +434,18 @@ export default function AdminDashboard() {
                         />
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm font-medium">{chef.call_attempts || 0}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium min-w-[20px]">{chef.call_attempts || 0}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleIncrementCalls(chef.id)}
+                            className="gap-1 h-8"
+                          >
+                            <PhoneCall className="w-3 h-3" />
+                            Log
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
