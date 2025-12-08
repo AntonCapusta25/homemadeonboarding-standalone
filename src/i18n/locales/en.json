@@ -1,4 +1,14 @@
 {
+  "congrats": {
+    "title": "Congratulations!",
+    "subtitle": "Your profile is complete!",
+    "whatsNext": "What's next?",
+    "teamReachOut": "You're all set! Our onboarding team will reach out to you shortly to help you get started.",
+    "step1": "Our team will call you within 24-48 hours",
+    "step2": "Review and customize your AI-generated menu",
+    "step3": "Start receiving orders from customers!",
+    "goToDashboard": "Go to Dashboard"
+  },
   "welcome": {
     "title": "Home-Made-Chef",
     "subtitle": "Start your journey as a home chef",

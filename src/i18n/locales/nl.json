@@ -1,4 +1,14 @@
 {
+  "congrats": {
+    "title": "Gefeliciteerd!",
+    "subtitle": "Je profiel is compleet!",
+    "whatsNext": "Wat nu?",
+    "teamReachOut": "Je bent helemaal klaar! Ons onboarding team neemt zo snel mogelijk contact met je op.",
+    "step1": "Ons team belt je binnen 24-48 uur",
+    "step2": "Bekijk en pas je AI-gegenereerde menu aan",
+    "step3": "Begin met het ontvangen van bestellingen!",
+    "goToDashboard": "Ga naar Dashboard"
+  },
   "welcome": {
     "title": "Home-Made-Chef",
     "subtitle": "Begin je reis als thuiskok",
