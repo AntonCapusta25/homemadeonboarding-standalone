@@ -295,6 +295,42 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     }
   };
 
+  const updateFollowUpDate = async (chefId: string, date: Date | null, currentAdminId: string, adminName?: string) => {
+    // Optimistic update
+    const previousChef = chefs.find(c => c.id === chefId);
+    const dateStr = date ? date.toISOString() : null;
+    optimisticUpdate(chefId, { crm_follow_up_date: dateStr });
+
+    try {
+      const { error } = await supabase
+        .from('chef_profiles')
+        .update({
+          crm_follow_up_date: dateStr,
+          crm_updated_by: currentAdminId,
+        })
+        .eq('id', chefId);
+
+      if (error) throw error;
+
+      // Log activity
+      await supabase.from('chef_activities').insert({
+        chef_id: chefId,
+        activity_type: 'follow_up_scheduled',
+        description: date ? `Follow-up scheduled for ${date.toLocaleDateString()}` : 'Follow-up cleared',
+        admin_user_id: currentAdminId,
+        admin_name: adminName,
+      });
+
+      return { error: null };
+    } catch (err) {
+      // Rollback on error
+      if (previousChef) {
+        optimisticUpdate(chefId, { crm_follow_up_date: previousChef.crm_follow_up_date });
+      }
+      return { error: err };
+    }
+  };
+
   return {
     chefs,
     admins,
@@ -309,5 +345,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     updateChefNotes,
     assignAdmin,
     incrementCallAttempts,
+    updateFollowUpDate,
   };
 }

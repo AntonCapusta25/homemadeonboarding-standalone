@@ -9,6 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Table,
   TableBody,
@@ -27,7 +33,7 @@ import {
 import {
   Users,
   TrendingUp,
-  Calendar,
+  Calendar as CalendarIcon,
   LogOut,
   Loader2,
   Search,
@@ -40,6 +46,7 @@ import {
   PhoneCall,
   UserPlus,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -76,6 +83,7 @@ export default function AdminDashboard() {
     updateChefNotes,
     assignAdmin,
     incrementCallAttempts,
+    updateFollowUpDate,
   } = useChefProfiles({
     page,
     pageSize: 10,
@@ -143,6 +151,24 @@ export default function AdminDashboard() {
       toast({
         title: 'Call Logged',
         description: 'Call attempt recorded',
+      });
+    }
+  };
+
+  const handleFollowUpChange = async (chefId: string, date: Date | undefined) => {
+    if (!user) return;
+
+    const { error } = await updateFollowUpDate(chefId, date || null, user.id, user.email || undefined);
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to set follow-up date',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Follow-up Set',
+        description: date ? `Follow-up scheduled for ${format(date, 'MMM d, yyyy')}` : 'Follow-up cleared',
       });
     }
   };
@@ -321,18 +347,20 @@ export default function AdminDashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[200px]">Chef</TableHead>
-                  <TableHead className="min-w-[120px]">City</TableHead>
-                  <TableHead className="min-w-[150px]">Assigned To</TableHead>
-                  <TableHead className="min-w-[180px]">Status</TableHead>
-                  <TableHead className="min-w-[200px]">Notes</TableHead>
-                  <TableHead className="min-w-[120px]">Calls</TableHead>
-                  <TableHead className="min-w-[140px]">Joined</TableHead>
+                  <TableHead className="min-w-[100px]">City</TableHead>
+                  <TableHead className="min-w-[140px]">Assigned To</TableHead>
+                  <TableHead className="min-w-[150px]">Status</TableHead>
+                  <TableHead className="min-w-[180px]">Notes</TableHead>
+                  <TableHead className="min-w-[100px]">Calls</TableHead>
+                  <TableHead className="min-w-[100px]">Last Contact</TableHead>
+                  <TableHead className="min-w-[140px]">Follow-up</TableHead>
+                  <TableHead className="min-w-[100px]">Joined</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredChefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No chefs found
                     </TableCell>
                   </TableRow>
@@ -448,8 +476,44 @@ export default function AdminDashboard() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-muted-foreground">
-                          {format(new Date(chef.created_at), 'MMM d, yyyy')}
+                        {chef.crm_last_contact_date ? (
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(chef.crm_last_contact_date), 'MMM d')}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">Never</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "w-full justify-start text-left font-normal h-8 text-xs",
+                                !chef.crm_follow_up_date && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-1 h-3 w-3" />
+                              {chef.crm_follow_up_date
+                                ? format(new Date(chef.crm_follow_up_date), 'MMM d')
+                                : 'Set'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={chef.crm_follow_up_date ? new Date(chef.crm_follow_up_date) : undefined}
+                              onSelect={(date) => handleFollowUpChange(chef.id, date)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(chef.created_at), 'MMM d')}
                         </span>
                       </TableCell>
                     </TableRow>
