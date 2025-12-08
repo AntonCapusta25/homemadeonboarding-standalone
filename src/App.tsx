@@ -24,14 +24,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route 
-              path="/onboarding" 
-              element={
-                <ProtectedRoute allowedRoles={['chef']}>
-                  <Onboarding />
-                </ProtectedRoute>
-              } 
-            />
+            <Route path="/onboarding" element={<Onboarding />} />
             <Route 
               path="/dashboard" 
               element={
