@@ -69,6 +69,7 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
+  const [openCalendarId, setOpenCalendarId] = useState<string | null>(null);
 
   const {
     chefs,
@@ -157,6 +158,9 @@ export default function AdminDashboard() {
 
   const handleFollowUpChange = async (chefId: string, date: Date | undefined) => {
     if (!user) return;
+    
+    // Close the popover immediately
+    setOpenCalendarId(null);
 
     const { error } = await updateFollowUpDate(chefId, date || null, user.id, user.email || undefined);
     if (error) {
@@ -485,7 +489,10 @@ export default function AdminDashboard() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Popover>
+                        <Popover 
+                          open={openCalendarId === chef.id} 
+                          onOpenChange={(open) => setOpenCalendarId(open ? chef.id : null)}
+                        >
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
