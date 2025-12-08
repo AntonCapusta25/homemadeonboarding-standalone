@@ -509,7 +509,7 @@ export default function AdminDashboard() {
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent 
-                            className="w-auto p-0 z-[100] bg-popover" 
+                            className="w-auto p-0 z-[100] bg-card border shadow-lg" 
                             align="start"
                             side="bottom"
                             sideOffset={5}
@@ -519,6 +519,7 @@ export default function AdminDashboard() {
                               selected={chef.crm_follow_up_date ? new Date(chef.crm_follow_up_date) : undefined}
                               onSelect={(date) => handleFollowUpChange(chef.id, date)}
                               initialFocus
+                              className="pointer-events-auto bg-card"
                             />
                           </PopoverContent>
                         </Popover>
