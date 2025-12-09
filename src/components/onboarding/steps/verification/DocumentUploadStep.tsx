@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
-import { FileCheck, ArrowRight, ArrowLeft, SkipForward, Upload, Check, Loader2 } from 'lucide-react';
+import { FileCheck, ArrowRight, ArrowLeft, Upload, Check, Loader2, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VerificationProgress } from '@/hooks/useVerification';
@@ -18,7 +18,7 @@ interface DocumentUploadStepProps {
 }
 
 interface DocumentType {
-  id: 'kvk' | 'haccp' | 'nvwa';
+  id: 'id';
   label: string;
   description: string;
   required: boolean;
@@ -38,76 +38,43 @@ export function DocumentUploadStep({
 }: DocumentUploadStepProps) {
   const { t } = useTranslation();
   
-  const [documents, setDocuments] = useState<DocumentType[]>([
-    {
-      id: 'kvk',
-      label: t('verification.kvkRegistration', 'KVK Registration'),
-      description: t('verification.kvkDesc', 'Your Chamber of Commerce registration document'),
-      required: true,
-      uploaded: false,
-      uploading: false,
-    },
-    {
-      id: 'haccp',
-      label: t('verification.haccpCertificate', 'HACCP Certificate'),
-      description: t('verification.haccpDesc', 'Your food safety training certificate'),
-      required: false,
-      uploaded: false,
-      uploading: false,
-    },
-    {
-      id: 'nvwa',
-      label: t('verification.nvwaRegistration', 'NVWA Registration'),
-      description: t('verification.nvwaDesc', 'Food safety authority registration'),
-      required: true,
-      uploaded: false,
-      uploading: false,
-    },
-  ]);
+  const [document, setDocument] = useState<DocumentType>({
+    id: 'id',
+    label: t('verification.idDocument', 'ID Document'),
+    description: t('verification.idDesc', 'Upload your passport or ID card for identity verification'),
+    required: true,
+    uploaded: false,
+    uploading: false,
+  });
 
-  // Load existing document URLs from verification progress or profile
+  // Load existing document URL from verification progress
   useEffect(() => {
-    setDocuments(prev => prev.map(doc => {
-      let url: string | undefined;
-      let uploaded = false;
-      
-      if (doc.id === 'kvk') {
-        url = verificationProgress?.kvkDocumentUrl || profile.kvkDocsUrl;
-      } else if (doc.id === 'haccp') {
-        url = verificationProgress?.haccpDocumentUrl || profile.haccpCertificateUrl;
-      } else if (doc.id === 'nvwa') {
-        url = verificationProgress?.nvwaDocumentUrl;
-      }
-      
-      uploaded = !!url;
-      return { ...doc, uploaded, url };
-    }));
-  }, [verificationProgress, profile]);
+    // Check if any document was uploaded (using kvk field as ID document)
+    const url = verificationProgress?.kvkDocumentUrl;
+    if (url) {
+      setDocument(prev => ({ ...prev, uploaded: true, url }));
+    }
+  }, [verificationProgress]);
 
-  const handleFileUpload = async (docId: 'kvk' | 'haccp' | 'nvwa', event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Update uploading state
-    setDocuments(prev => prev.map(d => 
-      d.id === docId ? { ...d, uploading: true } : d
-    ));
+    setDocument(prev => ({ ...prev, uploading: true }));
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error(t('verification.loginRequired', 'Please log in to upload documents'));
-        setDocuments(prev => prev.map(d => 
-          d.id === docId ? { ...d, uploading: false } : d
-        ));
+        setDocument(prev => ({ ...prev, uploading: false }));
         return;
       }
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${docId}-${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/id-${Date.now()}.${fileExt}`;
 
       const { error } = await supabase.storage
-        .from('logos') // Using logos bucket since documents bucket might not exist
+        .from('logos')
         .upload(`documents/${fileName}`, file, { upsert: true });
 
       if (error) throw error;
@@ -117,33 +84,20 @@ export function DocumentUploadStep({
         .getPublicUrl(`documents/${fileName}`);
 
       // Update document state
-      setDocuments(prev => prev.map(d => 
-        d.id === docId ? { ...d, uploading: false, uploaded: true, url: publicUrl } : d
-      ));
+      setDocument(prev => ({ ...prev, uploading: false, uploaded: true, url: publicUrl }));
 
-      // Save to verification progress in database
+      // Save to verification progress in database (reusing kvk field for ID)
       if (onDocumentUpload) {
-        await onDocumentUpload(docId, publicUrl);
+        await onDocumentUpload('kvk', publicUrl);
       }
 
-      // Update profile based on document type
-      if (docId === 'kvk') {
-        onUpdateProfile({ kvkDocsUrl: publicUrl });
-      } else if (docId === 'haccp') {
-        onUpdateProfile({ haccpCertificateUrl: publicUrl });
-      }
-
-      toast.success(t('verification.uploadSuccess', 'Document uploaded successfully!'));
+      toast.success(t('verification.uploadSuccess', 'ID uploaded successfully!'));
     } catch (error: unknown) {
       console.error('Upload error:', error);
-      setDocuments(prev => prev.map(d => 
-        d.id === docId ? { ...d, uploading: false } : d
-      ));
+      setDocument(prev => ({ ...prev, uploading: false }));
       toast.error(t('verification.uploadError', 'Failed to upload document'));
     }
   };
-
-  const uploadedCount = documents.filter(d => d.uploaded).length;
 
   return (
     <div className="flex flex-col h-full animate-fade-in">
@@ -154,70 +108,80 @@ export function DocumentUploadStep({
           </div>
         </div>
         <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-3">
-          {t('verification.uploadDocuments', 'Upload Documents')}
+          {t('verification.uploadId', 'Upload Your ID')}
         </h1>
         <p className="text-muted-foreground text-lg max-w-md mx-auto">
-          {t('verification.uploadDocsDesc', 'Upload your business documents to speed up verification. You can also do this later.')}
+          {t('verification.uploadIdDesc', 'Upload your identification document to complete verification. This helps us verify your identity.')}
         </p>
       </div>
 
-      <div className="flex-1 space-y-4">
-        {documents.map((doc) => (
-          <div
-            key={doc.id}
-            className={`p-4 rounded-xl border transition-all ${
-              doc.uploaded 
-                ? 'bg-primary/5 border-primary/30' 
-                : 'bg-card border-border hover:border-primary/30'
-            }`}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-foreground">{doc.label}</h3>
-                  {doc.required && (
-                    <span className="text-xs text-muted-foreground">
-                      ({t('common.required', 'Required')})
-                    </span>
-                  )}
+      <div className="flex-1 max-w-md mx-auto w-full">
+        <div
+          className={`p-6 rounded-xl border-2 border-dashed transition-all ${
+            document.uploaded 
+              ? 'bg-primary/5 border-primary' 
+              : 'bg-card border-border hover:border-primary/50'
+          }`}
+        >
+          <div className="text-center">
+            {document.uploaded ? (
+              <div className="py-4">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-primary" />
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">{doc.description}</p>
+                <h3 className="font-semibold text-foreground mb-2">
+                  {t('verification.idUploaded', 'ID Uploaded')}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('verification.idUploadedDesc', 'Your ID document has been uploaded successfully')}
+                </p>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleFileUpload}
+                  />
+                  <span className="text-primary hover:text-primary/80 text-sm font-medium">
+                    {t('verification.replaceDocument', 'Replace document')}
+                  </span>
+                </label>
               </div>
-              
-              <div className="flex-shrink-0">
-                {doc.uploaded ? (
-                  <div className="flex items-center gap-2 text-primary">
-                    <Check className="w-5 h-5" />
-                    <span className="text-sm font-medium">
-                      {t('verification.uploaded', 'Uploaded')}
+            ) : document.uploading ? (
+              <div className="py-8">
+                <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {t('verification.uploading', 'Uploading...')}
+                </p>
+              </div>
+            ) : (
+              <div className="py-8">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Upload className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">{document.label}</h3>
+                <p className="text-sm text-muted-foreground mb-4">{document.description}</p>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleFileUpload}
+                  />
+                  <Button variant="outline" asChild>
+                    <span>
+                      <Upload className="w-4 h-4 mr-2" />
+                      {t('verification.chooseFile', 'Choose file')}
                     </span>
-                  </div>
-                ) : doc.uploading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                ) : (
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileUpload(doc.id, e)}
-                    />
-                    <div className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors">
-                      <Upload className="w-5 h-5" />
-                      <span className="text-sm font-medium">
-                        {t('verification.upload', 'Upload')}
-                      </span>
-                    </div>
-                  </label>
-                )}
+                  </Button>
+                </label>
+                <p className="text-xs text-muted-foreground mt-4">
+                  {t('verification.acceptedFormats', 'PDF, JPG, or PNG • Max 10MB')}
+                </p>
               </div>
-            </div>
+            )}
           </div>
-        ))}
-
-        <p className="text-sm text-muted-foreground text-center mt-6">
-          {uploadedCount} / {documents.length} {t('verification.documentsUploaded', 'documents uploaded')}
-        </p>
+        </div>
       </div>
 
       <div className="flex justify-between pt-8 mt-auto border-t border-border">
@@ -225,16 +189,14 @@ export function DocumentUploadStep({
           <ArrowLeft className="w-4 h-4 mr-2" />
           {t('common.back', 'Back')}
         </Button>
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={onSkip}>
-            <SkipForward className="w-4 h-4 mr-2" />
-            {t('common.skip', 'Skip')}
-          </Button>
-          <Button onClick={onNext} size="lg">
-            {t('common.continue', 'Continue')}
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-        </div>
+        <Button 
+          onClick={onNext} 
+          size="lg"
+          disabled={!document.uploaded}
+        >
+          {t('verification.finishVerification', 'Finish Verification')}
+          <ArrowRight className="w-5 h-5 ml-2" />
+        </Button>
       </div>
     </div>
   );

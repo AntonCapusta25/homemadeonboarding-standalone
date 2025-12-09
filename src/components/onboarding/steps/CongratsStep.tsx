@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
-import { ChefHat, FileCheck, ShieldCheck, Zap } from 'lucide-react';
+import { ChefHat, FileCheck, ShieldCheck, Zap, ClipboardCheck, ArrowRight, Clock } from 'lucide-react';
 import { fireCelebration } from '@/components/confetti';
 import { Logo } from '@/components/Logo';
 
@@ -27,14 +27,19 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
 
   const verificationItems = [
     {
+      icon: ClipboardCheck,
+      title: t('congrats.reviewMenu', 'Review Your Menu'),
+      description: t('congrats.reviewMenuDesc', 'Check your AI-generated menu and make any adjustments'),
+    },
+    {
       icon: ShieldCheck,
-      title: t('congrats.foodSafetyQuiz', 'Complete Food Safety Quiz'),
-      description: t('congrats.foodSafetyDesc', 'Pass a quick quiz to show you understand food safety basics'),
+      title: t('congrats.foodSafetyQuiz', 'Complete Food Safety Info'),
+      description: t('congrats.foodSafetyDesc', 'Learn about food safety requirements for home chefs'),
     },
     {
       icon: FileCheck,
-      title: t('congrats.uploadDocs', 'Upload Required Documents'),
-      description: t('congrats.uploadDocsDesc', 'Upload your KVK registration and other required documents'),
+      title: t('congrats.uploadId', 'Upload Your ID'),
+      description: t('congrats.uploadIdDesc', 'Upload your identification document for verification'),
     },
   ];
 
@@ -54,26 +59,38 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
             </div>
           </div>
 
-          {/* Welcome message */}
+          {/* Congratulations message */}
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-            {t('congrats.welcome', 'Welcome on board, Chef!')} 🎉
+            {t('congrats.profileComplete', 'Congratulations!')} 🎉
           </h1>
+
+          <p className="text-xl text-muted-foreground mb-2">
+            {t('congrats.profileCreated', 'Your chef profile has been created')}
+          </p>
 
           {/* Chef name */}
           {profile.firstName && (
-            <p className="text-2xl font-semibold text-primary mb-8">
+            <p className="text-2xl font-semibold text-primary mb-6">
               {profile.firstName} {profile.lastName}
             </p>
           )}
 
-          {/* Fast verification section */}
+          {/* Waiting for approval status */}
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-8 flex items-center gap-3 justify-center">
+            <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <p className="text-amber-700 dark:text-amber-300 font-medium">
+              {t('congrats.waitingApproval', 'You are currently waiting for approval to join the Homemade platform')}
+            </p>
+          </div>
+
+          {/* Speed up verification section */}
           <div className="bg-card rounded-xl border border-border p-6 mb-8 text-left">
             <h2 className="font-semibold text-lg mb-2 flex items-center gap-2">
               <Zap className="w-5 h-5 text-amber-500" />
-              {t('congrats.getApprovedFaster', 'Get approved faster!')}
+              {t('congrats.speedUpApproval', 'Speed up your approval!')}
             </h2>
             <p className="text-muted-foreground mb-6">
-              {t('congrats.completeSteps', 'Complete these steps to speed up your verification:')}
+              {t('congrats.completeFollowing', 'Complete the following steps to get approved faster:')}
             </p>
             
             <ul className="space-y-4">
@@ -83,7 +100,9 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
                     <item.icon className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{item.title}</p>
+                    <p className="font-medium text-foreground">
+                      {index + 1}. {item.title}
+                    </p>
                     <p className="text-sm text-muted-foreground">{item.description}</p>
                   </div>
                 </li>
@@ -98,8 +117,8 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
               onClick={onStartFastVerification}
               className="shadow-glow hover:shadow-medium"
             >
-              <Zap className="w-5 h-5 mr-2" />
               {t('congrats.startVerification', 'Start Verification')}
+              <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </div>
         </div>
