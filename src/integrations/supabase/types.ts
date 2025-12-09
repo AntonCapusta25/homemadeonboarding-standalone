@@ -311,6 +311,7 @@ export type Database = {
           phone: string | null
           plan: Database["public"]["Enums"]["plan_type"] | null
           service_type: Database["public"]["Enums"]["service_type"] | null
+          session_token: string | null
         }
         Insert: {
           address?: string | null
@@ -333,6 +334,7 @@ export type Database = {
           phone?: string | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
+          session_token?: string | null
         }
         Update: {
           address?: string | null
@@ -355,6 +357,7 @@ export type Database = {
           phone?: string | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
+          session_token?: string | null
         }
         Relationships: []
       }
