@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { ChefProfile, StepId, ServiceType, FoodSafetyStatus, KvkStatus, PlanType, LogoMethod, NameMethod } from '@/types/onboarding';
 import { supabase } from '@/integrations/supabase/client';
 import { DbChefProfile } from './useChefProfile';
@@ -119,15 +119,97 @@ function getResumeStepIndex(profile: ChefProfile): number {
   return 10; // food-safety-status or later
 }
 
+// Map onboarding types to DB enum values
+function mapFoodSafetyStatus(status: string): 'have_certificate' | 'getting_certificate' | 'need_help' {
+  const map: Record<string, 'have_certificate' | 'getting_certificate' | 'need_help'> = {
+    'has_certificate': 'have_certificate',
+    'needs_training': 'need_help',
+  };
+  return map[status] || 'need_help';
+}
+
+function mapKvkStatus(status: string): 'have_both' | 'in_progress' | 'need_help' {
+  const map: Record<string, 'have_both' | 'in_progress' | 'need_help'> = {
+    'kvk_nvwa_both': 'have_both',
+    'kvk_only': 'in_progress',
+    'none': 'need_help',
+    'try_first': 'need_help',
+  };
+  return map[status] || 'need_help';
+}
+
+function mapPlanType(plan: string): 'starter' | 'growth' | 'pro' {
+  const map: Record<string, 'starter' | 'growth' | 'pro'> = {
+    'basic': 'starter',
+    'pro': 'growth',
+    'advanced': 'pro',
+    'auto_recommend': 'starter',
+  };
+  return map[plan] || 'starter';
+}
+
 export function useOnboarding() {
   const savedProgress = loadSavedProgress();
   const [dbLoaded, setDbLoaded] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [currentStepIndex, setCurrentStepIndex] = useState(savedProgress?.currentStepIndex ?? 0);
   const [profile, setProfile] = useState<ChefProfile>(savedProgress?.profile ?? initialProfile);
   const [completedSteps, setCompletedSteps] = useState<Set<StepId>>(
     new Set(savedProgress?.completedSteps ?? [])
   );
+  const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
+
+  // Save to pending_profiles table (debounced)
+  const saveToDatabase = useCallback(async (profileData: ChefProfile, step: StepId) => {
+    if (!profileData.email) return; // Only save after email is provided
+
+    try {
+      const dbData = {
+        email: profileData.email,
+        phone: profileData.phone || null,
+        chef_name: `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim() || null,
+        business_name: profileData.restaurantName || null,
+        city: profileData.city || null,
+        address: profileData.streetAddress 
+          ? `${profileData.streetAddress}, ${profileData.zipCode || ''}, ${profileData.city || ''}, ${profileData.country || ''}`
+          : null,
+        cuisines: profileData.primaryCuisines || [],
+        dish_types: profileData.dishTypes || [],
+        availability: profileData.availabilityBuckets || [],
+        service_type: (profileData.serviceType || 'unsure') as 'delivery' | 'pickup' | 'both' | 'unsure',
+        food_safety_status: profileData.foodSafetyStatus ? mapFoodSafetyStatus(profileData.foodSafetyStatus) : null,
+        kvk_status: profileData.kvkStatus ? mapKvkStatus(profileData.kvkStatus) : null,
+        plan: profileData.plan ? mapPlanType(profileData.plan) : 'starter',
+        logo_url: profileData.logoUrl || null,
+        current_step: step,
+      };
+
+      // Check if profile already exists for this email
+      const { data: existing } = await supabase
+        .from('pending_profiles')
+        .select('id')
+        .eq('email', profileData.email)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('pending_profiles')
+          .update(dbData)
+          .eq('id', existing.id);
+        setPendingProfileId(existing.id);
+      } else {
+        const { data } = await supabase
+          .from('pending_profiles')
+          .insert(dbData)
+          .select('id')
+          .single();
+        if (data) setPendingProfileId(data.id);
+      }
+    } catch (error) {
+      console.error('Error saving to pending_profiles:', error);
+    }
+  }, []);
 
   // Load progress from database on mount
   useEffect(() => {
@@ -178,8 +260,22 @@ export function useOnboarding() {
     // Don't save if on welcome step or completed or not loaded from DB yet
     if (currentStepIndex > 0 && dbLoaded) {
       saveProgress(currentStepIndex, profile, completedSteps);
+      
+      // Debounced save to database
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        saveToDatabase(profile, currentStep);
+      }, 1000);
     }
-  }, [currentStepIndex, profile, completedSteps, dbLoaded]);
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [currentStepIndex, profile, completedSteps, dbLoaded, currentStep, saveToDatabase]);
 
   const updateProfile = useCallback((updates: Partial<ChefProfile>) => {
     setProfile(prev => ({ ...prev, ...updates }));
@@ -209,6 +305,13 @@ export function useOnboarding() {
     setCompletedSteps(new Set());
   }, []);
 
+  // Immediately save to DB (used on step completion)
+  const saveStepToDatabase = useCallback(async () => {
+    if (profile.email) {
+      await saveToDatabase(profile, currentStep);
+    }
+  }, [profile, currentStep, saveToDatabase]);
+
   const canGoNext = currentStepIndex < STEP_ORDER.length - 1;
   const canGoPrevious = currentStepIndex > 0;
   const isFirstStep = currentStepIndex === 0;
@@ -231,5 +334,7 @@ export function useOnboarding() {
     isLastStep,
     resetProgress,
     dbLoaded,
+    pendingProfileId,
+    saveStepToDatabase,
   };
 }

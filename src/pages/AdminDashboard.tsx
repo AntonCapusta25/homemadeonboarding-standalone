@@ -45,6 +45,7 @@ import {
   Clock,
   PhoneCall,
   UserPlus,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -73,6 +74,7 @@ export default function AdminDashboard() {
 
   const {
     chefs,
+    pendingProfiles,
     admins,
     loading: chefsLoading,
     error,
@@ -90,6 +92,7 @@ export default function AdminDashboard() {
     pageSize: 10,
     statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
     adminId: user?.id,
+    includePending: true,
   });
 
   const { stats: adminStats, loading: statsLoading, error: statsError } = useAdminStatistics();
@@ -311,6 +314,68 @@ export default function AdminDashboard() {
           <AdminStatistics stats={adminStats} loading={statsLoading} error={statsError} />
         </div>
 
+        {/* Incomplete Onboarding Alert */}
+        {pendingProfiles && pendingProfiles.length > 0 && (
+          <Card className="mb-8 border-orange-200 bg-orange-50/50">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                <CardTitle className="text-lg font-semibold text-orange-800">
+                  Incomplete Onboarding ({pendingProfiles.length})
+                </CardTitle>
+              </div>
+              <p className="text-sm text-orange-700 mt-1">
+                These chefs started onboarding but haven't completed it. Call them to help finish!
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {pendingProfiles.slice(0, 6).map((pending) => (
+                  <div
+                    key={pending.id}
+                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-100 shadow-sm"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-foreground truncate">
+                        {pending.business_name || pending.chef_name || 'Unnamed'}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        {pending.email}
+                      </p>
+                      {pending.city && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {pending.city}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 ml-2">
+                      <Badge variant="outline" className="text-[10px] bg-orange-100 text-orange-700 border-orange-200">
+                        Step: {pending.current_step || 'contact'}
+                      </Badge>
+                      {pending.phone && (
+                        <a 
+                          href={`tel:${pending.phone}`}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Phone className="w-3 h-3" />
+                          Call
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {pendingProfiles.length > 6 && (
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  +{pendingProfiles.length - 6} more incomplete profiles
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Chef Pipeline */}
         <Card className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -367,12 +432,25 @@ export default function AdminDashboard() {
                   </TableRow>
                 ) : (
                   filteredChefs.map((chef) => (
-                    <TableRow key={chef.id}>
+                    <TableRow 
+                      key={chef.id}
+                      className={cn(
+                        !chef.onboarding_completed && "bg-orange-50/50 hover:bg-orange-50"
+                      )}
+                    >
                       <TableCell>
                         <div>
-                          <p className="font-medium">
-                            {chef.business_name || chef.chef_name || 'Unnamed'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">
+                              {chef.business_name || chef.chef_name || 'Unnamed'}
+                            </p>
+                            {!chef.onboarding_completed && (
+                              <Badge variant="outline" className="text-[10px] bg-orange-100 text-orange-700 border-orange-200">
+                                <AlertTriangle className="w-2.5 h-2.5 mr-1" />
+                                Incomplete
+                              </Badge>
+                            )}
+                          </div>
                           {chef.contact_email && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                               <Mail className="w-3 h-3" />
