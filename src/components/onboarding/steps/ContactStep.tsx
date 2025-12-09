@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
-import { Mail, Phone, User, Loader2 } from 'lucide-react';
+import { Mail, Phone, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 interface ContactStepProps {
   email: string;
@@ -20,7 +19,6 @@ interface ContactStepProps {
 export function ContactStep({ email, phone, firstName = '', lastName = '', onChange, onNext, onPrevious, onAccountCreated }: ContactStepProps) {
   const { t } = useTranslation();
   const [errors, setErrors] = useState<{ email?: string; phone?: string; firstName?: string }>({});
-  const [creatingAccount, setCreatingAccount] = useState(false);
 
   const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -51,51 +49,38 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
   const handleNext = async () => {
     if (!validate()) return;
     
-    setCreatingAccount(true);
-    try {
-      // Call edge function to auto-create account
-      const { data, error } = await supabase.functions.invoke('auto-create-account', {
-        body: {
-          email: email.trim(),
-          chefName: `${firstName} ${lastName}`.trim(),
-        },
-      });
-
+    // Silently create account in background - no UI feedback
+    supabase.functions.invoke('auto-create-account', {
+      body: {
+        email: email.trim(),
+        chefName: `${firstName} ${lastName}`.trim(),
+      },
+    }).then(({ data, error }) => {
       if (error) {
-        console.error('Auto-create account error:', error);
-        toast.error('Failed to create account. Please try again.');
-        setCreatingAccount(false);
+        console.error('Auto-create account error (background):', error);
         return;
       }
 
-      console.log('Account created/found:', data);
+      console.log('Account created/found (background):', data);
 
-      // If we got a verify token, use it to sign in
-      if (data.verifyToken) {
-        const { error: verifyError } = await supabase.auth.verifyOtp({
+      // If we got a verify token, use it to sign in silently
+      if (data?.verifyToken) {
+        supabase.auth.verifyOtp({
           token_hash: data.verifyToken,
           type: data.tokenType || 'magiclink',
-        });
-
-        if (verifyError) {
-          console.error('OTP verification error:', verifyError);
-          // Continue anyway - the account exists
-        }
+        }).catch(err => console.error('OTP verification error (background):', err));
       }
 
       // Notify parent about account creation
-      if (onAccountCreated && data.userId) {
+      if (onAccountCreated && data?.userId) {
         onAccountCreated(data.userId);
       }
+    }).catch(err => {
+      console.error('Error in background account creation:', err);
+    });
 
-      toast.success(data.isNewUser ? 'Account created!' : 'Welcome back!');
-      onNext();
-    } catch (err) {
-      console.error('Error in handleNext:', err);
-      toast.error('Something went wrong. Please try again.');
-    } finally {
-      setCreatingAccount(false);
-    }
+    // Continue immediately - don't wait for account creation
+    onNext();
   };
 
   const isValid = email.trim().length > 0 && phone.trim().length > 0 && firstName.trim().length > 0;
@@ -106,18 +91,8 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
       subtitle={t('contact.subtitle')}
       onNext={handleNext}
       onPrevious={onPrevious}
-      isNextDisabled={!isValid || creatingAccount}
-      nextLabel={creatingAccount ? undefined : undefined}
+      isNextDisabled={!isValid}
     >
-      {creatingAccount && (
-        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg">
-          <div className="flex items-center gap-2 text-primary">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Setting up your account...</span>
-          </div>
-        </div>
-      )}
-      
       <div className="max-w-md mx-auto space-y-6 relative">
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -135,7 +110,6 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
                   if (errors.firstName) setErrors(prev => ({ ...prev, firstName: undefined }));
                 }}
                 className="pl-10"
-                disabled={creatingAccount}
               />
             </div>
             {errors.firstName && (
@@ -152,7 +126,6 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
               placeholder={t('contact.lastNamePlaceholder')}
               value={lastName}
               onChange={(e) => onChange('lastName', e.target.value)}
-              disabled={creatingAccount}
             />
           </div>
         </div>
@@ -172,7 +145,6 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
                 if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
               }}
               className="pl-10"
-              disabled={creatingAccount}
             />
           </div>
           {errors.email && (
@@ -195,7 +167,6 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
                 if (errors.phone) setErrors(prev => ({ ...prev, phone: undefined }));
               }}
               className="pl-10"
-              disabled={creatingAccount}
             />
           </div>
           {errors.phone && (

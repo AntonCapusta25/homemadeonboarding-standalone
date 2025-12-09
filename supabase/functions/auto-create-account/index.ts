@@ -52,10 +52,10 @@ serve(async (req) => {
     const existingUser = existingUsers.users.find(u => u.email === email);
     
     if (existingUser) {
-      // User already exists - generate a session for them
+      // User already exists - generate a session for them silently
       console.log(`User already exists: ${email}, generating session`);
       
-      // Generate a magic link token that we can use for auto-login
+      // Generate a magic link token for auto-login
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email: email,
@@ -70,6 +70,14 @@ serve(async (req) => {
       const url = new URL(linkData.properties.action_link);
       const token = url.searchParams.get('token');
       const type = url.searchParams.get('type');
+
+      // Also send a magic link email for future logins (fire and forget)
+      supabaseAdmin.auth.signInWithOtp({
+        email: email,
+        options: {
+          emailRedirectTo: 'https://chef-craft-flow.lovable.app/dashboard',
+        }
+      }).catch(err => console.log('Magic link email send (non-blocking):', err));
 
       return new Response(
         JSON.stringify({ 
@@ -122,6 +130,16 @@ serve(async (req) => {
     const url = new URL(linkData.properties.action_link);
     const token = url.searchParams.get('token');
     const type = url.searchParams.get('type');
+
+    // Send a magic link email for future logins (fire and forget)
+    supabaseAdmin.auth.signInWithOtp({
+      email: email,
+      options: {
+        emailRedirectTo: 'https://chef-craft-flow.lovable.app/dashboard',
+      }
+    }).then(() => {
+      console.log(`Magic link email sent to: ${email}`);
+    }).catch(err => console.log('Magic link email send error (non-blocking):', err));
 
     console.log(`Account auto-created successfully for: ${email}`);
 
