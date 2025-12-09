@@ -43,7 +43,7 @@ async function sendMagicLinkEmail(
           <tr>
             <td style="padding: 40px 40px 20px;">
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #C65D3B; font-size: 28px; margin: 0 0 8px;">🍳 Home-Made-Chef</h1>
+                <h1 style="color: #C65D3B; font-size: 28px; margin: 0 0 8px;">🍳 Homemade Chef</h1>
                 <p style="color: #666; font-size: 14px; margin: 0;">Start your culinary journey</p>
               </div>
               
@@ -80,7 +80,7 @@ async function sendMagicLinkEmail(
           <tr>
             <td style="background-color: #FFF8F5; padding: 20px 40px; border-radius: 0 0 16px 16px;">
               <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-                © ${new Date().getFullYear()} Home-Made-Chef. All rights reserved.
+                © ${new Date().getFullYear()} Homemade Chef. All rights reserved.
               </p>
             </td>
           </tr>
@@ -99,8 +99,8 @@ async function sendMagicLinkEmail(
     },
     body: JSON.stringify({
       personalizations: [{ to: [{ email }] }],
-      from: { email: "info@homemademeals.net", name: "Home-Made-Chef" },
-      subject: `Welcome to Homemade ${businessName ? ` - ${businessName}` : ""} 🍳`,
+      from: { email: "info@homemademeals.net", name: "Homemade Chef" },
+      subject: `Welcome to Homemade${businessName ? ` - ${businessName}` : ""} 🍳`,
       content: [{ type: "text/html", value: emailHtml }],
     }),
   });
