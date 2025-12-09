@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth, AppRole } from '@/hooks/useAuth';
-import { CoolLoader } from '@/components/dashboard/CoolLoader';
+import { CoolLoader } from '@/components/ui/CoolLoader';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

@@ -88,7 +88,7 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
           {t('common.back', 'Back')}
         </Button>
         <Button onClick={onComplete} size="lg" variant="default">
-          {t('verification.finishAndGo', 'Finish & Go to Dashboard')}
+          {t('verification.complete', 'Complete Verification')}
         </Button>
       </div>
     </div>
