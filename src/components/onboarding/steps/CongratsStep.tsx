@@ -16,7 +16,6 @@ interface CongratsStepProps {
 export function CongratsStep({ profile, onStartFastVerification, verificationComplete = false }: CongratsStepProps) {
   const { t } = useTranslation();
   const [showContent, setShowContent] = useState(false);
-  const [emailsSent, setEmailsSent] = useState(false);
 
   useEffect(() => {
     // Trigger confetti celebration
@@ -29,9 +28,18 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
   }, []);
 
   // Send welcome emails when congrats page loads (profile just completed)
+  // Use localStorage to prevent duplicate sends across re-renders and page refreshes
   useEffect(() => {
     const sendWelcomeEmails = async () => {
-      if (emailsSent) return;
+      // Check localStorage to prevent duplicate sends
+      const emailSentKey = `welcome_emails_sent_${profile.email}`;
+      if (localStorage.getItem(emailSentKey)) {
+        console.log('Welcome emails already sent for this profile');
+        return;
+      }
+      
+      // Mark as sent immediately to prevent race conditions
+      localStorage.setItem(emailSentKey, 'true');
       
       try {
         // Send welcome email to chef
@@ -43,7 +51,7 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
           },
         });
 
-        // Send new signup notification to admin
+        // Send new signup notification to admin with full details
         await supabase.functions.invoke('send-notification-email', {
           body: {
             type: 'new_signup',
@@ -51,23 +59,30 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
             email: profile.email,
             phone: profile.phone,
             city: profile.city,
+            address: profile.streetAddress,
             businessName: profile.restaurantName,
             cuisines: profile.primaryCuisines,
+            dishTypes: profile.dishTypes,
+            serviceType: profile.serviceType,
+            availability: profile.availabilityBuckets,
+            foodSafetyStatus: profile.foodSafetyStatus,
+            kvkStatus: profile.kvkStatus,
             plan: profile.plan,
           },
         });
 
-        setEmailsSent(true);
         console.log('Welcome emails sent successfully');
       } catch (error) {
         console.error('Failed to send welcome emails:', error);
+        // Remove the flag so it can be retried
+        localStorage.removeItem(emailSentKey);
       }
     };
 
-    if (showContent && !emailsSent) {
+    if (showContent && profile.email) {
       sendWelcomeEmails();
     }
-  }, [showContent, emailsSent, profile]);
+  }, [showContent, profile]);
 
   const handleBookMeeting = () => {
     // Open Calendly or booking link
