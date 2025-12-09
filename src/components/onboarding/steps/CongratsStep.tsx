@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
-import { PartyPopper, Rocket, ArrowRight } from 'lucide-react';
+import { ChefHat, FileCheck, ShieldCheck, Zap } from 'lucide-react';
 import { fireCelebration } from '@/components/confetti';
 import { Logo } from '@/components/Logo';
 
 interface CongratsStepProps {
   profile: ChefProfile;
   onGoToDashboard: () => void;
+  onStartFastVerification: () => void;
 }
 
-export function CongratsStep({ profile, onGoToDashboard }: CongratsStepProps) {
+export function CongratsStep({ profile, onGoToDashboard, onStartFastVerification }: CongratsStepProps) {
   const { t } = useTranslation();
   const [showContent, setShowContent] = useState(false);
 
@@ -25,6 +26,19 @@ export function CongratsStep({ profile, onGoToDashboard }: CongratsStepProps) {
     return () => clearTimeout(timer);
   }, []);
 
+  const verificationItems = [
+    {
+      icon: ShieldCheck,
+      title: t('congrats.foodSafetyQuiz', 'Complete Food Safety Quiz'),
+      description: t('congrats.foodSafetyDesc', 'Pass a quick quiz to show you understand food safety basics'),
+    },
+    {
+      icon: FileCheck,
+      title: t('congrats.uploadDocs', 'Upload Required Documents'),
+      description: t('congrats.uploadDocsDesc', 'Upload your KVK registration and other required documents'),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
       <div className="container max-w-2xl mx-auto px-4 py-8">
@@ -34,64 +48,68 @@ export function CongratsStep({ profile, onGoToDashboard }: CongratsStepProps) {
             <Logo chefLogo={profile.logoUrl} size="lg" showText={false} />
           </div>
 
-          {/* Celebration icon */}
+          {/* Chef hat icon with animation */}
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center animate-bounce-slow">
-              <PartyPopper className="w-10 h-10 text-primary" />
+              <ChefHat className="w-10 h-10 text-primary" />
             </div>
           </div>
 
-          {/* Title */}
+          {/* Welcome message */}
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-            {t('congrats.title', 'Congratulations!')} 🎉
+            {t('congrats.welcome', 'Welcome on board, Chef!')} 🎉
           </h1>
 
-          {/* Subtitle */}
-          <p className="text-xl text-muted-foreground mb-4">
-            {t('congrats.subtitle', 'Your profile is complete!')}
-          </p>
-
-          {/* Business name */}
-          {profile.restaurantName && (
+          {/* Chef name */}
+          {profile.firstName && (
             <p className="text-2xl font-semibold text-primary mb-8">
-              {profile.restaurantName}
+              {profile.firstName} {profile.lastName}
             </p>
           )}
 
-          {/* What's next section */}
+          {/* Fast verification section */}
           <div className="bg-card rounded-xl border border-border p-6 mb-8 text-left">
-            <h2 className="font-semibold text-lg mb-4 flex items-center gap-2">
-              <Rocket className="w-5 h-5 text-primary" />
-              {t('congrats.whatsNext', "What's next?")}
+            <h2 className="font-semibold text-lg mb-2 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" />
+              {t('congrats.getApprovedFaster', 'Get approved faster!')}
             </h2>
-            <p className="text-muted-foreground mb-4">
-              {t('congrats.teamReachOut', "You're all set! Our onboarding team will reach out to you shortly to help you get started.")}
+            <p className="text-muted-foreground mb-6">
+              {t('congrats.completeSteps', 'Complete these steps to speed up your verification:')}
             </p>
-            <ul className="space-y-3 text-muted-foreground">
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                <span>{t('congrats.step1', 'Our team will call you within 24-48 hours')}</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                <span>{t('congrats.step2', 'Review and customize your AI-generated menu')}</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                <span>{t('congrats.step3', 'Start receiving orders from customers!')}</span>
-              </li>
+            
+            <ul className="space-y-4">
+              {verificationItems.map((item, index) => (
+                <li key={index} className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <item.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* CTA Button */}
-          <Button 
-            size="xl" 
-            onClick={onGoToDashboard}
-            className="shadow-glow hover:shadow-medium"
-          >
-            {t('congrats.goToDashboard', 'Go to Dashboard')}
-            <ArrowRight className="w-5 h-5" />
-          </Button>
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              size="xl" 
+              onClick={onStartFastVerification}
+              className="shadow-glow hover:shadow-medium"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              {t('congrats.fastVerification', 'Fast Verification')}
+            </Button>
+            <Button 
+              size="xl" 
+              variant="outline"
+              onClick={onGoToDashboard}
+            >
+              {t('congrats.skipToDashboard', 'Skip to Dashboard')}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
