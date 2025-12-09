@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
-import { Check, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, UtensilsCrossed, CircleCheck, Circle } from 'lucide-react';
+import { Check, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, CircleCheck, Circle, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { fireCelebration } from '@/components/confetti';
+import { fireCelebration, fireConfetti } from '@/components/confetti';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableMenu } from '@/components/menu/EditableMenu';
 import { useMenu } from '@/hooks/useMenu';
 import { useChefProfile } from '@/hooks/useChefProfile';
+import { toast } from '@/hooks/use-toast';
 
 interface SummaryStepProps { 
   profile: ChefProfile; 
@@ -24,6 +26,7 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
   const [menuLoading, setMenuLoading] = useState(true);
   const [generatedMenu, setGeneratedMenu] = useState(profile.generatedMenu);
   const [menuSaving, setMenuSaving] = useState(false);
+  const [regeneratingLogo, setRegeneratingLogo] = useState(false);
   const { saveMenu } = useMenu();
   const { profile: dbProfile } = useChefProfile();
 
@@ -93,6 +96,52 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
     }
   }, [dbProfile?.id, generatedMenu, saveMenu]);
 
+  // Regenerate logo
+  const handleRegenerateLogo = async () => {
+    setRegeneratingLogo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-logo', {
+        body: { 
+          name: profile.restaurantName, 
+          cuisine: profile.primaryCuisines?.join(', '),
+          tagline: profile.firstName ? `By Chef ${profile.firstName}` : undefined,
+          logoStyle: 'modern minimal',
+          primaryColor: '#C65D3B',
+          secondaryColor: '#F2A35E',
+          uploadToStorage: true,
+          storageBucket: 'logos',
+          storagePath: `generated/${Date.now()}-${profile.restaurantName?.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.png`,
+          publicUrl: true
+        }
+      });
+
+      if (error) {
+        console.error('Logo regeneration error:', error);
+        toast({ title: "Failed to regenerate", description: "Please try again", variant: "destructive" });
+        return;
+      }
+
+      let logoData: string | null = null;
+      
+      if (data?.uploaded?.url) {
+        logoData = data.uploaded.url;
+      } else if (data?.base64) {
+        logoData = `data:image/${data.type === 'svg' ? 'svg+xml' : 'png'};base64,${data.base64}`;
+      }
+
+      if (logoData && onUpdateProfile) {
+        onUpdateProfile({ logoUrl: logoData, logoGenerationMethod: 'ai' });
+        fireConfetti();
+        toast({ title: "Logo regenerated!", description: "Your new logo is ready" });
+      }
+    } catch (err) {
+      console.error('Logo regeneration failed:', err);
+      toast({ title: "Failed to regenerate", description: "Please try again", variant: "destructive" });
+    } finally {
+      setRegeneratingLogo(false);
+    }
+  };
+
   // Summary of completed steps
   const completedItems = [
     { label: t('summary.completed.city', { city: profile.city }), value: profile.city },
@@ -142,9 +191,23 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
 
   return (
     <div className={`flex flex-col items-center justify-center min-h-[70vh] text-center px-4 ${showContent ? 'animate-fade-in' : 'opacity-0'}`}>
+      {/* Logo with regenerate option */}
       <div className="mb-8 relative">
         {profile.logoUrl ? (
-          <img src={profile.logoUrl} alt="Your logo" className="w-24 h-24 rounded-3xl shadow-glow animate-scale-in object-cover border-4 border-primary/20" />
+          <div className="relative group">
+            <img src={profile.logoUrl} alt="Your logo" className="w-24 h-24 rounded-3xl shadow-glow animate-scale-in object-cover border-4 border-primary/20" />
+            <button
+              onClick={handleRegenerateLogo}
+              disabled={regeneratingLogo}
+              className="absolute inset-0 bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+            >
+              {regeneratingLogo ? (
+                <Loader2 className="w-6 h-6 text-white animate-spin" />
+              ) : (
+                <RefreshCw className="w-6 h-6 text-white" />
+              )}
+            </button>
+          </div>
         ) : (
           <div className="w-24 h-24 bg-gradient-warm rounded-3xl flex items-center justify-center shadow-glow animate-scale-in">
             <Store className="w-12 h-12 text-primary-foreground" />
@@ -154,6 +217,17 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
           <Check className="w-5 h-5 text-accent-foreground" />
         </div>
       </div>
+
+      {profile.logoUrl && (
+        <button 
+          onClick={handleRegenerateLogo}
+          disabled={regeneratingLogo}
+          className="text-sm text-muted-foreground hover:text-primary mb-4 flex items-center gap-1 transition-colors"
+        >
+          <RefreshCw className={cn("w-3 h-3", regeneratingLogo && "animate-spin")} />
+          {regeneratingLogo ? 'Regenerating...' : 'Regenerate logo'}
+        </button>
+      )}
 
       <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4 animate-slide-up">{t('summary.ready')} 🎉</h1>
       
