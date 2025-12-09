@@ -85,8 +85,7 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
   }, [showContent, profile]);
 
   const handleBookMeeting = () => {
-    // Open Calendly or booking link
-    window.open('https://calendly.com/homemade-meals/chef-onboarding', '_blank');
+    window.open('https://calendly.com/homemademeals-info/interview-with-homemade', '_blank');
   };
 
   const verificationItems = [
@@ -148,7 +147,7 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
           )}
 
           {/* Waiting for approval status */}
-          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-8 flex items-center gap-3 justify-center">
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-6 flex items-center gap-3 justify-center">
             <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             <p className="text-amber-700 dark:text-amber-300 font-medium">
               {t('congrats.waitingApproval', 'You are currently waiting for approval to join the Homemade platform')}
@@ -158,8 +157,28 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
           {/* Show verification steps or completion message */}
           {!verificationComplete ? (
             <>
+              {/* CTA Buttons - Now at the top! */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+                <Button 
+                  size="xl" 
+                  onClick={onStartFastVerification}
+                  className="shadow-glow hover:shadow-medium"
+                >
+                  {t('congrats.startVerification', 'Complete Profile')}
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+                <Button 
+                  size="xl" 
+                  variant="outline"
+                  onClick={handleBookMeeting}
+                >
+                  <Calendar className="w-5 h-5 mr-2" />
+                  {t('congrats.bookMeeting', 'Book a Meeting')}
+                </Button>
+              </div>
+
               {/* Speed up verification section */}
-              <div className="bg-card rounded-xl border border-border p-6 mb-8 text-left">
+              <div className="bg-card rounded-xl border border-border p-6 text-left">
                 <h2 className="font-semibold text-lg mb-2 flex items-center gap-2">
                   <Zap className="w-5 h-5 text-amber-500" />
                   {t('congrats.speedUpApproval', 'Speed up your approval!')}
@@ -183,26 +202,6 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
                     </li>
                   ))}
                 </ul>
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button 
-                  size="xl" 
-                  onClick={onStartFastVerification}
-                  className="shadow-glow hover:shadow-medium"
-                >
-                  {t('congrats.startVerification', 'Complete Profile')}
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-                <Button 
-                  size="xl" 
-                  variant="outline"
-                  onClick={handleBookMeeting}
-                >
-                  <Calendar className="w-5 h-5 mr-2" />
-                  {t('congrats.bookMeeting', 'Book a Meeting')}
-                </Button>
               </div>
             </>
           ) : (
