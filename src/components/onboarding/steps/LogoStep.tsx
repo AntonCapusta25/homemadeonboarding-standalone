@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { StepLayout } from '../StepLayout';
-import { Sparkles, Upload, SkipForward, Loader2, Image as ImageIcon, Check, X } from 'lucide-react';
+import { Sparkles, Upload, SkipForward, Loader2, Image as ImageIcon, Check, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LogoMethod } from '@/types/onboarding';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,11 +75,6 @@ export function LogoStep({
   const generateLogoInBackground = async () => {
     setIsGenerating(true);
     setShowGeneratingPopup(true);
-    
-    // Auto-advance to next step after a short delay
-    setTimeout(() => {
-      onNext();
-    }, 1500);
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-logo', {
@@ -243,8 +238,18 @@ export function LogoStep({
             <div className="flex-1">
               <h4 className="font-semibold text-foreground text-sm">Creating your logo ✨</h4>
               <p className="text-xs text-muted-foreground mt-1">
-                Your logo is being crafted in the background. Continue with the next steps!
+                Your logo is being crafted in the background. You can proceed to the next step!
               </p>
+              <Button 
+                size="sm" 
+                className="mt-3" 
+                onClick={() => {
+                  setShowGeneratingPopup(false);
+                  onNext();
+                }}
+              >
+                Continue <ArrowRight className="w-3 h-3 ml-1" />
+              </Button>
             </div>
             <button 
               onClick={() => setShowGeneratingPopup(false)}
