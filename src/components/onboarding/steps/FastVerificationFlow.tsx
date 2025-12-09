@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChefProfile } from '@/types/onboarding';
 import { MenuReviewStep } from './verification/MenuReviewStep';
 import { DocumentUploadStep } from './verification/DocumentUploadStep';
 import { FoodSafetyInfoStep } from './verification/FoodSafetyInfoStep';
 import { ProgressBar } from '../ProgressBar';
+import { supabase } from '@/integrations/supabase/client';
+import { useVerification } from '@/hooks/useVerification';
+import { Loader2 } from 'lucide-react';
 
 interface FastVerificationFlowProps {
   profile: ChefProfile;
@@ -17,14 +20,72 @@ const STEPS: VerificationStep[] = ['menu-review', 'documents', 'food-safety'];
 
 export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: FastVerificationFlowProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const currentStep = STEPS[currentStepIndex];
+  const [chefProfileId, setChefProfileId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { getOrCreateProgress, updateProgress, progress } = useVerification();
   
-  const progress = ((currentStepIndex + 1) / STEPS.length) * 100;
+  const currentStep = STEPS[currentStepIndex];
+  const progressPercent = ((currentStepIndex + 1) / STEPS.length) * 100;
 
-  const goToNext = () => {
+  // Load chef profile and verification progress
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+
+        const { data: chefProfile } = await supabase
+          .from('chef_profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (chefProfile) {
+          setChefProfileId(chefProfile.id);
+          const verificationProgress = await getOrCreateProgress(chefProfile.id);
+          
+          // Resume from last completed step
+          if (verificationProgress) {
+            if (verificationProgress.foodSafetyViewed) {
+              setCurrentStepIndex(2);
+            } else if (verificationProgress.documentsUploaded) {
+              setCurrentStepIndex(1);
+            } else if (verificationProgress.menuReviewed) {
+              setCurrentStepIndex(1);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading verification data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [getOrCreateProgress]);
+
+  const goToNext = async () => {
+    // Save progress for current step
+    if (chefProfileId) {
+      const updates: Record<string, boolean> = {};
+      if (currentStep === 'menu-review') updates.menuReviewed = true;
+      if (currentStep === 'documents') updates.documentsUploaded = true;
+      if (currentStep === 'food-safety') updates.foodSafetyViewed = true;
+      
+      await updateProgress(chefProfileId, updates);
+    }
+
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
     } else {
+      // Mark verification as completed
+      if (chefProfileId) {
+        await updateProgress(chefProfileId, { verificationCompleted: true });
+      }
       onComplete();
     }
   };
@@ -35,6 +96,25 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
     }
   };
 
+  const handleDocumentUpload = async (docType: 'kvk' | 'haccp' | 'nvwa', url: string) => {
+    if (!chefProfileId) return;
+    
+    const updates: Record<string, string> = {};
+    if (docType === 'kvk') updates.kvkDocumentUrl = url;
+    if (docType === 'haccp') updates.haccpDocumentUrl = url;
+    if (docType === 'nvwa') updates.nvwaDocumentUrl = url;
+    
+    await updateProgress(chefProfileId, updates);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   const renderStep = () => {
     switch (currentStep) {
       case 'menu-review':
@@ -44,6 +124,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
             onUpdateProfile={onUpdateProfile}
             onNext={goToNext}
             onSkip={goToNext}
+            chefProfileId={chefProfileId}
           />
         );
       case 'documents':
@@ -54,12 +135,14 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
             onNext={goToNext}
             onPrevious={goToPrevious}
             onSkip={goToNext}
+            onDocumentUpload={handleDocumentUpload}
+            verificationProgress={progress}
           />
         );
       case 'food-safety':
         return (
           <FoodSafetyInfoStep
-            onComplete={onComplete}
+            onComplete={goToNext}
             onPrevious={goToPrevious}
           />
         );
@@ -73,7 +156,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
       <div className="container max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8 animate-fade-in">
           <ProgressBar
-            progress={progress}
+            progress={progressPercent}
             currentStep={currentStepIndex + 1}
             totalSteps={STEPS.length}
           />

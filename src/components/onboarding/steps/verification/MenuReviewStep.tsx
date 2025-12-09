@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChefProfile, GeneratedMenu, MenuDish, MenuUpsell } from '@/types/onboarding';
+import { ChefProfile, GeneratedMenu } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
 import { ChefHat, ArrowRight, SkipForward, Loader2 } from 'lucide-react';
 import { EditableMenu } from '@/components/menu/EditableMenu';
@@ -13,45 +13,97 @@ interface MenuReviewStepProps {
   onUpdateProfile: (updates: Partial<ChefProfile>) => void;
   onNext: () => void;
   onSkip: () => void;
+  chefProfileId?: string | null;
 }
 
-export function MenuReviewStep({ profile, onUpdateProfile, onNext, onSkip }: MenuReviewStepProps) {
+export function MenuReviewStep({ profile, onUpdateProfile, onNext, onSkip, chefProfileId }: MenuReviewStepProps) {
   const { t } = useTranslation();
   const [menu, setMenu] = useState<GeneratedMenu | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { loadActiveMenu, toGeneratedMenu, saveDishes } = useMenu();
+  const { loadActiveMenu, toGeneratedMenu, saveMenu } = useMenu();
 
   useEffect(() => {
     loadMenu();
-  }, []);
+  }, [chefProfileId]);
 
   const loadMenu = async () => {
     setLoading(true);
     try {
-      // Load from database
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: chefProfile } = await supabase
-          .from('chef_profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (chefProfile) {
-          const result = await loadActiveMenu(chefProfile.id);
-          if (result) {
-            setMenuId(result.menu.id);
-            const convertedMenu = toGeneratedMenu(result.menu, result.dishes);
-            setMenu(convertedMenu);
+      let profileId = chefProfileId;
+      
+      // If no chefProfileId provided, try to get it from authenticated user
+      if (!profileId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: chefProfile } = await supabase
+            .from('chef_profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (chefProfile) {
+            profileId = chefProfile.id;
           }
+        }
+      }
+
+      if (profileId) {
+        // Try to load existing menu from database
+        const result = await loadActiveMenu(profileId);
+        
+        if (result && result.dishes.length > 0) {
+          // Menu exists in database
+          setMenuId(result.menu.id);
+          const convertedMenu = toGeneratedMenu(result.menu, result.dishes);
+          setMenu(convertedMenu);
+        } else {
+          // No menu exists - generate one now
+          console.log('No menu found, generating new menu...');
+          await generateAndSaveMenu(profileId);
         }
       }
     } catch (error) {
       console.error('Error loading menu:', error);
+      toast.error(t('verification.menuLoadError', 'Failed to load menu'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateAndSaveMenu = async (profileId: string) => {
+    try {
+      const { data: menuData, error: menuError } = await supabase.functions.invoke('generate-menu', {
+        body: {
+          city: profile.city,
+          cuisines: profile.primaryCuisines,
+          dishTypes: profile.dishTypes,
+          serviceType: profile.serviceType,
+          restaurantName: profile.restaurantName,
+          chefName: profile.firstName
+        }
+      });
+
+      if (menuError) {
+        console.error('Menu generation error:', menuError);
+        toast.error(t('verification.menuGenerateError', 'Failed to generate menu'));
+        return;
+      }
+
+      if (menuData?.menu) {
+        // Save the generated menu to database
+        const savedMenu = await saveMenu(profileId, menuData.menu);
+        
+        if (savedMenu) {
+          setMenuId(savedMenu.id);
+          setMenu(menuData.menu);
+          toast.success(t('verification.menuGenerated', 'Menu generated successfully!'));
+        }
+      }
+    } catch (error) {
+      console.error('Error generating menu:', error);
+      toast.error(t('verification.menuGenerateError', 'Failed to generate menu'));
     }
   };
 
@@ -62,20 +114,7 @@ export function MenuReviewStep({ profile, onUpdateProfile, onNext, onSkip }: Men
   const handleSaveAndContinue = async () => {
     setSaving(true);
     try {
-      if (menu && menuId) {
-        // Convert menu to dashboard dish format and save
-        const dishesToSave = menu.dishes.map((dish, index) => ({
-          id: `existing-${index}`, // This will be handled by the save logic
-          name: dish.name,
-          price: String(dish.price),
-          description: dish.description || '',
-          estimatedCost: dish.estimatedCost,
-          margin: dish.margin,
-        }));
-        
-        // For now, just show success - actual save happens via EditableMenu autosave
-        toast.success(t('verification.menuSaved', 'Menu saved!'));
-      }
+      toast.success(t('verification.menuSaved', 'Menu saved!'));
       onNext();
     } catch (error) {
       console.error('Error saving menu:', error);

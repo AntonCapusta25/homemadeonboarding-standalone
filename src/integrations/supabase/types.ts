@@ -148,6 +148,56 @@ export type Database = {
         }
         Relationships: []
       }
+      chef_verification: {
+        Row: {
+          chef_profile_id: string
+          created_at: string
+          documents_uploaded: boolean | null
+          food_safety_viewed: boolean | null
+          haccp_document_url: string | null
+          id: string
+          kvk_document_url: string | null
+          menu_reviewed: boolean | null
+          nvwa_document_url: string | null
+          updated_at: string
+          verification_completed: boolean | null
+        }
+        Insert: {
+          chef_profile_id: string
+          created_at?: string
+          documents_uploaded?: boolean | null
+          food_safety_viewed?: boolean | null
+          haccp_document_url?: string | null
+          id?: string
+          kvk_document_url?: string | null
+          menu_reviewed?: boolean | null
+          nvwa_document_url?: string | null
+          updated_at?: string
+          verification_completed?: boolean | null
+        }
+        Update: {
+          chef_profile_id?: string
+          created_at?: string
+          documents_uploaded?: boolean | null
+          food_safety_viewed?: boolean | null
+          haccp_document_url?: string | null
+          id?: string
+          kvk_document_url?: string | null
+          menu_reviewed?: boolean | null
+          nvwa_document_url?: string | null
+          updated_at?: string
+          verification_completed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chef_verification_chef_profile_id_fkey"
+            columns: ["chef_profile_id"]
+            isOneToOne: true
+            referencedRelation: "chef_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dishes: {
         Row: {
           category: string | null
