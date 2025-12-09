@@ -242,7 +242,8 @@
     "cost": "Cost",
     "margin": "margin",
     "cheaper": "cheaper than restaurants",
-    "editMenu": "Edit menu in dashboard"
+    "editMenu": "Edit menu in dashboard",
+    "addDish": "Add a dish"
   },
   "congrats": {
     "title": "Congratulations!",
