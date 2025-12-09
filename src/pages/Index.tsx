@@ -41,7 +41,7 @@ const Index = () => {
         <title>Join Homemade - Start Your Home Restaurant</title>
         <meta
           name="description"
-          content="Launch your home restaurant with Home-Made-Chef. Simple onboarding, AI-powered tools, and full support to get you cooking and selling in no time."
+          content="Launch your home restaurant with Homemade Chef. Simple onboarding, AI-powered tools, and full support to get you cooking and selling in no time."
         />
       </Helmet>
 
