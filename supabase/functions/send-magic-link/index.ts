@@ -27,10 +27,10 @@ serve(async (req) => {
     const { email, chefName, businessName, magicLinkUrl }: SendMagicLinkRequest = await req.json();
 
     if (!email || !magicLinkUrl) {
-      return new Response(
-        JSON.stringify({ error: "Email and magicLinkUrl are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Email and magicLinkUrl are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`Sending magic link email to: ${email}`);
@@ -41,7 +41,7 @@ serve(async (req) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to Home-Made-Chef</title>
+  <title>Welcome to Homemade</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #FFF8F5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -56,11 +56,11 @@ serve(async (req) => {
               </div>
               
               <h2 style="color: #333; font-size: 24px; margin: 0 0 16px; text-align: center;">
-                Welcome${chefName ? `, ${chefName}` : ''}! 🎉
+                Welcome${chefName ? `, ${chefName}` : ""}! 🎉
               </h2>
               
               <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
-                ${businessName ? `Your restaurant <strong>${businessName}</strong> is almost ready!` : 'Your account is almost ready!'} 
+                ${businessName ? `Your restaurant <strong>${businessName}</strong> is almost ready!` : "Your account is almost ready!"} 
                 Click the button below to verify your email and access your dashboard.
               </p>
               
@@ -102,16 +102,14 @@ serve(async (req) => {
     const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+        Authorization: `Bearer ${SENDGRID_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email }] }],
         from: { email: "info@homemademeals.net", name: "Home-Made-Chef" },
-        subject: `Welcome to Home-Made-Chef${businessName ? ` - ${businessName}` : ''} 🍳`,
-        content: [
-          { type: "text/html", value: emailHtml }
-        ],
+        subject: `Welcome to Home-Made-Chef${businessName ? ` - ${businessName}` : ""} 🍳`,
+        content: [{ type: "text/html", value: emailHtml }],
       }),
     });
 
@@ -123,16 +121,15 @@ serve(async (req) => {
 
     console.log(`Magic link email sent successfully to: ${email}`);
 
-    return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully" }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-
+    return new Response(JSON.stringify({ success: true, message: "Email sent successfully" }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error: any) {
     console.error("Error sending magic link email:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

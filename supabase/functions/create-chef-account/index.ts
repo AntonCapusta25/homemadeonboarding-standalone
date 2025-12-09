@@ -18,10 +18,10 @@ async function sendMagicLinkEmail(
   businessName: string,
   magicLinkUrl: string,
   supabaseUrl: string,
-  serviceRoleKey: string
+  serviceRoleKey: string,
 ): Promise<void> {
   const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-  
+
   if (!SENDGRID_API_KEY) {
     console.log("SendGrid not configured, falling back to Supabase email");
     return;
@@ -33,7 +33,7 @@ async function sendMagicLinkEmail(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to Home-Made-Chef</title>
+  <title>Welcome to Homemade</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #FFF8F5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -48,11 +48,11 @@ async function sendMagicLinkEmail(
               </div>
               
               <h2 style="color: #333; font-size: 24px; margin: 0 0 16px; text-align: center;">
-                Welcome${chefName ? `, ${chefName}` : ''}! 🎉
+                Welcome${chefName ? `, ${chefName}` : ""}! 🎉
               </h2>
               
               <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
-                ${businessName ? `Your restaurant <strong>${businessName}</strong> is almost ready!` : 'Your account is almost ready!'} 
+                ${businessName ? `Your restaurant <strong>${businessName}</strong> is almost ready!` : "Your account is almost ready!"} 
                 Click the button below to verify your email and access your dashboard.
               </p>
               
@@ -94,13 +94,13 @@ async function sendMagicLinkEmail(
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+      Authorization: `Bearer ${SENDGRID_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       personalizations: [{ to: [{ email }] }],
       from: { email: "info@homemademeals.net", name: "Home-Made-Chef" },
-      subject: `Welcome to Home-Made-Chef${businessName ? ` - ${businessName}` : ''} 🍳`,
+      subject: `Welcome to Homemade ${businessName ? ` - ${businessName}` : ""} 🍳`,
       content: [{ type: "text/html", value: emailHtml }],
     }),
   });
@@ -123,7 +123,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     // Use service role client for admin operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
@@ -133,26 +133,26 @@ serve(async (req) => {
     });
 
     const { email, pendingProfileId, redirectTo }: CreateAccountRequest = await req.json();
-    
+
     if (!email || !pendingProfileId) {
-      return new Response(
-        JSON.stringify({ error: "Email and pendingProfileId are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Email and pendingProfileId are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`Processing account creation for email: ${email}`);
 
     // Check if user already exists
     const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    
+
     if (listError) {
       console.error("Error checking existing users:", listError);
       throw listError;
     }
 
-    const existingUser = existingUsers.users.find(u => u.email === email);
-    
+    const existingUser = existingUsers.users.find((u) => u.email === email);
+
     // Fetch pending profile data (needed for email personalization)
     const { data: pendingProfile, error: profileError } = await supabaseAdmin
       .from("pending_profiles")
@@ -162,21 +162,21 @@ serve(async (req) => {
 
     if (profileError || !pendingProfile) {
       console.error("Error fetching pending profile:", profileError);
-      return new Response(
-        JSON.stringify({ error: "Pending profile not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Pending profile not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    
+
     if (existingUser) {
       // User exists - generate magic link for login
       console.log(`User exists, generating login magic link for: ${email}`);
-      
+
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
+        type: "magiclink",
         email: email,
         options: {
-          redirectTo: 'https://chef-craft-flow.lovable.app/summary',
+          redirectTo: "https://chef-craft-flow.lovable.app/summary",
         },
       });
 
@@ -186,12 +186,12 @@ serve(async (req) => {
       }
 
       // Replace preview URL with production URL in the redirect_to parameter
-      const productionUrl = 'https://chef-craft-flow.lovable.app';
+      const productionUrl = "https://chef-craft-flow.lovable.app";
       let magicLinkUrl = linkData.properties.action_link;
-      
+
       // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too
       const encodedProductionUrl = encodeURIComponent(productionUrl);
-      
+
       // Replace any lovable preview/project URLs (both encoded and non-encoded)
       magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovable\.app/gi, encodedProductionUrl);
       magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovableproject\.com/gi, encodedProductionUrl);
@@ -204,11 +204,11 @@ serve(async (req) => {
       try {
         await sendMagicLinkEmail(
           email,
-          pendingProfile.chef_name || '',
-          pendingProfile.business_name || '',
+          pendingProfile.chef_name || "",
+          pendingProfile.business_name || "",
           magicLinkUrl,
           supabaseUrl,
-          serviceRoleKey
+          serviceRoleKey,
         );
       } catch (sendError) {
         console.error("SendGrid failed, falling back to Supabase:", sendError);
@@ -220,18 +220,18 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           isNewUser: false,
-          message: "Magic link sent to existing user" 
+          message: "Magic link sent to existing user",
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Create new user
     console.log(`Creating new user for: ${email}`);
-    
+
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       email_confirm: false,
@@ -249,26 +249,24 @@ serve(async (req) => {
     console.log(`User created with ID: ${newUser.user.id}`);
 
     // Create chef profile linked to the new user
-    const { error: chefProfileError } = await supabaseAdmin
-      .from("chef_profiles")
-      .insert({
-        user_id: newUser.user.id,
-        contact_email: pendingProfile.email,
-        contact_phone: pendingProfile.phone,
-        chef_name: pendingProfile.chef_name,
-        business_name: pendingProfile.business_name,
-        city: pendingProfile.city,
-        address: pendingProfile.address,
-        cuisines: pendingProfile.cuisines,
-        dish_types: pendingProfile.dish_types,
-        availability: pendingProfile.availability,
-        service_type: pendingProfile.service_type,
-        food_safety_status: pendingProfile.food_safety_status,
-        kvk_status: pendingProfile.kvk_status,
-        plan: pendingProfile.plan,
-        logo_url: pendingProfile.logo_url,
-        onboarding_completed: true,
-      });
+    const { error: chefProfileError } = await supabaseAdmin.from("chef_profiles").insert({
+      user_id: newUser.user.id,
+      contact_email: pendingProfile.email,
+      contact_phone: pendingProfile.phone,
+      chef_name: pendingProfile.chef_name,
+      business_name: pendingProfile.business_name,
+      city: pendingProfile.city,
+      address: pendingProfile.address,
+      cuisines: pendingProfile.cuisines,
+      dish_types: pendingProfile.dish_types,
+      availability: pendingProfile.availability,
+      service_type: pendingProfile.service_type,
+      food_safety_status: pendingProfile.food_safety_status,
+      kvk_status: pendingProfile.kvk_status,
+      plan: pendingProfile.plan,
+      logo_url: pendingProfile.logo_url,
+      onboarding_completed: true,
+    });
 
     if (chefProfileError) {
       console.error("Error creating chef profile:", chefProfileError);
@@ -278,10 +276,10 @@ serve(async (req) => {
 
     // Generate magic link
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
+      type: "magiclink",
       email: email,
       options: {
-        redirectTo: 'https://chef-craft-flow.lovable.app/summary',
+        redirectTo: "https://chef-craft-flow.lovable.app/summary",
       },
     });
 
@@ -291,12 +289,12 @@ serve(async (req) => {
     }
 
     // Replace preview URL with production URL in the redirect_to parameter
-    const productionUrl = 'https://chef-craft-flow.lovable.app';
+    const productionUrl = "https://chef-craft-flow.lovable.app";
     let magicLinkUrl = linkData.properties.action_link;
-    
+
     // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too
     const encodedProductionUrl = encodeURIComponent(productionUrl);
-    
+
     // Replace any lovable preview/project URLs (both encoded and non-encoded)
     magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovable\.app/gi, encodedProductionUrl);
     magicLinkUrl = magicLinkUrl.replace(/https%3A%2F%2F[a-z0-9-]+\.lovableproject\.com/gi, encodedProductionUrl);
@@ -309,11 +307,11 @@ serve(async (req) => {
     try {
       await sendMagicLinkEmail(
         email,
-        pendingProfile.chef_name || '',
-        pendingProfile.business_name || '',
+        pendingProfile.chef_name || "",
+        pendingProfile.business_name || "",
         magicLinkUrl,
         supabaseUrl,
-        serviceRoleKey
+        serviceRoleKey,
       );
     } catch (sendError) {
       console.error("SendGrid failed, falling back to Supabase:", sendError);
@@ -325,27 +323,23 @@ serve(async (req) => {
     }
 
     // Delete the pending profile
-    await supabaseAdmin
-      .from("pending_profiles")
-      .delete()
-      .eq("id", pendingProfileId);
+    await supabaseAdmin.from("pending_profiles").delete().eq("id", pendingProfileId);
 
     console.log(`Account creation complete for: ${email}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         isNewUser: true,
-        message: "Account created and magic link sent" 
+        message: "Account created and magic link sent",
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error: any) {
     console.error("Error in create-chef-account:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
