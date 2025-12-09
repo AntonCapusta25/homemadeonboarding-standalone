@@ -7,6 +7,20 @@ type ChefProfile = Tables<'chef_profiles'>;
 export interface ChefWithStats extends ChefProfile {
   menuCount?: number;
   dishCount?: number;
+  isPending?: boolean; // True if from pending_profiles (incomplete onboarding)
+  currentStep?: string; // Current onboarding step for pending profiles
+}
+
+export interface PendingProfile {
+  id: string;
+  email: string;
+  phone: string | null;
+  chef_name: string | null;
+  business_name: string | null;
+  city: string | null;
+  cuisines: string[] | null;
+  current_step: string | null;
+  created_at: string;
 }
 
 export interface AdminUser {
@@ -22,6 +36,7 @@ interface UseChefProfilesOptions {
   cityFilter?: string;
   assignedToMe?: boolean;
   adminId?: string;
+  includePending?: boolean; // Whether to include pending profiles
 }
 
 interface Analytics {
@@ -30,12 +45,14 @@ interface Analytics {
   chefsLast7Days: number;
   avgCompletion: number;
   statusBreakdown: Record<string, number>;
+  pendingCount: number; // New: count of incomplete onboarding
 }
 
 export function useChefProfiles(options: UseChefProfilesOptions = {}) {
-  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId } = options;
+  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId, includePending = true } = options;
 
   const [chefs, setChefs] = useState<ChefWithStats[]>([]);
+  const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,10 +143,29 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       setChefs(deduplicatedChefs);
       setTotalCount(count || 0);
 
+      // Fetch pending profiles (incomplete onboarding)
+      if (includePending) {
+        const { data: pendingData } = await supabase
+          .from('pending_profiles')
+          .select('id, email, phone, chef_name, business_name, city, cuisines, current_step, created_at')
+          .order('created_at', { ascending: false });
+
+        if (pendingData) {
+          // Filter out pending profiles that already exist in chef_profiles
+          const existingEmails = new Set(deduplicatedChefs.map(c => c.contact_email?.toLowerCase()));
+          const filteredPending = pendingData.filter(p => !existingEmails.has(p.email.toLowerCase()));
+          setPendingProfiles(filteredPending);
+        }
+      }
+
       // Fetch analytics
       const { data: allChefs } = await supabase
         .from('chef_profiles')
         .select('created_at, admin_status, onboarding_completed');
+
+      const { count: pendingCountResult } = await supabase
+        .from('pending_profiles')
+        .select('id', { count: 'exact', head: true });
 
       if (allChefs) {
         const now = new Date();
@@ -157,6 +193,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             ? Math.round((completedCount / allChefs.length) * 100)
             : 0,
           statusBreakdown,
+          pendingCount: pendingCountResult || 0,
         });
       }
     } catch (err) {
@@ -165,7 +202,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId]);
+  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId, includePending]);
 
   useEffect(() => {
     fetchChefs();
@@ -348,6 +385,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
   return {
     chefs,
+    pendingProfiles,
     admins,
     loading,
     error,

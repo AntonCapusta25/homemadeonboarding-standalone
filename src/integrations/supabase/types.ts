@@ -248,6 +248,7 @@ export type Database = {
           city: string | null
           created_at: string
           cuisines: string[] | null
+          current_step: string | null
           dish_types: string[] | null
           email: string
           expires_at: string
@@ -269,6 +270,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           cuisines?: string[] | null
+          current_step?: string | null
           dish_types?: string[] | null
           email: string
           expires_at?: string
@@ -290,6 +292,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           cuisines?: string[] | null
+          current_step?: string | null
           dish_types?: string[] | null
           email?: string
           expires_at?: string
