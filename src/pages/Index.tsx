@@ -15,16 +15,12 @@ const Index = () => {
   const { user, loading: authLoading } = useAuth();
   const { hasCompletedOnboarding, loading: profileLoading } = useChefProfile();
 
-  // Redirect authenticated users
+  // Redirect authenticated users to onboarding (they can continue or see congrats)
   useEffect(() => {
     if (!authLoading && !profileLoading && user) {
-      if (hasCompletedOnboarding) {
-        navigate('/dashboard');
-      } else {
-        navigate('/onboarding');
-      }
+      navigate('/onboarding');
     }
-  }, [user, authLoading, profileLoading, hasCompletedOnboarding, navigate]);
+  }, [user, authLoading, profileLoading, navigate]);
 
   const handleGetStarted = () => {
     navigate('/onboarding');

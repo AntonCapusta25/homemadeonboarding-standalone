@@ -35,7 +35,7 @@ export function ProtectedRoute({
       if (role === 'admin') {
         return <Navigate to="/admin" replace />;
       } else if (role === 'chef') {
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/onboarding" replace />;
       }
       return <Navigate to="/auth" replace />;
     }

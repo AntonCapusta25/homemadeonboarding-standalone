@@ -7,7 +7,6 @@ import { HelmetProvider } from "react-helmet-async";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
-import Dashboard from "./pages/Dashboard";
 import Summary from "./pages/Summary";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -31,14 +30,6 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['chef']}>
                   <Summary />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['chef']}>
-                  <Dashboard />
                 </ProtectedRoute>
               } 
             />
