@@ -49,10 +49,16 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           setChefProfileId(chefProfile.id);
           const verificationProgress = await getOrCreateProgress(chefProfile.id);
           
+          // If already completed, call onComplete immediately
+          if (verificationProgress?.verificationCompleted) {
+            onComplete();
+            return;
+          }
+          
           // Resume from last completed step
           if (verificationProgress) {
             if (verificationProgress.documentsUploaded) {
-              // All done or at last step
+              // All done - go to last step to confirm
               setCurrentStepIndex(2);
             } else if (verificationProgress.foodSafetyViewed) {
               setCurrentStepIndex(2);
@@ -69,7 +75,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
     };
 
     loadData();
-  }, [getOrCreateProgress]);
+  }, [getOrCreateProgress, onComplete]);
 
   const goToNext = async () => {
     // Save progress for current step
