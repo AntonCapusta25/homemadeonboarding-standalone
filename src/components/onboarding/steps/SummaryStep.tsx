@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
 import { Check, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, UtensilsCrossed, CircleCheck, Circle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { fireCelebration } from '@/components/confetti';
 import { supabase } from '@/integrations/supabase/client';
-import { MenuPreview } from '@/components/menu/MenuPreview';
+import { EditableMenu } from '@/components/menu/EditableMenu';
 import { useMenu } from '@/hooks/useMenu';
 import { useChefProfile } from '@/hooks/useChefProfile';
 
@@ -23,6 +23,7 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
   const [showContent, setShowContent] = useState(false);
   const [menuLoading, setMenuLoading] = useState(true);
   const [generatedMenu, setGeneratedMenu] = useState(profile.generatedMenu);
+  const [menuSaving, setMenuSaving] = useState(false);
   const { saveMenu } = useMenu();
   const { profile: dbProfile } = useChefProfile();
 
@@ -70,6 +71,28 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
     return () => clearTimeout(timer); 
   }, [dbProfile?.id]);
 
+  // Handle menu updates with autosave
+  const handleMenuUpdate = useCallback((updatedMenu: typeof generatedMenu) => {
+    setGeneratedMenu(updatedMenu);
+    if (onUpdateProfile && updatedMenu) {
+      onUpdateProfile({ generatedMenu: updatedMenu });
+    }
+  }, [onUpdateProfile]);
+
+  // Save menu to database
+  const handleMenuSave = useCallback(async () => {
+    if (!dbProfile?.id || !generatedMenu) return;
+    
+    setMenuSaving(true);
+    try {
+      await saveMenu(dbProfile.id, generatedMenu);
+    } catch (err) {
+      console.error('Failed to save menu:', err);
+    } finally {
+      setMenuSaving(false);
+    }
+  }, [dbProfile?.id, generatedMenu, saveMenu]);
+
   // Summary of completed steps
   const completedItems = [
     { label: t('summary.completed.city', { city: profile.city }), value: profile.city },
@@ -84,7 +107,7 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
 
   // Next steps / pending items
   const pendingItems = [
-    { label: t('summary.pending.verifyEmail'), done: false },
+    { label: t('summary.pending.verifyEmail'), done: true }, // Auto-verified now
     { label: t('summary.pending.finalizeMenu'), done: !!generatedMenu },
     { label: t('summary.pending.setHours'), done: false },
     { label: t('summary.pending.addPhotos'), done: false },
@@ -176,21 +199,15 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
         </ul>
       </div>
 
-      {/* AI Generated Menu Preview */}
+      {/* Editable AI Generated Menu */}
       {generatedMenu && (
-        <div className="bg-card border border-border rounded-2xl p-6 mb-6 max-w-md w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.18s' }}>
-          <h3 className="font-display font-semibold text-foreground mb-4 text-left flex items-center gap-2">
-            <UtensilsCrossed className="w-5 h-5 text-primary" />
-            {t('menu.aiGenerated')}
-          </h3>
-          <div className="text-left mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">{t('menu.dishesGenerated', { count: generatedMenu.dishes.length })}</span>
-              <span className="text-sm font-medium text-forest">{generatedMenu.avgMargin}% {t('menu.avgMarginShort')}</span>
-            </div>
-            <p className="text-sm text-muted-foreground">{generatedMenu.summary}</p>
-          </div>
-          <MenuPreview menu={generatedMenu} compact onEdit={handleComplete} />
+        <div className="bg-card border border-border rounded-2xl p-6 mb-6 max-w-lg w-full shadow-soft animate-slide-up" style={{ animationDelay: '0.18s' }}>
+          <EditableMenu
+            menu={generatedMenu}
+            onUpdateMenu={handleMenuUpdate}
+            onSave={handleMenuSave}
+            saving={menuSaving}
+          />
         </div>
       )}
 

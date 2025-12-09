@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.send-magic-link]
 verify_jwt = false
+
+[functions.auto-create-account]
+verify_jwt = false

@@ -150,41 +150,64 @@ export function OnboardingWizard() {
   const handleCompleteOnboarding = async () => {
     setSaving(true);
     try {
-      // Save pending profile first
-      const profileId = await savePendingProfile();
-      if (!profileId) {
-        setSaving(false);
-        return;
-      }
-      setPendingProfileId(profileId);
-
-      // Call edge function to create account and send magic link
-      // Use production URL for magic link redirect
-      const redirectTo = 'https://chef-craft-flow.lovable.app/summary';
+      // User is already logged in (account created at contact step)
+      // Now we need to create/update the chef_profile from pending_profile data
       
-      const { data, error } = await supabase.functions.invoke('create-chef-account', {
-        body: {
-          email: profile.email,
-          pendingProfileId: profileId,
-          redirectTo,
-        },
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Create or update chef profile
+        const profileData = {
+          user_id: user.id,
+          contact_email: profile.email,
+          contact_phone: profile.phone,
+          chef_name: `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
+          business_name: profile.restaurantName,
+          city: profile.city,
+          address: `${profile.streetAddress || ''}, ${profile.zipCode || ''}, ${profile.city || ''}, ${profile.country || ''}`,
+          cuisines: profile.primaryCuisines,
+          dish_types: profile.dishTypes,
+          availability: profile.availabilityBuckets,
+          service_type: profile.serviceType as 'delivery' | 'pickup' | 'both' | 'unsure',
+          food_safety_status: mapFoodSafetyStatus(profile.foodSafetyStatus),
+          kvk_status: mapKvkStatus(profile.kvkStatus),
+          plan: mapPlanType(profile.plan),
+          logo_url: profile.logoUrl,
+          onboarding_completed: true,
+        };
 
-      if (error) {
-        console.error('Edge function error:', error);
-        toast.error('Failed to create account. Please try again.');
-        setSaving(false);
-        return;
+        const { error: upsertError } = await supabase
+          .from('chef_profiles')
+          .upsert(profileData, { 
+            onConflict: 'user_id',
+            ignoreDuplicates: false 
+          });
+
+        if (upsertError) {
+          console.error('Error saving chef profile:', upsertError);
+          toast.error('Failed to save profile. Please try again.');
+          setSaving(false);
+          return;
+        }
+
+        // Delete pending profile if exists
+        if (profile.email) {
+          await supabase
+            .from('pending_profiles')
+            .delete()
+            .eq('email', profile.email);
+        }
       }
 
       // Clear localStorage progress
       clearOnboardingProgress();
       
-      // Show magic link sent screen
-      setIsNewUser(data.isNewUser);
-      setMagicLinkSent(true);
+      toast.success('Profile saved! Redirecting to dashboard...');
       
-      toast.success('Check your email for the magic link!');
+      // Redirect to dashboard
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
     } catch (error: any) {
       console.error('Error completing onboarding:', error);
       toast.error('Something went wrong. Please try again.');
@@ -279,6 +302,10 @@ export function OnboardingWizard() {
             onChange={(field, value) => updateProfile({ [field]: value })}
             onNext={goToNext}
             onPrevious={goToPrevious}
+            onAccountCreated={(userId) => {
+              console.log('Account created with ID:', userId);
+              // Account is now created, user is logged in
+            }}
           />
         );
       
