@@ -29,7 +29,7 @@ const foodSafetyVideos = [
   },
 ];
 
-const foodSafetyQuizUrl = 'https://forms.google.com/your-quiz-url'; // TODO: Replace with actual quiz URL
+const foodSafetyQuizUrl = 'https://zol4dc90rf4.typeform.com/to/fORAE4HR';
 
 export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoStepProps) {
   const { t, i18n } = useTranslation();
