@@ -10,29 +10,38 @@ interface FoodSafetyInfoStepProps {
 
 const foodSafetyVideos = [
   {
-    id: 'basics',
-    title: 'Food Safety Basics',
-    titleNl: 'Basis Voedselveiligheid',
-    url: 'https://youtu.be/fEsvLzajbxs?si=uKJMETpjarCoGh_T',
-    embedId: 'fEsvLzajbxs',
+    id: 'class1',
+    title: 'Food Safety Class 1',
+    titleNl: 'Voedselveiligheid Les 1',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // TODO: Replace with actual class 1 URL
   },
   {
-    id: 'hygiene',
-    title: 'Kitchen Hygiene',
-    titleNl: 'Keuken Hygiëne',
-    url: 'https://youtu.be/NtTbLbHvNW8?si=GhT4lzl0In0AZPMW',
-    embedId: 'NtTbLbHvNW8',
+    id: 'class2',
+    title: 'Food Safety Class 2',
+    titleNl: 'Voedselveiligheid Les 2',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // TODO: Replace with actual class 2 URL
   },
   {
-    id: 'storage',
-    title: 'Food Storage',
-    titleNl: 'Voedsel Opslag',
-    url: 'https://youtu.be/bAs70eIvttk?si=1ZB9UQLCJKJFxhAR',
-    embedId: 'bAs70eIvttk',
+    id: 'class3',
+    title: 'Food Safety Class 3',
+    titleNl: 'Voedselveiligheid Les 3',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // TODO: Replace with actual class 3 URL
+  },
+  {
+    id: 'class4',
+    title: 'Food Safety Class 4',
+    titleNl: 'Voedselveiligheid Les 4',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // TODO: Replace with actual class 4 URL
+  },
+  {
+    id: 'class5',
+    title: 'Food Safety Class 5',
+    titleNl: 'Voedselveiligheid Les 5',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // TODO: Replace with actual class 5 URL
   },
 ];
 
-const foodSafetyQuizUrl = '#'; // TODO: Add actual quiz URL
+const foodSafetyQuizUrl = 'https://forms.google.com/your-quiz-url'; // TODO: Replace with actual quiz URL
 
 export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoStepProps) {
   const { t, i18n } = useTranslation();
