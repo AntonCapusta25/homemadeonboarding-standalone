@@ -16,7 +16,7 @@ import { DishTypesStep } from './steps/DishTypesStep';
 import { FoodSafetyStep } from './steps/FoodSafetyStep';
 import { KvkNvwaStep } from './steps/KvkNvwaStep';
 import { PlanStep } from './steps/PlanStep';
-import { SummaryStep } from './steps/SummaryStep';
+import { SummaryStep } from './steps/SummaryStep'; // Keep import for potential future use
 import { MagicLinkSentStep } from './steps/MagicLinkSentStep';
 import { CongratsStep } from './steps/CongratsStep';
 import { FastVerificationFlow } from './steps/FastVerificationFlow';
@@ -180,18 +180,97 @@ export function OnboardingWizard() {
           onboarding_completed: true,
         };
 
-        const { error: upsertError } = await supabase
+        const { data: chefProfile, error: upsertError } = await supabase
           .from('chef_profiles')
           .upsert(profileData, { 
             onConflict: 'user_id',
             ignoreDuplicates: false 
-          });
+          })
+          .select('id')
+          .single();
 
         if (upsertError) {
           console.error('Error saving chef profile:', upsertError);
           toast.error('Failed to save profile. Please try again.');
           setSaving(false);
           return;
+        }
+
+        // Generate and save menu to database
+        if (chefProfile) {
+          try {
+            const { data: menuData, error: menuError } = await supabase.functions.invoke('generate-menu', {
+              body: {
+                city: profile.city,
+                cuisines: profile.primaryCuisines,
+                dishTypes: profile.dishTypes,
+                serviceType: profile.serviceType,
+                restaurantName: profile.restaurantName,
+                chefName: profile.firstName
+              }
+            });
+
+            if (!menuError && menuData?.menu) {
+              // Save menu to database
+              // First, deactivate any existing active menus
+              await supabase
+                .from('menus')
+                .update({ is_active: false })
+                .eq('chef_profile_id', chefProfile.id);
+
+              // Create the new menu
+              const { data: savedMenu, error: saveMenuError } = await supabase
+                .from('menus')
+                .insert({
+                  chef_profile_id: chefProfile.id,
+                  summary: menuData.menu.summary,
+                  average_margin: menuData.menu.avgMargin,
+                  is_active: true,
+                })
+                .select()
+                .single();
+
+              if (!saveMenuError && savedMenu) {
+                // Insert all dishes
+                const dishesToInsert = menuData.menu.dishes.map((dish: any, index: number) => ({
+                  menu_id: savedMenu.id,
+                  name: dish.name,
+                  description: dish.description,
+                  price: dish.price,
+                  estimated_cost: dish.estimatedCost,
+                  margin: dish.margin,
+                  category: dish.category || null,
+                  restaurant_comparison_price: dish.restaurantPrice || null,
+                  is_upsell: false,
+                  sort_order: index,
+                }));
+
+                // Add upsells
+                if (menuData.menu.upsells) {
+                  menuData.menu.upsells.forEach((upsell: any, index: number) => {
+                    const upsellCategory = upsell.type === 'extra' ? 'side' : upsell.type;
+                    dishesToInsert.push({
+                      menu_id: savedMenu.id,
+                      name: upsell.name,
+                      description: null,
+                      price: upsell.price,
+                      estimated_cost: null,
+                      margin: null,
+                      category: upsellCategory || null,
+                      restaurant_comparison_price: null,
+                      is_upsell: true,
+                      sort_order: menuData.menu.dishes.length + index,
+                    });
+                  });
+                }
+
+                await supabase.from('dishes').insert(dishesToInsert);
+              }
+            }
+          } catch (menuErr) {
+            console.error('Failed to generate/save menu:', menuErr);
+            // Continue anyway - menu can be created later
+          }
         }
 
         // Delete pending profile if exists
@@ -428,19 +507,8 @@ export function OnboardingWizard() {
           <PlanStep
             value={profile.plan}
             onChange={(plan) => updateProfile({ plan })}
-            onNext={goToNext}
+            onNext={handleCompleteOnboarding}
             onPrevious={goToPrevious}
-          />
-        );
-      
-      case 'summary':
-        return (
-          <SummaryStep
-            profile={profile}
-            onComplete={handleCompleteOnboarding}
-            onBookCall={() => window.open('https://calendly.com', '_blank')}
-            onUpdateProfile={updateProfile}
-            saving={saving}
           />
         );
       

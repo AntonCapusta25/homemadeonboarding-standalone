@@ -19,7 +19,6 @@ const STEP_ORDER: StepId[] = [
   'food-safety-status',
   'kvk-nvwa-status',
   'plan',
-  'summary',
 ];
 
 const initialProfile: ChefProfile = {
