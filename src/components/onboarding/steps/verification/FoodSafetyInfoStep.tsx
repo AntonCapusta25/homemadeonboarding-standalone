@@ -32,7 +32,7 @@ const foodSafetyVideos = [
   },
 ];
 
-const foodSafetyQuizUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSd_food_safety_quiz/viewform';
+const foodSafetyQuizUrl = '#'; // TODO: Add actual quiz URL
 
 export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoStepProps) {
   const { t, i18n } = useTranslation();
