@@ -18,6 +18,8 @@ import { KvkNvwaStep } from './steps/KvkNvwaStep';
 import { PlanStep } from './steps/PlanStep';
 import { SummaryStep } from './steps/SummaryStep';
 import { MagicLinkSentStep } from './steps/MagicLinkSentStep';
+import { CongratsStep } from './steps/CongratsStep';
+import { FastVerificationFlow } from './steps/FastVerificationFlow';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -30,6 +32,8 @@ export function OnboardingWizard() {
   const [isNewUser, setIsNewUser] = useState(true);
   const [resending, setResending] = useState(false);
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [showFastVerification, setShowFastVerification] = useState(false);
   
   const {
     currentStep,
@@ -202,12 +206,8 @@ export function OnboardingWizard() {
       // Clear localStorage progress
       clearOnboardingProgress();
       
-      toast.success('Profile saved! Redirecting to dashboard...');
-      
-      // Redirect to dashboard
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1000);
+      // Show congrats screen instead of redirecting
+      setShowCongrats(true);
     } catch (error: any) {
       console.error('Error completing onboarding:', error);
       toast.error('Something went wrong. Please try again.');
@@ -250,6 +250,28 @@ export function OnboardingWizard() {
       <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  // Show fast verification flow
+  if (showFastVerification) {
+    return (
+      <FastVerificationFlow
+        profile={profile}
+        onUpdateProfile={updateProfile}
+        onComplete={() => navigate('/dashboard')}
+      />
+    );
+  }
+
+  // Show congrats screen
+  if (showCongrats) {
+    return (
+      <CongratsStep
+        profile={profile}
+        onGoToDashboard={() => navigate('/dashboard')}
+        onStartFastVerification={() => setShowFastVerification(true)}
+      />
     );
   }
 
