@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
 import { FileCheck, ArrowRight, ArrowLeft, SkipForward, Upload, Check, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { VerificationProgress } from '@/hooks/useVerification';
 
 interface DocumentUploadStepProps {
   profile: ChefProfile;
@@ -12,10 +13,12 @@ interface DocumentUploadStepProps {
   onNext: () => void;
   onPrevious: () => void;
   onSkip: () => void;
+  onDocumentUpload?: (docType: 'kvk' | 'haccp' | 'nvwa', url: string) => Promise<void>;
+  verificationProgress?: VerificationProgress | null;
 }
 
 interface DocumentType {
-  id: string;
+  id: 'kvk' | 'haccp' | 'nvwa';
   label: string;
   description: string;
   required: boolean;
@@ -24,7 +27,15 @@ interface DocumentType {
   url?: string;
 }
 
-export function DocumentUploadStep({ profile, onUpdateProfile, onNext, onPrevious, onSkip }: DocumentUploadStepProps) {
+export function DocumentUploadStep({ 
+  profile, 
+  onUpdateProfile, 
+  onNext, 
+  onPrevious, 
+  onSkip,
+  onDocumentUpload,
+  verificationProgress 
+}: DocumentUploadStepProps) {
   const { t } = useTranslation();
   
   const [documents, setDocuments] = useState<DocumentType[]>([
@@ -33,18 +44,16 @@ export function DocumentUploadStep({ profile, onUpdateProfile, onNext, onPreviou
       label: t('verification.kvkRegistration', 'KVK Registration'),
       description: t('verification.kvkDesc', 'Your Chamber of Commerce registration document'),
       required: true,
-      uploaded: !!profile.kvkDocsUrl,
+      uploaded: false,
       uploading: false,
-      url: profile.kvkDocsUrl,
     },
     {
       id: 'haccp',
       label: t('verification.haccpCertificate', 'HACCP Certificate'),
       description: t('verification.haccpDesc', 'Your food safety training certificate'),
       required: false,
-      uploaded: !!profile.haccpCertificateUrl,
+      uploaded: false,
       uploading: false,
-      url: profile.haccpCertificateUrl,
     },
     {
       id: 'nvwa',
@@ -56,7 +65,26 @@ export function DocumentUploadStep({ profile, onUpdateProfile, onNext, onPreviou
     },
   ]);
 
-  const handleFileUpload = async (docId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+  // Load existing document URLs from verification progress or profile
+  useEffect(() => {
+    setDocuments(prev => prev.map(doc => {
+      let url: string | undefined;
+      let uploaded = false;
+      
+      if (doc.id === 'kvk') {
+        url = verificationProgress?.kvkDocumentUrl || profile.kvkDocsUrl;
+      } else if (doc.id === 'haccp') {
+        url = verificationProgress?.haccpDocumentUrl || profile.haccpCertificateUrl;
+      } else if (doc.id === 'nvwa') {
+        url = verificationProgress?.nvwaDocumentUrl;
+      }
+      
+      uploaded = !!url;
+      return { ...doc, uploaded, url };
+    }));
+  }, [verificationProgress, profile]);
+
+  const handleFileUpload = async (docId: 'kvk' | 'haccp' | 'nvwa', event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -69,26 +97,34 @@ export function DocumentUploadStep({ profile, onUpdateProfile, onNext, onPreviou
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error(t('verification.loginRequired', 'Please log in to upload documents'));
+        setDocuments(prev => prev.map(d => 
+          d.id === docId ? { ...d, uploading: false } : d
+        ));
         return;
       }
 
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${docId}-${Date.now()}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .upload(fileName, file, { upsert: true });
+      const { error } = await supabase.storage
+        .from('logos') // Using logos bucket since documents bucket might not exist
+        .upload(`documents/${fileName}`, file, { upsert: true });
 
       if (error) throw error;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
+        .from('logos')
+        .getPublicUrl(`documents/${fileName}`);
 
       // Update document state
       setDocuments(prev => prev.map(d => 
         d.id === docId ? { ...d, uploading: false, uploaded: true, url: publicUrl } : d
       ));
+
+      // Save to verification progress in database
+      if (onDocumentUpload) {
+        await onDocumentUpload(docId, publicUrl);
+      }
 
       // Update profile based on document type
       if (docId === 'kvk') {
@@ -98,7 +134,7 @@ export function DocumentUploadStep({ profile, onUpdateProfile, onNext, onPreviou
       }
 
       toast.success(t('verification.uploadSuccess', 'Document uploaded successfully!'));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
       setDocuments(prev => prev.map(d => 
         d.id === docId ? { ...d, uploading: false } : d
