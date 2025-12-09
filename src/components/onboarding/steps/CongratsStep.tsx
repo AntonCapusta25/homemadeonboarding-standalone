@@ -8,11 +8,10 @@ import { Logo } from '@/components/Logo';
 
 interface CongratsStepProps {
   profile: ChefProfile;
-  onGoToDashboard: () => void;
   onStartFastVerification: () => void;
 }
 
-export function CongratsStep({ profile, onGoToDashboard, onStartFastVerification }: CongratsStepProps) {
+export function CongratsStep({ profile, onStartFastVerification }: CongratsStepProps) {
   const { t } = useTranslation();
   const [showContent, setShowContent] = useState(false);
 
@@ -92,22 +91,15 @@ export function CongratsStep({ profile, onGoToDashboard, onStartFastVerification
             </ul>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          {/* CTA Button */}
+          <div className="flex justify-center">
             <Button 
               size="xl" 
               onClick={onStartFastVerification}
               className="shadow-glow hover:shadow-medium"
             >
               <Zap className="w-5 h-5 mr-2" />
-              {t('congrats.fastVerification', 'Fast Verification')}
-            </Button>
-            <Button 
-              size="xl" 
-              variant="outline"
-              onClick={onGoToDashboard}
-            >
-              {t('congrats.skipToDashboard', 'Skip to Dashboard')}
+              {t('congrats.startVerification', 'Start Verification')}
             </Button>
           </div>
         </div>

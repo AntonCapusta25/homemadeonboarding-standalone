@@ -59,7 +59,7 @@ export function OnboardingWizard() {
           .maybeSingle();
         
         if (data?.onboarding_completed) {
-          navigate('/dashboard');
+          setShowCongrats(true);
         }
       };
       checkOnboarding();
@@ -338,7 +338,11 @@ export function OnboardingWizard() {
       <FastVerificationFlow
         profile={profile}
         onUpdateProfile={updateProfile}
-        onComplete={() => navigate('/dashboard')}
+        onComplete={() => {
+          // Fast verification complete - stay on congrats or show completion message
+          setShowFastVerification(false);
+          setShowCongrats(true);
+        }}
       />
     );
   }
@@ -348,7 +352,6 @@ export function OnboardingWizard() {
     return (
       <CongratsStep
         profile={profile}
-        onGoToDashboard={() => navigate('/dashboard')}
         onStartFastVerification={() => setShowFastVerification(true)}
       />
     );
