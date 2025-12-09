@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOnboarding, clearOnboardingProgress } from '@/hooks/useOnboarding';
 import { useAuth } from '@/hooks/useAuth';
+import { useAbandonmentTracking } from '@/hooks/useAbandonmentTracking';
 import { ProgressBar } from './ProgressBar';
 import { Logo } from '@/components/Logo';
 import { CityStep } from './steps/CityStep';
@@ -34,6 +35,7 @@ export function OnboardingWizard() {
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
   const [showCongrats, setShowCongrats] = useState(false);
   const [showFastVerification, setShowFastVerification] = useState(false);
+  const [verificationComplete, setVerificationComplete] = useState(false);
   
   const {
     currentStep,
@@ -46,6 +48,13 @@ export function OnboardingWizard() {
     goToPrevious,
     dbLoaded,
   } = useOnboarding();
+
+  // Track abandonment
+  useAbandonmentTracking({
+    profile,
+    currentStep,
+    isOnboardingComplete: showCongrats || verificationComplete,
+  });
 
   // If user is already logged in and has completed onboarding, redirect to dashboard
   useEffect(() => {
@@ -339,8 +348,9 @@ export function OnboardingWizard() {
         profile={profile}
         onUpdateProfile={updateProfile}
         onComplete={() => {
-          // Fast verification complete - stay on congrats or show completion message
+          // Fast verification complete - show congrats with verification complete flag
           setShowFastVerification(false);
+          setVerificationComplete(true);
           setShowCongrats(true);
         }}
       />
@@ -353,6 +363,7 @@ export function OnboardingWizard() {
       <CongratsStep
         profile={profile}
         onStartFastVerification={() => setShowFastVerification(true)}
+        verificationComplete={verificationComplete}
       />
     );
   }
