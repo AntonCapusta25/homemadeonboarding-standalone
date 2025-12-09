@@ -1,5 +1,5 @@
-import { ChefHat } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import homemadeLogo from "@/assets/homemade-logo.jpg";
 
 interface LogoProps {
   chefLogo?: string;
@@ -8,13 +8,13 @@ interface LogoProps {
   showDisclaimer?: boolean;
 }
 
-export function Logo({ chefLogo, size = "md", showText = true, showDisclaimer = false }: LogoProps) {
+export function Logo({ chefLogo, size = "md", showText = false, showDisclaimer = false }: LogoProps) {
   const { t } = useTranslation();
 
   const sizes = {
-    sm: { container: "w-10 h-10", icon: "w-5 h-5", text: "text-lg" },
-    md: { container: "w-14 h-14", icon: "w-7 h-7", text: "text-xl" },
-    lg: { container: "w-20 h-20", icon: "w-10 h-10", text: "text-2xl" },
+    sm: { container: "h-10", text: "text-lg" },
+    md: { container: "h-14", text: "text-xl" },
+    lg: { container: "h-20", text: "text-2xl" },
   };
 
   return (
@@ -27,11 +27,11 @@ export function Logo({ chefLogo, size = "md", showText = true, showDisclaimer = 
             className={`${sizes[size].container} rounded-xl object-cover shadow-soft border-2 border-primary/20`}
           />
         ) : (
-          <div
-            className={`${sizes[size].container} bg-gradient-warm rounded-xl flex items-center justify-center shadow-soft`}
-          >
-            <ChefHat className={`${sizes[size].icon} text-primary-foreground`} />
-          </div>
+          <img
+            src={homemadeLogo}
+            alt="Homemade"
+            className={`${sizes[size].container} object-contain`}
+          />
         )}
         {showText && <span className={`font-display font-bold ${sizes[size].text} text-foreground`}>Homemade</span>}
       </div>
