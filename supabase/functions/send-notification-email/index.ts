@@ -13,8 +13,14 @@ interface NotificationEmailRequest {
   email: string;
   phone?: string;
   city?: string;
+  address?: string;
   businessName?: string;
   cuisines?: string[];
+  dishTypes?: string[];
+  serviceType?: string;
+  availability?: string[];
+  foodSafetyStatus?: string;
+  kvkStatus?: string;
   plan?: string;
 }
 
@@ -25,7 +31,11 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const request: NotificationEmailRequest = await req.json();
-    const { type, chefName, email, phone, city, businessName, cuisines, plan } = request;
+    const { 
+      type, chefName, email, phone, city, address, businessName, 
+      cuisines, dishTypes, serviceType, availability, 
+      foodSafetyStatus, kvkStatus, plan 
+    } = request;
 
     let subject = "";
     let htmlContent = "";
@@ -82,27 +92,71 @@ const handler = async (req: Request): Promise<Response> => {
         </div>
       `;
     } else if (type === 'new_signup') {
-      // Send to admin about new chef signup
+      // Send to admin about new chef signup with FULL details
       toEmail = "chefs@homemade-meals.net";
       subject = `🎉 New Chef Signup: ${businessName || chefName}`;
+      
+      // Format service type nicely
+      const serviceTypeDisplay = serviceType === 'both' ? 'Delivery & Pickup' 
+        : serviceType === 'delivery' ? 'Delivery Only'
+        : serviceType === 'pickup' ? 'Pickup Only'
+        : serviceType || 'Not specified';
+      
+      // Format food safety status
+      const foodSafetyDisplay = foodSafetyStatus === 'have_certificate' ? '✅ Has Certificate'
+        : foodSafetyStatus === 'getting_certificate' ? '⏳ Getting Certificate'
+        : foodSafetyStatus === 'need_help' ? '❓ Needs Help'
+        : 'Not specified';
+      
+      // Format KVK status
+      const kvkDisplay = kvkStatus === 'have_both' ? '✅ Has KVK & NVWA'
+        : kvkStatus === 'in_progress' ? '⏳ In Progress'
+        : kvkStatus === 'need_help' ? '❓ Needs Help'
+        : 'Not specified';
+      
+      // Format plan
+      const planDisplay = plan === 'growth' ? '🚀 Growth (12%)'
+        : plan === 'pro' ? '👑 Pro (14%)'
+        : '📦 Starter (10%)';
+      
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #22c55e;">🎉 New Chef Signed Up!</h1>
           <p style="font-size: 16px; color: #333;">
             A new chef has completed their profile and is waiting for approval.
           </p>
+          
           <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">
-            <h3 style="margin-top: 0; color: #166534;">Chef Details:</h3>
+            <h3 style="margin-top: 0; color: #166534;">📋 Contact Information</h3>
             <p><strong>Name:</strong> ${chefName}</p>
             <p><strong>Business Name:</strong> ${businessName || 'Not set'}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
-            <p><strong>City:</strong> ${city || 'Not provided'}</p>
-            <p><strong>Cuisines:</strong> ${cuisines?.join(', ') || 'Not specified'}</p>
-            <p><strong>Selected Plan:</strong> ${plan || 'Starter'}</p>
+            <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+            <p><strong>Phone:</strong> ${phone ? `<a href="tel:${phone}">${phone}</a>` : 'Not provided'}</p>
           </div>
-          <p style="font-size: 16px; color: #333;">
-            Please review their profile and reach out to complete their verification.
+          
+          <div style="background: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bfdbfe;">
+            <h3 style="margin-top: 0; color: #1e40af;">📍 Location & Service</h3>
+            <p><strong>City:</strong> ${city || 'Not provided'}</p>
+            <p><strong>Address:</strong> ${address || 'Not provided'}</p>
+            <p><strong>Service Type:</strong> ${serviceTypeDisplay}</p>
+            <p><strong>Availability:</strong> ${availability?.join(', ') || 'Not specified'}</p>
+          </div>
+          
+          <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fcd34d;">
+            <h3 style="margin-top: 0; color: #92400e;">🍳 Menu & Cuisine</h3>
+            <p><strong>Cuisines:</strong> ${cuisines?.join(', ') || 'Not specified'}</p>
+            <p><strong>Dish Types:</strong> ${dishTypes?.join(', ') || 'Not specified'}</p>
+          </div>
+          
+          <div style="background: #f3e8ff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #d8b4fe;">
+            <h3 style="margin-top: 0; color: #7c3aed;">📄 Compliance & Plan</h3>
+            <p><strong>Food Safety:</strong> ${foodSafetyDisplay}</p>
+            <p><strong>KVK/NVWA:</strong> ${kvkDisplay}</p>
+            <p><strong>Selected Plan:</strong> ${planDisplay}</p>
+          </div>
+          
+          <p style="font-size: 16px; color: #333; background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fecaca;">
+            <strong>⏰ Action Required:</strong> Please review their profile and reach out to complete their verification.
           </p>
         </div>
       `;
