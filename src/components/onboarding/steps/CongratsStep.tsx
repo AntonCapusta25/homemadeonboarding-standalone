@@ -2,18 +2,21 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
-import { ChefHat, FileCheck, ShieldCheck, Zap, ClipboardCheck, ArrowRight, Clock } from 'lucide-react';
+import { ChefHat, FileCheck, ShieldCheck, Zap, ClipboardCheck, ArrowRight, Clock, Calendar, CheckCircle } from 'lucide-react';
 import { fireCelebration } from '@/components/confetti';
 import { Logo } from '@/components/Logo';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CongratsStepProps {
   profile: ChefProfile;
   onStartFastVerification: () => void;
+  verificationComplete?: boolean;
 }
 
-export function CongratsStep({ profile, onStartFastVerification }: CongratsStepProps) {
+export function CongratsStep({ profile, onStartFastVerification, verificationComplete = false }: CongratsStepProps) {
   const { t } = useTranslation();
   const [showContent, setShowContent] = useState(false);
+  const [emailsSent, setEmailsSent] = useState(false);
 
   useEffect(() => {
     // Trigger confetti celebration
@@ -25,6 +28,52 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
     return () => clearTimeout(timer);
   }, []);
 
+  // Send welcome emails when congrats page loads (profile just completed)
+  useEffect(() => {
+    const sendWelcomeEmails = async () => {
+      if (emailsSent) return;
+      
+      try {
+        // Send welcome email to chef
+        await supabase.functions.invoke('send-notification-email', {
+          body: {
+            type: 'welcome',
+            chefName: `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Chef',
+            email: profile.email,
+          },
+        });
+
+        // Send new signup notification to admin
+        await supabase.functions.invoke('send-notification-email', {
+          body: {
+            type: 'new_signup',
+            chefName: `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Chef',
+            email: profile.email,
+            phone: profile.phone,
+            city: profile.city,
+            businessName: profile.restaurantName,
+            cuisines: profile.primaryCuisines,
+            plan: profile.plan,
+          },
+        });
+
+        setEmailsSent(true);
+        console.log('Welcome emails sent successfully');
+      } catch (error) {
+        console.error('Failed to send welcome emails:', error);
+      }
+    };
+
+    if (showContent && !emailsSent) {
+      sendWelcomeEmails();
+    }
+  }, [showContent, emailsSent, profile]);
+
+  const handleBookMeeting = () => {
+    // Open Calendly or booking link
+    window.open('https://calendly.com/homemade-meals/chef-onboarding', '_blank');
+  };
+
   const verificationItems = [
     {
       icon: ClipboardCheck,
@@ -33,8 +82,8 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
     },
     {
       icon: ShieldCheck,
-      title: t('congrats.foodSafetyQuiz', 'Complete Food Safety Info'),
-      description: t('congrats.foodSafetyDesc', 'Learn about food safety requirements for home chefs'),
+      title: t('congrats.foodSafetyQuiz', 'Complete Food Safety Training'),
+      description: t('congrats.foodSafetyDesc', 'Watch training videos and complete the quiz'),
     },
     {
       icon: FileCheck,
@@ -55,17 +104,25 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
           {/* Chef hat icon with animation */}
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center animate-bounce-slow">
-              <ChefHat className="w-10 h-10 text-primary" />
+              {verificationComplete ? (
+                <CheckCircle className="w-10 h-10 text-primary" />
+              ) : (
+                <ChefHat className="w-10 h-10 text-primary" />
+              )}
             </div>
           </div>
 
           {/* Congratulations message */}
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-            {t('congrats.profileComplete', 'Congratulations!')} 🎉
+            {verificationComplete 
+              ? t('congrats.verificationComplete', 'Verification Complete!') 
+              : t('congrats.profileComplete', 'Congratulations!')} 🎉
           </h1>
 
           <p className="text-xl text-muted-foreground mb-2">
-            {t('congrats.profileCreated', 'Your chef profile has been created')}
+            {verificationComplete
+              ? t('congrats.allStepsComplete', 'You have completed all verification steps')
+              : t('congrats.profileCreated', 'Your chef profile has been created')}
           </p>
 
           {/* Chef name */}
@@ -83,44 +140,78 @@ export function CongratsStep({ profile, onStartFastVerification }: CongratsStepP
             </p>
           </div>
 
-          {/* Speed up verification section */}
-          <div className="bg-card rounded-xl border border-border p-6 mb-8 text-left">
-            <h2 className="font-semibold text-lg mb-2 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-amber-500" />
-              {t('congrats.speedUpApproval', 'Speed up your approval!')}
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              {t('congrats.completeFollowing', 'Complete the following steps to get approved faster:')}
-            </p>
-            
-            <ul className="space-y-4">
-              {verificationItems.map((item, index) => (
-                <li key={index} className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <item.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {index + 1}. {item.title}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Show verification steps or completion message */}
+          {!verificationComplete ? (
+            <>
+              {/* Speed up verification section */}
+              <div className="bg-card rounded-xl border border-border p-6 mb-8 text-left">
+                <h2 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-amber-500" />
+                  {t('congrats.speedUpApproval', 'Speed up your approval!')}
+                </h2>
+                <p className="text-muted-foreground mb-6">
+                  {t('congrats.completeFollowing', 'Complete the following steps to get approved faster:')}
+                </p>
+                
+                <ul className="space-y-4">
+                  {verificationItems.map((item, index) => (
+                    <li key={index} className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <item.icon className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {index + 1}. {item.title}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-          {/* CTA Button */}
-          <div className="flex justify-center">
-            <Button 
-              size="xl" 
-              onClick={onStartFastVerification}
-              className="shadow-glow hover:shadow-medium"
-            >
-              {t('congrats.startVerification', 'Start Verification')}
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-          </div>
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button 
+                  size="xl" 
+                  onClick={onStartFastVerification}
+                  className="shadow-glow hover:shadow-medium"
+                >
+                  {t('congrats.startVerification', 'Complete Profile')}
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+                <Button 
+                  size="xl" 
+                  variant="outline"
+                  onClick={handleBookMeeting}
+                >
+                  <Calendar className="w-5 h-5 mr-2" />
+                  {t('congrats.bookMeeting', 'Book a Meeting')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* All done message */}
+              <div className="bg-primary/5 rounded-xl border border-primary/20 p-6 mb-8">
+                <p className="text-lg text-foreground">
+                  {t('congrats.allDoneMessage', 'Thank you for completing all the steps! Our team will review your profile and get back to you soon.')}
+                </p>
+              </div>
+
+              {/* Book meeting button */}
+              <div className="flex justify-center">
+                <Button 
+                  size="xl" 
+                  onClick={handleBookMeeting}
+                  className="shadow-glow hover:shadow-medium"
+                >
+                  <Calendar className="w-5 h-5 mr-2" />
+                  {t('congrats.bookMeeting', 'Book a Meeting')}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
