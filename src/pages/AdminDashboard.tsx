@@ -484,7 +484,7 @@ export default function AdminDashboard() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={chef.assigned_admin_id || 'unassigned'}
                           onValueChange={(value) => handleAssignAdmin(chef.id, value)}
@@ -511,7 +511,7 @@ export default function AdminDashboard() {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={chef.admin_status || 'new'}
                           onValueChange={(value) => handleStatusChange(chef.id, value)}
@@ -537,7 +537,7 @@ export default function AdminDashboard() {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Textarea
                           placeholder="Add notes..."
                           value={editingNotes[chef.id] ?? chef.admin_notes ?? ''}
@@ -551,7 +551,7 @@ export default function AdminDashboard() {
                           className="min-h-[60px] text-sm resize-none"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium min-w-[20px]">{chef.call_attempts || 0}</span>
                           <Button
@@ -574,7 +574,7 @@ export default function AdminDashboard() {
                           <span className="text-xs text-muted-foreground/50">Never</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
