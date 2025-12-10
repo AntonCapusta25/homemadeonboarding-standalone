@@ -291,5 +291,9 @@
     "cancel": "Annuleren",
     "confirm": "Bevestigen",
     "selected": "Geselecteerd"
+  },
+  "onboarding": {
+    "menuGenerating": "Menu wordt gegenereerd...",
+    "menuGeneratingSubtitle": "Dit kan even duren"
   }
 }
