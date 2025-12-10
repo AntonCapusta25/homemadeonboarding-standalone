@@ -282,9 +282,8 @@ export function useOnboarding() {
   }, []);
 
   const currentStep = STEP_ORDER[currentStepIndex];
-  const totalSteps = STEP_ORDER.length - 2; // Exclude welcome and summary
+  const totalSteps = STEP_ORDER.length - 1; // Exclude welcome (12 visible steps)
   const displayStepNumber = Math.max(0, currentStepIndex - 1); // 0-indexed after welcome
-  // Cap progress at 100% (summary step would otherwise go over)
   const progress = currentStepIndex > 0 ? Math.min(100, ((currentStepIndex - 1) / (totalSteps - 1)) * 100) : 0;
 
   // Save progress whenever it changes
