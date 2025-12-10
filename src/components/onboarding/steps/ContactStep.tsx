@@ -59,6 +59,14 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
   const handleNext = async () => {
     if (!validate()) return;
     
+    // Track Lead event in Meta Pixel
+    if (typeof window !== 'undefined' && (window as any).fbq) {
+      (window as any).fbq('track', 'Lead', {
+        content_name: 'Chef Onboarding Contact',
+        content_category: 'Onboarding',
+      });
+    }
+    
     // Silently create account in background - no UI feedback
     supabase.functions.invoke('auto-create-account', {
       body: {

@@ -19,6 +19,14 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
   const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
+    // Track CompleteRegistration event in Meta Pixel
+    if (typeof window !== 'undefined' && (window as any).fbq) {
+      (window as any).fbq('track', 'CompleteRegistration', {
+        content_name: 'Chef Onboarding Complete',
+        status: verificationComplete ? 'verified' : 'pending_verification',
+      });
+    }
+    
     // Trigger confetti celebration
     const timer = setTimeout(() => {
       fireCelebration();
