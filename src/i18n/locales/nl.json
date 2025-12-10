@@ -301,5 +301,5 @@
     "menuTimeRemaining": "~{{seconds}}s resterend",
     "menuAlmostDone": "Bijna klaar...",
     "menuGeneratedSuccess": "Je gepersonaliseerde menu is klaar! 🎉"
-  },
+  }
 }
