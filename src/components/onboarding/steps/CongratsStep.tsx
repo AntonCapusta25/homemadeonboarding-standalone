@@ -6,6 +6,7 @@ import { ChefHat, FileCheck, ShieldCheck, Zap, ClipboardCheck, ArrowRight, Clock
 import { fireCelebration } from '@/components/confetti';
 import { Logo } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
+import { ContactButtons } from '@/components/onboarding/ContactButtons';
 
 interface CongratsStepProps {
   profile: ChefProfile;
@@ -228,6 +229,9 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
           )}
         </div>
       </div>
+      
+      {/* Contact buttons */}
+      <ContactButtons />
     </div>
   );
 }

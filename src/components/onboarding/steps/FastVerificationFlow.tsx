@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useVerification } from '@/hooks/useVerification';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import { ContactButtons } from '@/components/onboarding/ContactButtons';
 
 interface FastVerificationFlowProps {
   profile: ChefProfile;
@@ -180,6 +181,9 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           {renderStep()}
         </div>
       </div>
+      
+      {/* Contact buttons */}
+      <ContactButtons />
     </div>
   );
 }
