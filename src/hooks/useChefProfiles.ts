@@ -276,183 +276,191 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     ));
   };
 
-  // Ensure admin data record exists for a chef
-  const ensureAdminData = async (chefId: string) => {
-    const { data: existing } = await supabase
-      .from('chef_admin_data')
-      .select('id')
-      .eq('chef_profile_id', chefId)
-      .maybeSingle();
-
-    if (!existing) {
-      await supabase
-        .from('chef_admin_data')
-        .insert({ chef_profile_id: chefId });
-    }
-  };
-
   const updateChefStatus = async (chefId: string, status: string, currentAdminId: string, adminName?: string) => {
     const previousChef = chefs.find(c => c.id === chefId);
+    const now = new Date().toISOString();
+    
+    // Optimistic update - happens immediately
     optimisticUpdate(chefId, { 
       admin_status: status, 
-      crm_last_contact_date: new Date().toISOString() 
+      crm_last_contact_date: now 
     });
 
-    try {
-      await ensureAdminData(chefId);
+    // Fire-and-forget DB operations
+    (async () => {
+      try {
+        // Use upsert to handle missing records automatically
+        const { error } = await supabase
+          .from('chef_admin_data')
+          .upsert({
+            chef_profile_id: chefId,
+            admin_status: status,
+            crm_updated_by: currentAdminId,
+            crm_last_contact_date: now,
+          }, { onConflict: 'chef_profile_id' });
 
-      const { error } = await supabase
-        .from('chef_admin_data')
-        .update({
-          admin_status: status,
-          crm_updated_by: currentAdminId,
-          crm_last_contact_date: new Date().toISOString(),
-        })
-        .eq('chef_profile_id', chefId);
+        if (error) throw error;
 
-      if (error) throw error;
-
-      await supabase.from('chef_activities').insert({
-        chef_id: chefId,
-        activity_type: 'status_change',
-        description: `Status changed to ${status}`,
-        admin_user_id: currentAdminId,
-        admin_name: adminName,
-      });
-
-      return { error: null };
-    } catch (err) {
-      if (previousChef) {
-        optimisticUpdate(chefId, { admin_status: previousChef.admin_status });
+        // Log activity in background
+        supabase.from('chef_activities').insert({
+          chef_id: chefId,
+          activity_type: 'status_change',
+          description: `Status changed to ${status}`,
+          admin_user_id: currentAdminId,
+          admin_name: adminName,
+        });
+      } catch (err) {
+        console.error('Failed to update status:', err);
+        if (previousChef) {
+          optimisticUpdate(chefId, { admin_status: previousChef.admin_status });
+        }
       }
-      return { error: err };
-    }
+    })();
+
+    return { error: null };
   };
 
   const updateChefNotes = async (chefId: string, notes: string, currentAdminId: string) => {
     optimisticUpdate(chefId, { admin_notes: notes });
 
-    try {
-      await ensureAdminData(chefId);
+    // Fire-and-forget
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('chef_admin_data')
+          .upsert({
+            chef_profile_id: chefId,
+            admin_notes: notes,
+            crm_updated_by: currentAdminId,
+          }, { onConflict: 'chef_profile_id' });
 
-      const { error } = await supabase
-        .from('chef_admin_data')
-        .update({
-          admin_notes: notes,
-          crm_updated_by: currentAdminId,
-        })
-        .eq('chef_profile_id', chefId);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Failed to update notes:', err);
+      }
+    })();
 
-      if (error) throw error;
-      return { error: null };
-    } catch (err) {
-      return { error: err };
-    }
+    return { error: null };
   };
 
   const assignAdmin = async (chefId: string, newAdminId: string | null, currentAdminId: string, adminName?: string) => {
     const previousChef = chefs.find(c => c.id === chefId);
+    
+    // Optimistic update - happens immediately
     optimisticUpdate(chefId, { assigned_admin_id: newAdminId });
 
-    try {
-      await ensureAdminData(chefId);
+    // Fire-and-forget DB operations
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('chef_admin_data')
+          .upsert({
+            chef_profile_id: chefId,
+            assigned_admin_id: newAdminId,
+          }, { onConflict: 'chef_profile_id' });
 
-      const { error } = await supabase
-        .from('chef_admin_data')
-        .update({ assigned_admin_id: newAdminId })
-        .eq('chef_profile_id', chefId);
+        if (error) throw error;
 
-      if (error) throw error;
-
-      await supabase.from('chef_activities').insert({
-        chef_id: chefId,
-        activity_type: 'admin_assigned',
-        description: newAdminId ? `Assigned to admin` : 'Unassigned from admin',
-        admin_user_id: currentAdminId,
-        admin_name: adminName,
-      });
-
-      return { error: null };
-    } catch (err) {
-      if (previousChef) {
-        optimisticUpdate(chefId, { assigned_admin_id: previousChef.assigned_admin_id });
+        // Log activity in background
+        supabase.from('chef_activities').insert({
+          chef_id: chefId,
+          activity_type: 'admin_assigned',
+          description: newAdminId ? `Assigned to admin` : 'Unassigned from admin',
+          admin_user_id: currentAdminId,
+          admin_name: adminName,
+        });
+      } catch (err) {
+        console.error('Failed to assign admin:', err);
+        if (previousChef) {
+          optimisticUpdate(chefId, { assigned_admin_id: previousChef.assigned_admin_id });
+        }
       }
-      return { error: err };
-    }
+    })();
+
+    return { error: null };
   };
 
   const incrementCallAttempts = async (chefId: string, currentAdminId: string, adminName?: string) => {
     const chef = chefs.find(c => c.id === chefId);
     const newCount = (chef?.call_attempts || 0) + 1;
+    const now = new Date().toISOString();
+    
+    // Optimistic update - happens immediately
     optimisticUpdate(chefId, { 
       call_attempts: newCount,
-      crm_last_contact_date: new Date().toISOString()
+      crm_last_contact_date: now
     });
 
-    try {
-      await ensureAdminData(chefId);
+    // Fire-and-forget DB operations
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('chef_admin_data')
+          .upsert({
+            chef_profile_id: chefId,
+            call_attempts: newCount,
+            crm_last_contact_date: now,
+            crm_updated_by: currentAdminId,
+          }, { onConflict: 'chef_profile_id' });
 
-      const { error } = await supabase
-        .from('chef_admin_data')
-        .update({
-          call_attempts: newCount,
-          crm_last_contact_date: new Date().toISOString(),
-          crm_updated_by: currentAdminId,
-        })
-        .eq('chef_profile_id', chefId);
+        if (error) throw error;
 
-      if (error) throw error;
-
-      await supabase.from('chef_activities').insert({
-        chef_id: chefId,
-        activity_type: 'call_attempt',
-        description: `Call attempt #${newCount}`,
-        admin_user_id: currentAdminId,
-        admin_name: adminName,
-      });
-
-      return { error: null };
-    } catch (err) {
-      if (chef) {
-        optimisticUpdate(chefId, { call_attempts: chef.call_attempts });
+        // Log activity in background
+        supabase.from('chef_activities').insert({
+          chef_id: chefId,
+          activity_type: 'call_attempt',
+          description: `Call attempt #${newCount}`,
+          admin_user_id: currentAdminId,
+          admin_name: adminName,
+        });
+      } catch (err) {
+        console.error('Failed to log call:', err);
+        if (chef) {
+          optimisticUpdate(chefId, { call_attempts: chef.call_attempts });
+        }
       }
-      return { error: err };
-    }
+    })();
+
+    return { error: null };
   };
 
   const updateFollowUpDate = async (chefId: string, date: Date | null, currentAdminId: string, adminName?: string) => {
     const previousChef = chefs.find(c => c.id === chefId);
     const dateStr = date ? date.toISOString() : null;
+    
+    // Optimistic update - happens immediately
     optimisticUpdate(chefId, { crm_follow_up_date: dateStr });
 
-    try {
-      await ensureAdminData(chefId);
+    // Fire-and-forget DB operations
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('chef_admin_data')
+          .upsert({
+            chef_profile_id: chefId,
+            crm_follow_up_date: dateStr,
+            crm_updated_by: currentAdminId,
+          }, { onConflict: 'chef_profile_id' });
 
-      const { error } = await supabase
-        .from('chef_admin_data')
-        .update({
-          crm_follow_up_date: dateStr,
-          crm_updated_by: currentAdminId,
-        })
-        .eq('chef_profile_id', chefId);
+        if (error) throw error;
 
-      if (error) throw error;
-
-      await supabase.from('chef_activities').insert({
-        chef_id: chefId,
-        activity_type: 'follow_up_scheduled',
-        description: date ? `Follow-up scheduled for ${date.toLocaleDateString()}` : 'Follow-up cleared',
-        admin_user_id: currentAdminId,
-        admin_name: adminName,
-      });
-
-      return { error: null };
-    } catch (err) {
-      if (previousChef) {
-        optimisticUpdate(chefId, { crm_follow_up_date: previousChef.crm_follow_up_date });
+        // Log activity in background
+        supabase.from('chef_activities').insert({
+          chef_id: chefId,
+          activity_type: 'follow_up_scheduled',
+          description: date ? `Follow-up scheduled for ${date.toLocaleDateString()}` : 'Follow-up cleared',
+          admin_user_id: currentAdminId,
+          admin_name: adminName,
+        });
+      } catch (err) {
+        console.error('Failed to update follow-up:', err);
+        if (previousChef) {
+          optimisticUpdate(chefId, { crm_follow_up_date: previousChef.crm_follow_up_date });
+        }
       }
-      return { error: err };
-    }
+    })();
+
+    return { error: null };
   };
 
   return {
