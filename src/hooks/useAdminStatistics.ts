@@ -184,9 +184,8 @@ export function useAdminStatistics() {
         }
       }
 
-      // Convert to array and sort by assigned chefs
+      // Convert to array and sort by assigned chefs (show all admins)
       const statsArray = Object.values(adminStatsMap)
-        .filter(s => s.assignedChefs > 0)
         .sort((a, b) => b.assignedChefs - a.assignedChefs);
 
       setStats(statsArray);
