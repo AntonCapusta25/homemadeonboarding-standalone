@@ -24,7 +24,7 @@ export function Logo({ chefLogo, size = "md", showText = false, showDisclaimer =
           <img
             src={chefLogo}
             alt="Your logo"
-            className={`${sizes[size].container} rounded-xl object-cover shadow-soft border-2 border-primary/20`}
+            className={`${sizes[size].container} rounded-xl object-contain shadow-soft border-2 border-primary/20 bg-white`}
           />
         ) : (
           <img
