@@ -7,8 +7,6 @@ import { HelmetProvider } from "react-helmet-async";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
-import TestOnboarding from "./pages/TestOnboarding";
-
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -26,7 +24,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/test" element={<TestOnboarding />} />
+            
             <Route 
               path="/admin" 
               element={
