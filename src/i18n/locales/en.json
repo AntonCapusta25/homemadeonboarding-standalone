@@ -302,5 +302,5 @@
     "menuTimeRemaining": "~{{seconds}}s remaining",
     "menuAlmostDone": "Almost done...",
     "menuGeneratedSuccess": "Your personalized menu is ready! 🎉"
-  },
+  }
 }
