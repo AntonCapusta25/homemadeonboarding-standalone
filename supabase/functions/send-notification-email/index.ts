@@ -43,7 +43,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (type === 'abandonment') {
       // Send to admin about abandoned onboarding
-      toEmail = "chefs@homemade-meals.net";
+      toEmail = "chefs@homemademeals.net";
       subject = `⚠️ URGENT: ${chefName} did not finish onboarding`;
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -93,7 +93,7 @@ const handler = async (req: Request): Promise<Response> => {
       `;
     } else if (type === 'new_signup') {
       // Send to admin about new chef signup with FULL details
-      toEmail = "chefs@homemade-meals.net";
+      toEmail = "chefs@homemademeals.net";
       subject = `🎉 New Chef Signup: ${businessName || chefName}`;
       
       // Format service type nicely
