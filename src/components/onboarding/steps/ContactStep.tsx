@@ -41,13 +41,24 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
     const cleaned = phoneValue.replace(/[\s\-\(\)\.]/g, '');
     const isValidPhone = /^\+?\d{8,15}$/.test(cleaned);
     
-    if (isValidPhone && typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'Lead', {
-        content_name: 'Chef Onboarding Contact',
-        content_category: 'Onboarding',
-      });
-      leadTrackedRef.current = true;
-      console.log('Meta Pixel Lead event tracked');
+    if (isValidPhone) {
+      const fireLead = () => {
+        if (typeof window !== 'undefined' && (window as any).fbq) {
+          (window as any).fbq('track', 'Lead', {
+            content_name: 'Chef Onboarding Contact',
+            content_category: 'Onboarding',
+          });
+          leadTrackedRef.current = true;
+          console.log('Meta Pixel Lead event tracked for phone:', cleaned);
+          return true;
+        }
+        return false;
+      };
+
+      // Try immediately, then retry after a delay if fbq not ready
+      if (!fireLead()) {
+        setTimeout(fireLead, 500);
+      }
     }
   };
 
@@ -196,6 +207,7 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
                 if (errors.phone) setErrors(prev => ({ ...prev, phone: undefined }));
                 trackLeadEvent(newValue);
               }}
+              onBlur={() => trackLeadEvent(phone)}
               className="pl-10"
             />
           </div>
