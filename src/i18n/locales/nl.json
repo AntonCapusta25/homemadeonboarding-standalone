@@ -294,6 +294,14 @@
   },
   "onboarding": {
     "menuGenerating": "Menu wordt gegenereerd...",
-    "menuGeneratingSubtitle": "Dit kan even duren"
+    "menuGeneratingSubtitle": "Dit kan even duren",
+    "menuTimeRemaining": "~{{seconds}}s resterend",
+    "menuAlmostDone": "Bijna klaar...",
+    "menuGeneratedSuccess": "Je gepersonaliseerde menu is klaar! 🎉"
+  },
+  "contact": {
+    "whatsapp": "WhatsApp",
+    "call": "Bel ons",
+    "whatsappMessage": "Hallo! Ik heb hulp nodig met mijn Homemade onboarding."
   }
 }
