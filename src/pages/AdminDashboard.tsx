@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useChefProfiles } from '@/hooks/useChefProfiles';
+import { useChefProfiles, ChefWithStats } from '@/hooks/useChefProfiles';
 import { useAdminStatistics } from '@/hooks/useAdminStatistics';
 import { AdminStatistics } from '@/components/admin/AdminStatistics';
+import { ChefDetailsModal } from '@/components/admin/ChefDetailsModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +47,7 @@ import {
   PhoneCall,
   UserPlus,
   AlertTriangle,
+  Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -70,6 +72,8 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
+  const [selectedChef, setSelectedChef] = useState<ChefWithStats | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   
 
   const {
@@ -421,6 +425,7 @@ export default function AdminDashboard() {
                   <TableHead className="min-w-[100px]">Last Contact</TableHead>
                   <TableHead className="min-w-[140px]">Follow-up</TableHead>
                   <TableHead className="min-w-[100px]">Joined</TableHead>
+                  <TableHead className="min-w-[80px]">View</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -435,8 +440,14 @@ export default function AdminDashboard() {
                     <TableRow 
                       key={chef.id}
                       className={cn(
-                        !chef.onboarding_completed && "bg-orange-50/50 hover:bg-orange-50"
+                        "cursor-pointer transition-colors",
+                        !chef.onboarding_completed && "bg-orange-50/50 hover:bg-orange-100/50",
+                        chef.onboarding_completed && "hover:bg-muted/50"
                       )}
+                      onClick={() => {
+                        setSelectedChef(chef);
+                        setIsDetailsModalOpen(true);
+                      }}
                     >
                       <TableCell>
                         <div>
@@ -599,6 +610,20 @@ export default function AdminDashboard() {
                           {format(new Date(chef.created_at), 'MMM d')}
                         </span>
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedChef(chef);
+                            setIsDetailsModalOpen(true);
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -637,6 +662,27 @@ export default function AdminDashboard() {
           )}
         </Card>
       </main>
+
+      {/* Chef Details Modal */}
+      {selectedChef && (
+        <ChefDetailsModal
+          chef={selectedChef}
+          isOpen={isDetailsModalOpen}
+          onClose={() => {
+            setIsDetailsModalOpen(false);
+            setSelectedChef(null);
+          }}
+          onRefresh={refetch}
+          onStatusChange={async (chefId, status) => {
+            if (!user) return { error: 'Not authenticated' };
+            return updateChefStatus(chefId, status, user.id, user.email || undefined);
+          }}
+          onNotesChange={async (chefId, notes) => {
+            if (!user) return { error: 'Not authenticated' };
+            return updateChefNotes(chefId, notes, user.id);
+          }}
+        />
+      )}
     </div>
   );
 }
