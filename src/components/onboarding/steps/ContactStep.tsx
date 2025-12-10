@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
 import { Mail, Phone, User } from 'lucide-react';
@@ -19,6 +19,7 @@ interface ContactStepProps {
 export function ContactStep({ email, phone, firstName = '', lastName = '', onChange, onNext, onPrevious, onAccountCreated }: ContactStepProps) {
   const { t } = useTranslation();
   const [errors, setErrors] = useState<{ email?: string; phone?: string; firstName?: string }>({});
+  const leadTrackedRef = useRef(false);
 
   const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,6 +32,23 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
     // Must be at least 8 digits and contain only digits and optionally start with +
     const phoneRegex = /^\+?\d{8,15}$/;
     return phoneRegex.test(cleaned);
+  };
+
+  // Track Lead event when valid phone is entered
+  const trackLeadEvent = (phoneValue: string) => {
+    if (leadTrackedRef.current) return;
+    
+    const cleaned = phoneValue.replace(/[\s\-\(\)\.]/g, '');
+    const isValidPhone = /^\+?\d{8,15}$/.test(cleaned);
+    
+    if (isValidPhone && typeof window !== 'undefined' && (window as any).fbq) {
+      (window as any).fbq('track', 'Lead', {
+        content_name: 'Chef Onboarding Contact',
+        content_category: 'Onboarding',
+      });
+      leadTrackedRef.current = true;
+      console.log('Meta Pixel Lead event tracked');
+    }
   };
 
   const validate = () => {
@@ -58,14 +76,6 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
 
   const handleNext = async () => {
     if (!validate()) return;
-    
-    // Track Lead event in Meta Pixel
-    if (typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'Lead', {
-        content_name: 'Chef Onboarding Contact',
-        content_category: 'Onboarding',
-      });
-    }
     
     // Silently create account in background - no UI feedback
     supabase.functions.invoke('auto-create-account', {
@@ -181,8 +191,10 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
               placeholder={t('contact.phonePlaceholder')}
               value={phone}
               onChange={(e) => {
-                onChange('phone', e.target.value);
+                const newValue = e.target.value;
+                onChange('phone', newValue);
                 if (errors.phone) setErrors(prev => ({ ...prev, phone: undefined }));
+                trackLeadEvent(newValue);
               }}
               className="pl-10"
             />
