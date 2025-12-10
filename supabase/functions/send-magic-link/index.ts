@@ -107,7 +107,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email }] }],
-        from: { email: "info@homemademeals.net", name: "Homemade Chef" },
+        from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
         subject: `Welcome to Homemade${businessName ? ` - ${businessName}` : ""} 🍳`,
         content: [{ type: "text/html", value: emailHtml }],
       }),
