@@ -21,6 +21,7 @@ import { SummaryStep } from './steps/SummaryStep'; // Keep import for potential 
 import { MagicLinkSentStep } from './steps/MagicLinkSentStep';
 import { CongratsStep } from './steps/CongratsStep';
 import { FastVerificationFlow } from './steps/FastVerificationFlow';
+import { MenuGeneratingIndicator } from './MenuGeneratingIndicator';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -36,6 +37,7 @@ export function OnboardingWizard() {
   const [showCongrats, setShowCongrats] = useState(false);
   const [showFastVerification, setShowFastVerification] = useState(false);
   const [verificationComplete, setVerificationComplete] = useState(false);
+  const [isGeneratingMenu, setIsGeneratingMenu] = useState(false);
   
   const {
     currentStep,
@@ -208,6 +210,7 @@ export function OnboardingWizard() {
         // Generate and save menu to database
         if (chefProfile) {
           try {
+            setIsGeneratingMenu(true);
             const { data: menuData, error: menuError } = await supabase.functions.invoke('generate-menu', {
               body: {
                 city: profile.city,
@@ -279,6 +282,8 @@ export function OnboardingWizard() {
           } catch (menuErr) {
             console.error('Failed to generate/save menu:', menuErr);
             // Continue anyway - menu can be created later
+          } finally {
+            setIsGeneratingMenu(false);
           }
         }
 
@@ -557,6 +562,9 @@ export function OnboardingWizard() {
           {renderStep()}
         </div>
       </div>
+      
+      {/* Menu generation indicator */}
+      <MenuGeneratingIndicator isVisible={isGeneratingMenu} />
     </div>
   );
 }
