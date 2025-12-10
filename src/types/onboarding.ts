@@ -90,7 +90,8 @@ export const CITIES = [
 
 export const CUISINES = [
   'Italian',
-  'Indian / Pakistani',
+  'Indian',
+  'Pakistani',
   'Middle Eastern',
   'African',
   'Surinamese',
