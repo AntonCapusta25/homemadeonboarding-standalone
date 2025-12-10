@@ -176,7 +176,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: toEmail }] }],
-        from: { email: "info@homemademeals.net", name: "Homemade" },
+        from: { email: "chefs@homemademeals.net", name: "Homemade" },
         subject,
         content: [{ type: "text/html", value: htmlContent }],
       }),
