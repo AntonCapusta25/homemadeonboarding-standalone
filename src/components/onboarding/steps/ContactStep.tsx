@@ -25,21 +25,31 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
     return emailRegex.test(value);
   };
 
+  const validatePhone = (value: string) => {
+    // Remove spaces, dashes, parentheses for validation
+    const cleaned = value.replace(/[\s\-\(\)\.]/g, '');
+    // Must be at least 8 digits and contain only digits and optionally start with +
+    const phoneRegex = /^\+?\d{8,15}$/;
+    return phoneRegex.test(cleaned);
+  };
+
   const validate = () => {
     const newErrors: { email?: string; phone?: string; firstName?: string } = {};
     
     if (!firstName.trim()) {
-      newErrors.firstName = t('contact.firstName');
+      newErrors.firstName = t('contact.firstNameRequired', 'First name is required');
     }
     
     if (!email.trim()) {
-      newErrors.email = t('contact.email');
+      newErrors.email = t('contact.emailRequired', 'Email is required');
     } else if (!validateEmail(email)) {
-      newErrors.email = t('contact.email');
+      newErrors.email = t('contact.emailInvalid', 'Please enter a valid email address');
     }
     
     if (!phone.trim()) {
-      newErrors.phone = t('contact.phone');
+      newErrors.phone = t('contact.phoneRequired', 'Phone number is required');
+    } else if (!validatePhone(phone)) {
+      newErrors.phone = t('contact.phoneInvalid', 'Please enter a valid phone number (8-15 digits)');
     }
     
     setErrors(newErrors);
@@ -83,7 +93,7 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
     onNext();
   };
 
-  const isValid = email.trim().length > 0 && phone.trim().length > 0 && firstName.trim().length > 0;
+  const isValid = email.trim().length > 0 && phone.trim().length > 0 && firstName.trim().length > 0 && validatePhone(phone);
 
   return (
     <StepLayout
