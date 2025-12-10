@@ -55,23 +55,66 @@ export type Database = {
           },
         ]
       }
-      chef_profiles: {
+      chef_admin_data: {
         Row: {
-          address: string | null
           admin_notes: string | null
           admin_status: string | null
           assigned_admin_id: string | null
+          call_attempts: number | null
+          chef_profile_id: string
+          created_at: string
+          crm_follow_up_date: string | null
+          crm_last_contact_date: string | null
+          crm_updated_by: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          admin_status?: string | null
+          assigned_admin_id?: string | null
+          call_attempts?: number | null
+          chef_profile_id: string
+          created_at?: string
+          crm_follow_up_date?: string | null
+          crm_last_contact_date?: string | null
+          crm_updated_by?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          admin_status?: string | null
+          assigned_admin_id?: string | null
+          call_attempts?: number | null
+          chef_profile_id?: string
+          created_at?: string
+          crm_follow_up_date?: string | null
+          crm_last_contact_date?: string | null
+          crm_updated_by?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chef_admin_data_chef_profile_id_fkey"
+            columns: ["chef_profile_id"]
+            isOneToOne: true
+            referencedRelation: "chef_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chef_profiles: {
+        Row: {
+          address: string | null
           availability: string[] | null
           business_name: string | null
-          call_attempts: number | null
           chef_name: string | null
           city: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
-          crm_follow_up_date: string | null
-          crm_last_contact_date: string | null
-          crm_updated_by: string | null
           cuisines: string[] | null
           dish_types: string[] | null
           food_safety_status:
@@ -88,20 +131,13 @@ export type Database = {
         }
         Insert: {
           address?: string | null
-          admin_notes?: string | null
-          admin_status?: string | null
-          assigned_admin_id?: string | null
           availability?: string[] | null
           business_name?: string | null
-          call_attempts?: number | null
           chef_name?: string | null
           city?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
-          crm_follow_up_date?: string | null
-          crm_last_contact_date?: string | null
-          crm_updated_by?: string | null
           cuisines?: string[] | null
           dish_types?: string[] | null
           food_safety_status?:
@@ -118,20 +154,13 @@ export type Database = {
         }
         Update: {
           address?: string | null
-          admin_notes?: string | null
-          admin_status?: string | null
-          assigned_admin_id?: string | null
           availability?: string[] | null
           business_name?: string | null
-          call_attempts?: number | null
           chef_name?: string | null
           city?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
-          crm_follow_up_date?: string | null
-          crm_last_contact_date?: string | null
-          crm_updated_by?: string | null
           cuisines?: string[] | null
           dish_types?: string[] | null
           food_safety_status?:

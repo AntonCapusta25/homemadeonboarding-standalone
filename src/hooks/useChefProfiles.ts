@@ -4,11 +4,32 @@ import { Tables } from '@/integrations/supabase/types';
 
 type ChefProfile = Tables<'chef_profiles'>;
 
+// Admin data from separate table (only visible to admins)
+export interface ChefAdminData {
+  id: string;
+  chef_profile_id: string;
+  admin_notes: string | null;
+  admin_status: string | null;
+  crm_last_contact_date: string | null;
+  crm_follow_up_date: string | null;
+  call_attempts: number | null;
+  assigned_admin_id: string | null;
+  crm_updated_by: string | null;
+}
+
 export interface ChefWithStats extends ChefProfile {
   menuCount?: number;
   dishCount?: number;
-  isPending?: boolean; // True if from pending_profiles (incomplete onboarding)
-  currentStep?: string; // Current onboarding step for pending profiles
+  isPending?: boolean;
+  currentStep?: string;
+  // Admin data (joined from chef_admin_data table)
+  admin_notes?: string | null;
+  admin_status?: string | null;
+  crm_last_contact_date?: string | null;
+  crm_follow_up_date?: string | null;
+  call_attempts?: number | null;
+  assigned_admin_id?: string | null;
+  crm_updated_by?: string | null;
 }
 
 export interface PendingProfile {
@@ -36,7 +57,7 @@ interface UseChefProfilesOptions {
   cityFilter?: string;
   assignedToMe?: boolean;
   adminId?: string;
-  includePending?: boolean; // Whether to include pending profiles
+  includePending?: boolean;
 }
 
 interface Analytics {
@@ -45,7 +66,7 @@ interface Analytics {
   chefsLast7Days: number;
   avgCompletion: number;
   statusBreakdown: Record<string, number>;
-  pendingCount: number; // New: count of incomplete onboarding
+  pendingCount: number;
 }
 
 export function useChefProfiles(options: UseChefProfilesOptions = {}) {
@@ -61,16 +82,14 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
   const fetchAdmins = useCallback(async () => {
     try {
-      // Get admin user IDs from user_roles
       const { data: adminRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id')
+        .select('user_id, email')
         .eq('role', 'admin');
 
       if (rolesError) throw rolesError;
 
       if (adminRoles && adminRoles.length > 0) {
-        // Get admin names from chef_activities (where they've logged activity)
         const { data: activities } = await supabase
           .from('chef_activities')
           .select('admin_user_id, admin_name')
@@ -81,8 +100,8 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           const activity = activities?.find(a => a.admin_user_id === role.user_id);
           adminMap[role.user_id] = {
             id: role.user_id,
-            email: '',
-            name: activity?.admin_name || `Admin ${role.user_id.slice(0, 8)}`,
+            email: role.email || '',
+            name: activity?.admin_name || role.email || `Admin ${role.user_id.slice(0, 8)}`,
           };
         });
 
@@ -98,22 +117,15 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     setError(null);
 
     try {
+      // First fetch chef profiles
       let query = supabase
         .from('chef_profiles')
         .select('*', { count: 'exact' });
 
-      // Apply filters
-      if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('admin_status', statusFilter);
-      }
       if (cityFilter && cityFilter !== 'all') {
         query = query.eq('city', cityFilter);
       }
-      if (assignedToMe && adminId) {
-        query = query.eq('assigned_admin_id', adminId);
-      }
 
-      // Pagination
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -121,12 +133,52 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      const { data, error: fetchError, count } = await query;
+      const { data: profilesData, error: fetchError, count } = await query;
 
       if (fetchError) throw fetchError;
 
-      // Deduplicate by contact_email - keep only the most recent profile per email
-      const deduplicatedChefs = (data || []).reduce((acc: ChefWithStats[], chef) => {
+      // Fetch admin data for these profiles
+      const profileIds = (profilesData || []).map(p => p.id);
+      let adminDataMap: Record<string, ChefAdminData> = {};
+
+      if (profileIds.length > 0) {
+        const { data: adminData, error: adminError } = await supabase
+          .from('chef_admin_data')
+          .select('*')
+          .in('chef_profile_id', profileIds);
+
+        if (!adminError && adminData) {
+          adminDataMap = adminData.reduce((acc, ad) => {
+            acc[ad.chef_profile_id] = ad;
+            return acc;
+          }, {} as Record<string, ChefAdminData>);
+        }
+      }
+
+      // Merge chef profiles with admin data
+      let mergedData: ChefWithStats[] = (profilesData || []).map(chef => ({
+        ...chef,
+        admin_notes: adminDataMap[chef.id]?.admin_notes || null,
+        admin_status: adminDataMap[chef.id]?.admin_status || 'new',
+        crm_last_contact_date: adminDataMap[chef.id]?.crm_last_contact_date || null,
+        crm_follow_up_date: adminDataMap[chef.id]?.crm_follow_up_date || null,
+        call_attempts: adminDataMap[chef.id]?.call_attempts || 0,
+        assigned_admin_id: adminDataMap[chef.id]?.assigned_admin_id || null,
+        crm_updated_by: adminDataMap[chef.id]?.crm_updated_by || null,
+      }));
+
+      // Apply status filter after merging (since status is now in admin_data)
+      if (statusFilter && statusFilter !== 'all') {
+        mergedData = mergedData.filter(chef => chef.admin_status === statusFilter);
+      }
+
+      // Apply assigned to me filter
+      if (assignedToMe && adminId) {
+        mergedData = mergedData.filter(chef => chef.assigned_admin_id === adminId);
+      }
+
+      // Deduplicate by contact_email
+      const deduplicatedChefs = mergedData.reduce((acc: ChefWithStats[], chef) => {
         if (!chef.contact_email) {
           acc.push(chef);
           return acc;
@@ -143,7 +195,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       setChefs(deduplicatedChefs);
       setTotalCount(count || 0);
 
-      // Fetch pending profiles (incomplete onboarding)
+      // Fetch pending profiles
       if (includePending) {
         const { data: pendingData } = await supabase
           .from('pending_profiles')
@@ -151,23 +203,31 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           .order('created_at', { ascending: false });
 
         if (pendingData) {
-          // Filter out pending profiles that already exist in chef_profiles
           const existingEmails = new Set(deduplicatedChefs.map(c => c.contact_email?.toLowerCase()));
           const filteredPending = pendingData.filter(p => !existingEmails.has(p.email.toLowerCase()));
           setPendingProfiles(filteredPending);
         }
       }
 
-      // Fetch analytics
+      // Fetch analytics - need to get admin data for status breakdown
       const { data: allChefs } = await supabase
         .from('chef_profiles')
-        .select('created_at, admin_status, onboarding_completed');
+        .select('id, created_at, onboarding_completed');
+
+      const { data: allAdminData } = await supabase
+        .from('chef_admin_data')
+        .select('chef_profile_id, admin_status');
 
       const { count: pendingCountResult } = await supabase
         .from('pending_profiles')
         .select('id', { count: 'exact', head: true });
 
       if (allChefs) {
+        const adminStatusMap = (allAdminData || []).reduce((acc, ad) => {
+          acc[ad.chef_profile_id] = ad.admin_status;
+          return acc;
+        }, {} as Record<string, string | null>);
+
         const now = new Date();
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -176,7 +236,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         let completedCount = 0;
 
         allChefs.forEach((chef) => {
-          const status = chef.admin_status || 'new';
+          const status = adminStatusMap[chef.id] || 'new';
           statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
           if (chef.onboarding_completed) completedCount++;
         });
@@ -216,8 +276,22 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     ));
   };
 
+  // Ensure admin data record exists for a chef
+  const ensureAdminData = async (chefId: string) => {
+    const { data: existing } = await supabase
+      .from('chef_admin_data')
+      .select('id')
+      .eq('chef_profile_id', chefId)
+      .maybeSingle();
+
+    if (!existing) {
+      await supabase
+        .from('chef_admin_data')
+        .insert({ chef_profile_id: chefId });
+    }
+  };
+
   const updateChefStatus = async (chefId: string, status: string, currentAdminId: string, adminName?: string) => {
-    // Optimistic update
     const previousChef = chefs.find(c => c.id === chefId);
     optimisticUpdate(chefId, { 
       admin_status: status, 
@@ -225,18 +299,19 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     });
 
     try {
+      await ensureAdminData(chefId);
+
       const { error } = await supabase
-        .from('chef_profiles')
+        .from('chef_admin_data')
         .update({
           admin_status: status,
           crm_updated_by: currentAdminId,
           crm_last_contact_date: new Date().toISOString(),
         })
-        .eq('id', chefId);
+        .eq('chef_profile_id', chefId);
 
       if (error) throw error;
 
-      // Log activity
       await supabase.from('chef_activities').insert({
         chef_id: chefId,
         activity_type: 'status_change',
@@ -247,7 +322,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
       return { error: null };
     } catch (err) {
-      // Rollback on error
       if (previousChef) {
         optimisticUpdate(chefId, { admin_status: previousChef.admin_status });
       }
@@ -256,17 +330,18 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   };
 
   const updateChefNotes = async (chefId: string, notes: string, currentAdminId: string) => {
-    // Optimistic update
     optimisticUpdate(chefId, { admin_notes: notes });
 
     try {
+      await ensureAdminData(chefId);
+
       const { error } = await supabase
-        .from('chef_profiles')
+        .from('chef_admin_data')
         .update({
           admin_notes: notes,
           crm_updated_by: currentAdminId,
         })
-        .eq('id', chefId);
+        .eq('chef_profile_id', chefId);
 
       if (error) throw error;
       return { error: null };
@@ -276,19 +351,19 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   };
 
   const assignAdmin = async (chefId: string, newAdminId: string | null, currentAdminId: string, adminName?: string) => {
-    // Optimistic update
     const previousChef = chefs.find(c => c.id === chefId);
     optimisticUpdate(chefId, { assigned_admin_id: newAdminId });
 
     try {
+      await ensureAdminData(chefId);
+
       const { error } = await supabase
-        .from('chef_profiles')
+        .from('chef_admin_data')
         .update({ assigned_admin_id: newAdminId })
-        .eq('id', chefId);
+        .eq('chef_profile_id', chefId);
 
       if (error) throw error;
 
-      // Log activity
       await supabase.from('chef_activities').insert({
         chef_id: chefId,
         activity_type: 'admin_assigned',
@@ -299,7 +374,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
       return { error: null };
     } catch (err) {
-      // Rollback on error
       if (previousChef) {
         optimisticUpdate(chefId, { assigned_admin_id: previousChef.assigned_admin_id });
       }
@@ -308,7 +382,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   };
 
   const incrementCallAttempts = async (chefId: string, currentAdminId: string, adminName?: string) => {
-    // Optimistic update
     const chef = chefs.find(c => c.id === chefId);
     const newCount = (chef?.call_attempts || 0) + 1;
     optimisticUpdate(chefId, { 
@@ -317,18 +390,19 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     });
 
     try {
+      await ensureAdminData(chefId);
+
       const { error } = await supabase
-        .from('chef_profiles')
+        .from('chef_admin_data')
         .update({
           call_attempts: newCount,
           crm_last_contact_date: new Date().toISOString(),
           crm_updated_by: currentAdminId,
         })
-        .eq('id', chefId);
+        .eq('chef_profile_id', chefId);
 
       if (error) throw error;
 
-      // Log activity
       await supabase.from('chef_activities').insert({
         chef_id: chefId,
         activity_type: 'call_attempt',
@@ -339,7 +413,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
       return { error: null };
     } catch (err) {
-      // Rollback on error
       if (chef) {
         optimisticUpdate(chefId, { call_attempts: chef.call_attempts });
       }
@@ -348,23 +421,23 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   };
 
   const updateFollowUpDate = async (chefId: string, date: Date | null, currentAdminId: string, adminName?: string) => {
-    // Optimistic update
     const previousChef = chefs.find(c => c.id === chefId);
     const dateStr = date ? date.toISOString() : null;
     optimisticUpdate(chefId, { crm_follow_up_date: dateStr });
 
     try {
+      await ensureAdminData(chefId);
+
       const { error } = await supabase
-        .from('chef_profiles')
+        .from('chef_admin_data')
         .update({
           crm_follow_up_date: dateStr,
           crm_updated_by: currentAdminId,
         })
-        .eq('id', chefId);
+        .eq('chef_profile_id', chefId);
 
       if (error) throw error;
 
-      // Log activity
       await supabase.from('chef_activities').insert({
         chef_id: chefId,
         activity_type: 'follow_up_scheduled',
@@ -375,7 +448,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
       return { error: null };
     } catch (err) {
-      // Rollback on error
       if (previousChef) {
         optimisticUpdate(chefId, { crm_follow_up_date: previousChef.crm_follow_up_date });
       }

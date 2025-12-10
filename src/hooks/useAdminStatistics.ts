@@ -15,10 +15,14 @@ export interface AdminStats {
   lastActivity: string | null;
 }
 
-interface AdminUser {
-  id: string;
-  email: string;
-  raw_user_meta_data?: { name?: string };
+interface ChefAdminData {
+  chef_profile_id: string;
+  admin_notes: string | null;
+  admin_status: string | null;
+  crm_last_contact_date: string | null;
+  crm_follow_up_date: string | null;
+  call_attempts: number | null;
+  assigned_admin_id: string | null;
 }
 
 export function useAdminStatistics() {
@@ -34,7 +38,7 @@ export function useAdminStatistics() {
       // Get all admin user IDs from user_roles
       const { data: adminRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id')
+        .select('user_id, email')
         .eq('role', 'admin');
 
       if (rolesError) throw rolesError;
@@ -46,13 +50,42 @@ export function useAdminStatistics() {
 
       const adminIds = adminRoles.map(r => r.user_id);
 
-      // Get chef profiles with assigned admins
-      const { data: profiles, error: profilesError } = await supabase
-        .from('chef_profiles')
+      // Get admin data with assigned admins
+      const { data: adminDataRows, error: adminDataError } = await supabase
+        .from('chef_admin_data')
         .select('*')
         .in('assigned_admin_id', adminIds);
 
-      if (profilesError) throw profilesError;
+      if (adminDataError) throw adminDataError;
+
+      // Get chef profiles for completion stats
+      const profileIds = (adminDataRows || []).map(a => a.chef_profile_id);
+      let profilesMap: Record<string, {
+        business_name: string | null;
+        chef_name: string | null;
+        city: string | null;
+        address: string | null;
+        contact_email: string | null;
+        contact_phone: string | null;
+        cuisines: string[] | null;
+        dish_types: string[] | null;
+        service_type: string | null;
+        availability: string[] | null;
+      }> = {};
+
+      if (profileIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('chef_profiles')
+          .select('id, business_name, chef_name, city, address, contact_email, contact_phone, cuisines, dish_types, service_type, availability')
+          .in('id', profileIds);
+
+        if (profiles) {
+          profilesMap = profiles.reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {} as typeof profilesMap);
+        }
+      }
 
       // Get latest activities per admin
       const { data: activities, error: activitiesError } = await supabase
@@ -67,14 +100,14 @@ export function useAdminStatistics() {
       const adminStatsMap: Record<string, AdminStats> = {};
 
       // Initialize stats for each admin
-      for (const adminId of adminIds) {
-        // Try to get admin name from activities
+      for (const adminRole of adminRoles) {
+        const adminId = adminRole.user_id;
         const adminActivity = activities?.find(a => a.admin_user_id === adminId);
         
         adminStatsMap[adminId] = {
           adminId,
-          adminName: adminActivity?.admin_name || 'Unknown Admin',
-          adminEmail: '', // We'll try to get this from profiles or activities
+          adminName: adminActivity?.admin_name || adminRole.email || 'Unknown Admin',
+          adminEmail: adminRole.email || '',
           assignedChefs: 0,
           successRate: 0,
           successfulConversions: 0,
@@ -86,18 +119,18 @@ export function useAdminStatistics() {
         };
       }
 
-      // Process profiles
+      // Process admin data
       const successStatuses = ['interested', 'meeting_set', 'active'];
       
-      for (const profile of profiles || []) {
-        const adminId = profile.assigned_admin_id;
+      for (const adminData of adminDataRows || []) {
+        const adminId = adminData.assigned_admin_id;
         if (!adminId || !adminStatsMap[adminId]) continue;
 
         const stat = adminStatsMap[adminId];
         stat.assignedChefs++;
 
         // Status breakdown
-        const status = profile.admin_status || 'new';
+        const status = adminData.admin_status || 'new';
         stat.statusBreakdown[status] = (stat.statusBreakdown[status] || 0) + 1;
 
         // Success tracking
@@ -106,31 +139,34 @@ export function useAdminStatistics() {
         }
 
         // Call attempts
-        stat.totalCalls += profile.call_attempts || 0;
+        stat.totalCalls += adminData.call_attempts || 0;
 
         // Follow-ups (count profiles with follow-up dates)
-        if (profile.crm_follow_up_date) {
+        if (adminData.crm_follow_up_date) {
           stat.totalFollowUps++;
         }
 
-        // Calculate completion based on filled fields
-        const completionFields = [
-          profile.business_name,
-          profile.chef_name,
-          profile.city,
-          profile.address,
-          profile.contact_email,
-          profile.contact_phone,
-          profile.cuisines?.length > 0,
-          profile.dish_types?.length > 0,
-          profile.service_type,
-          profile.availability?.length > 0,
-        ];
-        const filledFields = completionFields.filter(Boolean).length;
-        const completion = Math.round((filledFields / completionFields.length) * 100);
-        stat.averageCompletion = stat.assignedChefs === 1 
-          ? completion 
-          : Math.round((stat.averageCompletion * (stat.assignedChefs - 1) + completion) / stat.assignedChefs);
+        // Calculate completion based on profile fields
+        const profile = profilesMap[adminData.chef_profile_id];
+        if (profile) {
+          const completionFields = [
+            profile.business_name,
+            profile.chef_name,
+            profile.city,
+            profile.address,
+            profile.contact_email,
+            profile.contact_phone,
+            profile.cuisines && profile.cuisines.length > 0,
+            profile.dish_types && profile.dish_types.length > 0,
+            profile.service_type,
+            profile.availability && profile.availability.length > 0,
+          ];
+          const filledFields = completionFields.filter(Boolean).length;
+          const completion = Math.round((filledFields / completionFields.length) * 100);
+          stat.averageCompletion = stat.assignedChefs === 1 
+            ? completion 
+            : Math.round((stat.averageCompletion * (stat.assignedChefs - 1) + completion) / stat.assignedChefs);
+        }
       }
 
       // Calculate success rates and get last activity
@@ -150,7 +186,7 @@ export function useAdminStatistics() {
 
       // Convert to array and sort by assigned chefs
       const statsArray = Object.values(adminStatsMap)
-        .filter(s => s.assignedChefs > 0) // Only show admins with assigned chefs
+        .filter(s => s.assignedChefs > 0)
         .sort((a, b) => b.assignedChefs - a.assignedChefs);
 
       setStats(statsArray);
