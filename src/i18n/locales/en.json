@@ -295,6 +295,14 @@
   },
   "onboarding": {
     "menuGenerating": "Generating your menu...",
-    "menuGeneratingSubtitle": "This may take a moment"
+    "menuGeneratingSubtitle": "This may take a moment",
+    "menuTimeRemaining": "~{{seconds}}s remaining",
+    "menuAlmostDone": "Almost done...",
+    "menuGeneratedSuccess": "Your personalized menu is ready! 🎉"
+  },
+  "contact": {
+    "whatsapp": "WhatsApp",
+    "call": "Call us",
+    "whatsappMessage": "Hi! I need help with my Homemade onboarding."
   }
 }

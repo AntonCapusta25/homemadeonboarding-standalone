@@ -22,13 +22,16 @@ import { MagicLinkSentStep } from './steps/MagicLinkSentStep';
 import { CongratsStep } from './steps/CongratsStep';
 import { FastVerificationFlow } from './steps/FastVerificationFlow';
 import { MenuGeneratingIndicator } from './MenuGeneratingIndicator';
+import { ContactButtons } from './ContactButtons';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [isNewUser, setIsNewUser] = useState(true);
@@ -277,6 +280,9 @@ export function OnboardingWizard() {
                 }
 
                 await supabase.from('dishes').insert(dishesToInsert);
+                
+                // Show success toast
+                toast.success(t('onboarding.menuGeneratedSuccess', 'Your personalized menu is ready! 🎉'));
               }
             }
           } catch (menuErr) {
@@ -565,6 +571,9 @@ export function OnboardingWizard() {
       
       {/* Menu generation indicator */}
       <MenuGeneratingIndicator isVisible={isGeneratingMenu} />
+      
+      {/* Contact buttons */}
+      <ContactButtons />
     </div>
   );
 }
