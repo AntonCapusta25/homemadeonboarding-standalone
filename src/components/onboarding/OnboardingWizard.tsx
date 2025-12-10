@@ -550,8 +550,8 @@ export function OnboardingWizard() {
   return (
     <div className="min-h-screen bg-gradient-soft">
       <div className="container max-w-4xl mx-auto px-4 py-8">
-        {/* Header with logo */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Header with logo and language selector */}
+        <div className="flex items-center gap-4 mb-6">
           <Logo chefLogo={profile.logoUrl} size="sm" />
           <LanguageSelector />
         </div>
