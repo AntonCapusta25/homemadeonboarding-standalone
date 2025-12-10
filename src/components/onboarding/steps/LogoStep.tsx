@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { StepLayout } from '../StepLayout';
-import { Sparkles, Upload, SkipForward, Loader2, Image as ImageIcon, Check, X, ArrowRight } from 'lucide-react';
+import { Sparkles, Upload, SkipForward, Loader2, Image as ImageIcon, Check, X, ArrowRight, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LogoMethod } from '@/types/onboarding';
 import { supabase } from '@/integrations/supabase/client';
@@ -320,6 +320,31 @@ export function LogoStep({
               </div>
             </div>
           </div>
+          
+          {/* Premium Logo Request */}
+          <a 
+            href="https://calendly.com/homemademeals-info/interview-with-homemade" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="block"
+          >
+            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-2 border-amber-500/30 rounded-2xl p-6 transition-all hover:border-amber-500/50 hover:shadow-soft cursor-pointer">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Crown className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-display font-semibold text-foreground mb-1 flex items-center gap-2">
+                    Request Premium Logo
+                    <span className="text-xs bg-amber-500/20 text-amber-700 px-2 py-0.5 rounded-full">Pro</span>
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Get a professionally designed custom logo crafted by our design team
+                  </p>
+                </div>
+              </div>
+            </div>
+          </a>
         </div>
         
         <div className="text-center mt-6">
