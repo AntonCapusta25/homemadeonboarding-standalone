@@ -89,16 +89,16 @@
     "sunday": "Sunday"
   },
   "contact": {
-    "title": "Your contact details",
+    "title": "f",
     "subtitle": "How can customers reach you?",
     "firstName": "First Name",
     "lastName": "Last Name",
     "email": "Email",
     "phone": "Phone number",
-    "firstNamePlaceholder": "Your first name",
-    "lastNamePlaceholder": "Your last name",
-    "emailPlaceholder": "your@email.com",
-    "phonePlaceholder": "+31 6 12345678"
+    "firstNamePlaceholder": "Maria",
+    "lastNamePlaceholder": "de Jong",
+    "emailPlaceholder": "maria.dejong@gmail.com",
+    "phonePlaceholder": "+31 6 12 34 56 78"
   },
   "address": {
     "title": "Where will you cook?",

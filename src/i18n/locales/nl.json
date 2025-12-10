@@ -89,16 +89,16 @@
     "sunday": "Zondag"
   },
   "contact": {
-    "title": "Je contactgegevens",
+    "title": "f",
     "subtitle": "Hoe kunnen klanten je bereiken?",
     "firstName": "Voornaam",
     "lastName": "Achternaam",
     "email": "E-mail",
     "phone": "Telefoonnummer",
-    "firstNamePlaceholder": "Je voornaam",
-    "lastNamePlaceholder": "Je achternaam",
-    "emailPlaceholder": "jouw@email.nl",
-    "phonePlaceholder": "+31 6 12345678"
+    "firstNamePlaceholder": "Maria",
+    "lastNamePlaceholder": "de Jong",
+    "emailPlaceholder": "maria.dejong@gmail.com",
+    "phonePlaceholder": "+31 6 12 34 56 78"
   },
   "address": {
     "title": "Waar ga je koken?",
