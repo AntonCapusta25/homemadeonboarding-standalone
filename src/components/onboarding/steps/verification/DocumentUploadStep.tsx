@@ -71,24 +71,24 @@ export function DocumentUploadStep({
       }
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/id-${Date.now()}.${fileExt}`;
+      // Store in user's folder for RLS policy compliance
+      const filePath = `${user.id}/id-${Date.now()}.${fileExt}`;
 
       const { error } = await supabase.storage
-        .from('logos')
-        .upload(`documents/${fileName}`, file, { upsert: true });
+        .from('verification-documents')
+        .upload(filePath, file, { upsert: true });
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('logos')
-        .getPublicUrl(`documents/${fileName}`);
+      // Store the file path (not public URL) - access requires authentication
+      const storedPath = `verification-documents/${filePath}`;
 
       // Update document state
-      setDocument(prev => ({ ...prev, uploading: false, uploaded: true, url: publicUrl }));
+      setDocument(prev => ({ ...prev, uploading: false, uploaded: true, url: storedPath }));
 
       // Save to verification progress in database (reusing kvk field for ID)
       if (onDocumentUpload) {
-        await onDocumentUpload('kvk', publicUrl);
+        await onDocumentUpload('kvk', storedPath);
       }
 
       toast.success(t('verification.uploadSuccess', 'ID uploaded successfully!'));
