@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
-import { Check, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, CircleCheck, Circle, RefreshCw } from 'lucide-react';
+import { Check, ArrowRight, Phone, MapPin, Store, Loader2, Sparkles, CircleCheck, Circle, RefreshCw, Crown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { fireCelebration, fireConfetti } from '@/components/confetti';
 import { cn } from '@/lib/utils';
@@ -219,14 +219,26 @@ export function SummaryStep({ profile, onComplete, onBookCall, onUpdateProfile, 
       </div>
 
       {profile.logoUrl && (
-        <button 
-          onClick={handleRegenerateLogo}
-          disabled={regeneratingLogo}
-          className="text-sm text-muted-foreground hover:text-primary mb-4 flex items-center gap-1 transition-colors"
-        >
-          <RefreshCw className={cn("w-3 h-3", regeneratingLogo && "animate-spin")} />
-          {regeneratingLogo ? 'Regenerating...' : 'Regenerate logo'}
-        </button>
+        <div className="flex items-center gap-3 mb-4">
+          <button 
+            onClick={handleRegenerateLogo}
+            disabled={regeneratingLogo}
+            className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+          >
+            <RefreshCw className={cn("w-3 h-3", regeneratingLogo && "animate-spin")} />
+            {regeneratingLogo ? 'Regenerating...' : 'Regenerate logo'}
+          </button>
+          <span className="text-muted-foreground/50">•</span>
+          <a 
+            href="https://calendly.com/homemademeals-info/interview-with-homemade" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sm text-amber-600 hover:text-amber-700 flex items-center gap-1 transition-colors"
+          >
+            <Crown className="w-3 h-3" />
+            Request Premium Logo
+          </a>
+        </div>
       )}
 
       <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4 animate-slide-up">{t('summary.ready')} 🎉</h1>
