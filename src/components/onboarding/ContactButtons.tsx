@@ -17,7 +17,7 @@ export function ContactButtons() {
   };
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-3">
+    <div className="fixed top-4 right-4 z-50 flex gap-2">
       <button
         onClick={handleWhatsApp}
         className="flex items-center gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white px-4 py-2.5 rounded-full shadow-lg transition-all hover:scale-105 text-sm font-medium"
