@@ -98,7 +98,10 @@
     "firstNamePlaceholder": "Maria",
     "lastNamePlaceholder": "de Jong",
     "emailPlaceholder": "maria.dejong@gmail.com",
-    "phonePlaceholder": "+31 6 12 34 56 78"
+    "phonePlaceholder": "+31 6 12 34 56 78",
+    "whatsapp": "WhatsApp",
+    "call": "Call us",
+    "whatsappMessage": "Hi! I need help with my Homemade onboarding."
   },
   "address": {
     "title": "Where will you cook?",
@@ -300,9 +303,4 @@
     "menuAlmostDone": "Almost done...",
     "menuGeneratedSuccess": "Your personalized menu is ready! 🎉"
   },
-  "contact": {
-    "whatsapp": "WhatsApp",
-    "call": "Call us",
-    "whatsappMessage": "Hi! I need help with my Homemade onboarding."
-  }
 }
