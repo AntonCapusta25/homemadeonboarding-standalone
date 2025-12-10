@@ -1,8 +1,8 @@
 import { Phone, MessageCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const WHATSAPP_NUMBER = '31612345678'; // Replace with actual number
-const PHONE_NUMBER = '+31612345678'; // Replace with actual number
+const WHATSAPP_NUMBER = '3197010208809';
+const PHONE_NUMBER = '+3197010208809';
 
 export function ContactButtons() {
   const { t } = useTranslation();
