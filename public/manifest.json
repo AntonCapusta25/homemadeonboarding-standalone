@@ -1,7 +1,7 @@
 {
-  "name": "Homemade-Chef",
-  "short_name": "HomeMadeChef",
-  "description": "Start your journey as a home chef",
+  "name": "Homemade - Home Restaurant Platform",
+  "short_name": "Homemade",
+  "description": "Turn your kitchen into a restaurant! Start selling homemade food in Amsterdam & Enschede. No upfront fees, full support.",
   "theme_color": "#E07A5F",
   "background_color": "#FAF8F5",
   "display": "standalone",
