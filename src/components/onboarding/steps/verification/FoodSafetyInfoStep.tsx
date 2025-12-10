@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { useTranslation } from 'react-i18next';
-import { ShieldCheck, ArrowLeft, ExternalLink, CheckCircle, Play } from 'lucide-react';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
+import { ShieldCheck, ArrowLeft, ExternalLink, CheckCircle, Play } from "lucide-react";
 
 interface FoodSafetyInfoStepProps {
   onComplete: () => void;
@@ -10,26 +10,26 @@ interface FoodSafetyInfoStepProps {
 
 const foodSafetyVideos = [
   {
-    id: 'basics',
-    title: 'Food Safety Basics',
-    titleNl: 'Basis Voedselveiligheid',
-    url: 'https://youtu.be/fEsvLzajbxs?si=uKJMETpjarCoGh_T',
+    id: "basics",
+    title: "Food Safety Basics",
+    titleNl: "Basis Voedselveiligheid",
+    url: "https://www.youtube.com/watch?v=fEsvLzajbxs",
   },
   {
-    id: 'hygiene',
-    title: 'Kitchen Hygiene',
-    titleNl: 'Keuken Hygiëne',
-    url: 'https://youtu.be/NtTbLbHvNW8?si=GhT4lzl0In0AZPMW',
+    id: "hygiene",
+    title: "Kitchen Hygiene",
+    titleNl: "Keuken Hygiëne",
+    url: "https://www.youtube.com/watch?v=NtTbLbHvNW8",
   },
   {
-    id: 'storage',
-    title: 'Food Storage',
-    titleNl: 'Voedsel Opslag',
-    url: 'https://youtu.be/bAs70eIvttk?si=1ZB9UQLCJKJFxhAR',
+    id: "storage",
+    title: "Food Storage",
+    titleNl: "Voedsel Opslag",
+    url: "https://www.youtube.com/watch?v=bAs70eIvttk",
   },
 ];
 
-const foodSafetyQuizUrl = 'https://zol4dc90rf4.typeform.com/to/fORAE4HR';
+const foodSafetyQuizUrl = "https://zol4dc90rf4.typeform.com/to/fORAE4HR";
 
 export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoStepProps) {
   const { t, i18n } = useTranslation();
@@ -37,12 +37,12 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
   const [quizCompleted, setQuizCompleted] = useState(false);
 
   const handleWatchVideo = (videoId: string, url: string) => {
-    window.open(url, '_blank');
-    setWatchedVideos(prev => new Set([...prev, videoId]));
+    window.open(url, "_blank");
+    setWatchedVideos((prev) => new Set([...prev, videoId]));
   };
 
   const handleTakeQuiz = () => {
-    window.open(foodSafetyQuizUrl, '_blank');
+    window.open(foodSafetyQuizUrl, "_blank");
     setQuizCompleted(true);
   };
 
@@ -58,26 +58,24 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
           </div>
         </div>
         <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-3">
-          {t('verification.foodSafetyTitle', 'Food Safety Training')}
+          {t("verification.foodSafetyTitle", "Food Safety Training")}
         </h1>
         <p className="text-muted-foreground text-lg max-w-md mx-auto">
-          {t('verification.foodSafetyDesc', 'Watch the training videos and complete the quiz to continue.')}
+          {t("verification.foodSafetyDesc", "Watch the training videos and complete the quiz to continue.")}
         </p>
       </div>
 
       <div className="flex-1 space-y-4">
         {/* Video cards */}
         <div className="space-y-3">
-          <h3 className="font-semibold text-foreground">
-            {t('verification.trainingVideos', 'Training Videos')}
-          </h3>
+          <h3 className="font-semibold text-foreground">{t("verification.trainingVideos", "Training Videos")}</h3>
           {foodSafetyVideos.map((video) => (
             <div
               key={video.id}
               className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
                 watchedVideos.has(video.id)
-                  ? 'bg-primary/5 border-primary/30'
-                  : 'bg-card border-border hover:border-primary/50'
+                  ? "bg-primary/5 border-primary/30"
+                  : "bg-card border-border hover:border-primary/50"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -87,18 +85,18 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
                   <Play className="w-5 h-5 text-muted-foreground" />
                 )}
                 <span className="font-medium text-foreground">
-                  {i18n.language === 'nl' ? video.titleNl : video.title}
+                  {i18n.language === "nl" ? video.titleNl : video.title}
                 </span>
               </div>
               <Button
-                variant={watchedVideos.has(video.id) ? 'outline' : 'default'}
+                variant={watchedVideos.has(video.id) ? "outline" : "default"}
                 size="sm"
                 onClick={() => handleWatchVideo(video.id, video.url)}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
-                {watchedVideos.has(video.id) 
-                  ? t('verification.watchAgain', 'Watch Again') 
-                  : t('verification.watch', 'Watch')}
+                {watchedVideos.has(video.id)
+                  ? t("verification.watchAgain", "Watch Again")
+                  : t("verification.watch", "Watch")}
               </Button>
             </div>
           ))}
@@ -106,14 +104,10 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
 
         {/* Quiz section */}
         <div className="mt-6">
-          <h3 className="font-semibold text-foreground mb-3">
-            {t('verification.foodSafetyQuiz', 'Food Safety Quiz')}
-          </h3>
+          <h3 className="font-semibold text-foreground mb-3">{t("verification.foodSafetyQuiz", "Food Safety Quiz")}</h3>
           <div
             className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
-              quizCompleted
-                ? 'bg-primary/5 border-primary/30'
-                : 'bg-card border-border'
+              quizCompleted ? "bg-primary/5 border-primary/30" : "bg-card border-border"
             }`}
           >
             <div className="flex items-center gap-3">
@@ -123,24 +117,22 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
                 <ShieldCheck className="w-5 h-5 text-muted-foreground" />
               )}
               <span className="font-medium text-foreground">
-                {t('verification.completeQuiz', 'Complete the Food Safety Quiz')}
+                {t("verification.completeQuiz", "Complete the Food Safety Quiz")}
               </span>
             </div>
             <Button
-              variant={quizCompleted ? 'outline' : 'default'}
+              variant={quizCompleted ? "outline" : "default"}
               size="sm"
               onClick={handleTakeQuiz}
               disabled={!allVideosWatched}
             >
               <ExternalLink className="w-4 h-4 mr-2" />
-              {quizCompleted 
-                ? t('verification.retakeQuiz', 'Retake Quiz') 
-                : t('verification.takeQuiz', 'Take Quiz')}
+              {quizCompleted ? t("verification.retakeQuiz", "Retake Quiz") : t("verification.takeQuiz", "Take Quiz")}
             </Button>
           </div>
           {!allVideosWatched && (
             <p className="text-sm text-muted-foreground mt-2">
-              {t('verification.watchAllFirst', 'Please watch all videos before taking the quiz.')}
+              {t("verification.watchAllFirst", "Please watch all videos before taking the quiz.")}
             </p>
           )}
         </div>
@@ -149,15 +141,10 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
       <div className="flex justify-between pt-8 mt-auto border-t border-border">
         <Button variant="ghost" onClick={onPrevious}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          {t('common.back', 'Back')}
+          {t("common.back", "Back")}
         </Button>
-        <Button 
-          onClick={onComplete} 
-          size="lg" 
-          variant="default"
-          disabled={!canComplete}
-        >
-          {t('verification.complete', 'Complete')}
+        <Button onClick={onComplete} size="lg" variant="default" disabled={!canComplete}>
+          {t("verification.complete", "Complete")}
         </Button>
       </div>
     </div>
