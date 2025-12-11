@@ -23,7 +23,8 @@ import { CongratsStep } from './steps/CongratsStep';
 import { FastVerificationFlow } from './steps/FastVerificationFlow';
 import { MenuGeneratingIndicator } from './MenuGeneratingIndicator';
 import { ContactButtons } from './ContactButtons';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,7 +32,7 @@ import { toast } from 'sonner';
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -551,9 +552,26 @@ export function OnboardingWizard() {
     <div className="min-h-screen bg-gradient-soft">
       <div className="container max-w-4xl mx-auto px-4 py-8">
         {/* Header with logo and language selector */}
-        <div className="flex items-center gap-4 mb-6">
-          <Logo chefLogo={profile.logoUrl} size="sm" />
-          <LanguageSelector />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Logo chefLogo={profile.logoUrl} size="sm" />
+            <LanguageSelector />
+          </div>
+          {user && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await signOut();
+                clearOnboardingProgress();
+                window.location.href = '/onboarding';
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              {t('auth.signOut', 'Logout')}
+            </Button>
+          )}
         </div>
 
         {showProgress && (
