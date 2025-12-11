@@ -27,6 +27,14 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
       });
     }
     
+    // Track CompleteRegistration event in TikTok Pixel
+    if (typeof window !== 'undefined' && (window as any).ttq) {
+      (window as any).ttq.track('CompleteRegistration', {
+        content_name: 'Chef Onboarding Complete',
+        status: verificationComplete ? 'verified' : 'pending_verification',
+      });
+    }
+    
     // Trigger confetti celebration
     const timer = setTimeout(() => {
       fireCelebration();
