@@ -43,19 +43,35 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
     
     if (isValidPhone) {
       const fireLead = () => {
+        let tracked = false;
+        
+        // Meta Pixel
         if (typeof window !== 'undefined' && (window as any).fbq) {
           (window as any).fbq('track', 'Lead', {
             content_name: 'Chef Onboarding Contact',
             content_category: 'Onboarding',
           });
-          leadTrackedRef.current = true;
           console.log('Meta Pixel Lead event tracked for phone:', cleaned);
-          return true;
+          tracked = true;
         }
-        return false;
+        
+        // TikTok Pixel
+        if (typeof window !== 'undefined' && (window as any).ttq) {
+          (window as any).ttq.track('SubmitForm', {
+            content_name: 'Chef Onboarding Contact',
+            content_category: 'Onboarding',
+          });
+          console.log('TikTok Pixel SubmitForm event tracked for phone:', cleaned);
+          tracked = true;
+        }
+        
+        if (tracked) {
+          leadTrackedRef.current = true;
+        }
+        return tracked;
       };
 
-      // Try immediately, then retry after a delay if fbq not ready
+      // Try immediately, then retry after a delay if pixels not ready
       if (!fireLead()) {
         setTimeout(fireLead, 500);
       }
