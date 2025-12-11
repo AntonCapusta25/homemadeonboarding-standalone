@@ -23,7 +23,7 @@ import { CongratsStep } from './steps/CongratsStep';
 import { FastVerificationFlow } from './steps/FastVerificationFlow';
 import { MenuGeneratingIndicator } from './MenuGeneratingIndicator';
 import { ContactButtons } from './ContactButtons';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -559,23 +559,6 @@ export function OnboardingWizard() {
             <Logo chefLogo={profile.logoUrl} size="sm" />
             <LanguageSelector />
           </div>
-          {user && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={async () => {
-                await signOut();
-                // Clear local cache so new user gets fresh form
-                // DB data (pending_profiles) remains intact for both users
-                clearOnboardingProgress();
-                window.location.href = '/onboarding';
-              }}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              {t('auth.signOut', 'Logout')}
-            </Button>
-          )}
         </div>
 
         {showProgress && (
