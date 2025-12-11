@@ -563,6 +563,9 @@ export function OnboardingWizard() {
               size="sm"
               onClick={async () => {
                 await signOut();
+                // Clear local cache so new user gets fresh form
+                // DB data (pending_profiles) remains intact for both users
+                clearOnboardingProgress();
                 window.location.href = '/onboarding';
               }}
               className="text-muted-foreground hover:text-foreground"
