@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
-import { Mail, Phone, User } from 'lucide-react';
+import { Mail, Phone, User, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ContactStepProps {
   email: string;
@@ -14,12 +15,16 @@ interface ContactStepProps {
   onNext: () => void;
   onPrevious: () => void;
   onAccountCreated?: (userId: string) => void;
+  onLookupByEmail?: (email: string) => Promise<boolean>;
 }
 
-export function ContactStep({ email, phone, firstName = '', lastName = '', onChange, onNext, onPrevious, onAccountCreated }: ContactStepProps) {
+export function ContactStep({ email, phone, firstName = '', lastName = '', onChange, onNext, onPrevious, onAccountCreated, onLookupByEmail }: ContactStepProps) {
   const { t } = useTranslation();
   const [errors, setErrors] = useState<{ email?: string; phone?: string; firstName?: string }>({});
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [hasLookedUp, setHasLookedUp] = useState(false);
   const leadTrackedRef = useRef(false);
+  const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -196,11 +201,31 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
               placeholder={t('contact.emailPlaceholder')}
               value={email}
               onChange={(e) => {
-                onChange('email', e.target.value);
+                const newEmail = e.target.value;
+                onChange('email', newEmail);
                 if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+                
+                // Debounced lookup when email looks valid
+                if (lookupTimeoutRef.current) {
+                  clearTimeout(lookupTimeoutRef.current);
+                }
+                if (validateEmail(newEmail) && !hasLookedUp && onLookupByEmail) {
+                  lookupTimeoutRef.current = setTimeout(async () => {
+                    setIsLookingUp(true);
+                    const found = await onLookupByEmail(newEmail);
+                    setIsLookingUp(false);
+                    setHasLookedUp(true);
+                    if (found) {
+                      toast.success(t('contact.profileRestored', 'Welcome back! Your progress has been restored.'));
+                    }
+                  }, 500);
+                }
               }}
-              className="pl-10"
+              className="pl-10 pr-10"
             />
+            {isLookingUp && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+            )}
           </div>
           {errors.email && (
             <p className="text-sm text-destructive mt-1">{errors.email}</p>
