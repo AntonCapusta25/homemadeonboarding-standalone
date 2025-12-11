@@ -101,7 +101,8 @@
     "phonePlaceholder": "+31 6 12 34 56 78",
     "whatsapp": "WhatsApp",
     "call": "Call us",
-    "whatsappMessage": "Hi! I need help with my Homemade onboarding."
+    "whatsappMessage": "Hi! I need help with my Homemade onboarding.",
+    "profileRestored": "Welcome back! Your progress has been restored."
   },
   "address": {
     "title": "Where will you cook?",

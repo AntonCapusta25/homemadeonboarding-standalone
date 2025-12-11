@@ -123,6 +123,68 @@ function dbProfileToOnboarding(dbProfile: DbChefProfile): Partial<ChefProfile> {
   };
 }
 
+// Helper to convert pending profile to onboarding profile format
+interface PendingProfileData {
+  email: string;
+  phone: string | null;
+  chef_name: string | null;
+  business_name: string | null;
+  city: string | null;
+  address: string | null;
+  cuisines: string[] | null;
+  dish_types: string[] | null;
+  availability: string[] | null;
+  service_type: string | null;
+  food_safety_status: string | null;
+  kvk_status: string | null;
+  plan: string | null;
+  logo_url: string | null;
+  current_step: string | null;
+}
+
+function pendingProfileToOnboarding(pending: PendingProfileData): Partial<ChefProfile> {
+  const nameParts = (pending.chef_name || '').split(' ');
+  const addressParts = (pending.address || '').split(',');
+  
+  // Map DB enum values back to onboarding values
+  const foodSafetyMap: Record<string, FoodSafetyStatus> = {
+    'have_certificate': 'has_certificate',
+    'getting_certificate': 'has_certificate',
+    'need_help': 'needs_training',
+  };
+  
+  const kvkMap: Record<string, KvkStatus> = {
+    'have_both': 'kvk_nvwa_both',
+    'in_progress': 'kvk_only',
+    'need_help': 'try_first',
+  };
+  
+  const planMap: Record<string, PlanType> = {
+    'starter': 'basic',
+    'growth': 'pro',
+    'pro': 'advanced',
+  };
+
+  return {
+    email: pending.email,
+    phone: pending.phone || '',
+    city: pending.city || '',
+    streetAddress: addressParts[0]?.trim() || '',
+    zipCode: addressParts[1]?.trim() || '',
+    restaurantName: pending.business_name || '',
+    firstName: nameParts[0] || '',
+    lastName: nameParts.slice(1).join(' ') || '',
+    primaryCuisines: pending.cuisines || [],
+    dishTypes: pending.dish_types || [],
+    availabilityBuckets: pending.availability || [],
+    logoUrl: pending.logo_url || undefined,
+    serviceType: (pending.service_type as ServiceType) || 'unsure',
+    foodSafetyStatus: pending.food_safety_status ? foodSafetyMap[pending.food_safety_status] || 'needs_training' : 'needs_training',
+    kvkStatus: pending.kvk_status ? kvkMap[pending.kvk_status] || 'try_first' : 'try_first',
+    plan: pending.plan ? planMap[pending.plan] || 'advanced' : 'advanced',
+  };
+}
+
 // Determine step index based on what data is already filled
 function getResumeStepIndex(profile: ChefProfile): number {
   if (!profile.city) return 1; // city step
@@ -344,6 +406,44 @@ export function useOnboarding() {
     }
   }, [profile, currentStep, saveToDatabase]);
 
+  // Lookup pending profile by email and restore progress
+  const lookupByEmail = useCallback(async (email: string): Promise<boolean> => {
+    if (!email || !email.includes('@')) return false;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('lookup-pending-profile', {
+        body: { email: email.trim().toLowerCase() },
+      });
+
+      if (error || !data?.found) {
+        return false;
+      }
+
+      // Restore the profile data
+      const restoredProfile = pendingProfileToOnboarding(data.profile);
+      setProfile(prev => ({ ...prev, ...restoredProfile }));
+
+      // Save the session token for continued editing
+      if (data.sessionToken) {
+        saveSessionToken(data.sessionToken);
+      }
+
+      // Determine which step to resume from based on current_step
+      const stepIndex = STEP_ORDER.indexOf(data.profile.current_step as StepId);
+      if (stepIndex > currentStepIndex) {
+        // Mark previous steps as completed
+        const completed = STEP_ORDER.slice(0, stepIndex);
+        setCompletedSteps(new Set(completed));
+      }
+
+      console.log('Restored pending profile for email:', email);
+      return true;
+    } catch (err) {
+      console.error('Error looking up pending profile:', err);
+      return false;
+    }
+  }, [currentStepIndex]);
+
   const canGoNext = currentStepIndex < STEP_ORDER.length - 1;
   const canGoPrevious = currentStepIndex > 0;
   const isFirstStep = currentStepIndex === 0;
@@ -368,5 +468,6 @@ export function useOnboarding() {
     dbLoaded,
     pendingProfileId,
     saveStepToDatabase,
+    lookupByEmail,
   };
 }

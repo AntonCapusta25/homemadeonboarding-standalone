@@ -54,6 +54,7 @@ export function OnboardingWizard() {
     goToNext,
     goToPrevious,
     dbLoaded,
+    lookupByEmail,
   } = useOnboarding();
 
   // Track abandonment
@@ -434,6 +435,7 @@ export function OnboardingWizard() {
               console.log('Account created with ID:', userId);
               // Account is now created, user is logged in
             }}
+            onLookupByEmail={lookupByEmail}
           />
         );
       
