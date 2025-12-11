@@ -563,7 +563,6 @@ export function OnboardingWizard() {
               size="sm"
               onClick={async () => {
                 await signOut();
-                clearOnboardingProgress();
                 window.location.href = '/onboarding';
               }}
               className="text-muted-foreground hover:text-foreground"
