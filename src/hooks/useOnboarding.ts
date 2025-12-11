@@ -101,6 +101,7 @@ function saveProgress(currentStepIndex: number, profile: ChefProfile, completedS
 
 export function clearOnboardingProgress() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SESSION_TOKEN_KEY);
 }
 
 // Helper to convert DB profile to onboarding profile format
