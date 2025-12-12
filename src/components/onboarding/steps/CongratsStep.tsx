@@ -7,6 +7,7 @@ import { fireCelebration } from '@/components/confetti';
 import { Logo } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactButtons } from '@/components/onboarding/ContactButtons';
+import { trackMetaCapiEvent } from '@/lib/metaCapi';
 
 interface CongratsStepProps {
   profile: ChefProfile;
@@ -19,13 +20,13 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
   const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
-    // Track CompleteRegistration event in Meta Pixel
-    if (typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'CompleteRegistration', {
-        content_name: 'Chef Onboarding Complete',
-        status: verificationComplete ? 'verified' : 'pending_verification',
-      });
-    }
+    // Track CompleteRegistration event via Meta CAPI (handles both pixel and server-side)
+    trackMetaCapiEvent('CompleteRegistration', {
+      content_name: 'Chef Onboarding Complete',
+      status: verificationComplete ? 'verified' : 'pending_verification',
+      email: profile.email,
+      phone: profile.phone,
+    });
     
     // Track CompleteRegistration event in TikTok Pixel
     if (typeof window !== 'undefined' && (window as any).ttq) {
