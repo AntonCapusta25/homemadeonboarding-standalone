@@ -58,7 +58,9 @@ export function trackMetaCapiEvent(eventName: string, additionalData: Record<str
   // Fire browser pixel event with deduplication ID
   if (typeof window !== 'undefined' && (window as any).fbq) {
     (window as any).fbq('track', eventName, {}, { eventID: eventId });
-    console.log('Pixel event fired:', eventName, eventId);
+    console.log('✅ Pixel event fired:', eventName, eventId);
+  } else {
+    console.warn('⚠️ Meta Pixel not loaded');
   }
   
   // Fire CAPI event with same deduplication ID
