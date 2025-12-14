@@ -281,19 +281,23 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           }
         });
 
-        // Count only pending profiles whose email is NOT already in chef_profiles
-        let uniquePendingCount = 0;
+        // Count pending profiles whose email is NOT already in chef_profiles
+        let uniquePendingFromTable = 0;
         (allPendingProfiles || []).forEach((pending) => {
           if (pending.email) {
             const emailLower = pending.email.toLowerCase();
             if (!chefEmails.has(emailLower)) {
-              uniquePendingCount++;
+              uniquePendingFromTable++;
             }
           }
         });
 
+        // Also count chef_profiles with onboarding_completed = false as "pending"
+        const incompleteChefProfiles = allChefs.filter(c => c.onboarding_completed !== true).length;
+        const totalPendingCount = uniquePendingFromTable + incompleteChefProfiles;
+
         // Use auth.users count as the source of truth for total signups
-        const totalSignups = authUsersCount > 0 ? authUsersCount : (allChefs.length + uniquePendingCount);
+        const totalSignups = authUsersCount > 0 ? authUsersCount : (allChefs.length + uniquePendingFromTable);
         
         // Completion rate = profiles with onboarding_completed=true / total signups
         const completedOnboarding = allChefs.filter(c => c.onboarding_completed === true).length;
@@ -309,7 +313,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           avgCompletion: completionRate,
           statusBreakdown,
           planBreakdown,
-          pendingCount: uniquePendingCount,
+          pendingCount: totalPendingCount,
         });
       }
     } catch (err) {

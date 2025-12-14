@@ -76,6 +76,7 @@ export default function AdminDashboard() {
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
   const [selectedChef, setSelectedChef] = useState<ChefWithStats | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [showAllPending, setShowAllPending] = useState(false);
   
 
   const {
@@ -527,7 +528,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {pendingProfiles.slice(0, 6).map((pending) => (
+                {(showAllPending ? pendingProfiles : pendingProfiles.slice(0, 6)).map((pending) => (
                   <div
                     key={pending.id}
                     className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-100 shadow-sm"
@@ -564,10 +565,25 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
-              {pendingProfiles.length > 6 && (
-                <p className="text-xs text-muted-foreground mt-3 text-center">
-                  +{pendingProfiles.length - 6} more incomplete profiles
-                </p>
+              {pendingProfiles.length > 6 && !showAllPending && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllPending(true)}
+                  className="mt-4 w-full"
+                >
+                  See All ({pendingProfiles.length} total)
+                </Button>
+              )}
+              {showAllPending && pendingProfiles.length > 6 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllPending(false)}
+                  className="mt-4 w-full"
+                >
+                  Show Less
+                </Button>
               )}
             </CardContent>
           </Card>
