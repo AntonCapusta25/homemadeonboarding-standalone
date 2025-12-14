@@ -500,6 +500,16 @@ export default function AdminDashboard() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCsv}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </Button>
             </div>
           </div>
 
