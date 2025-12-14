@@ -48,6 +48,7 @@ import {
   UserPlus,
   AlertTriangle,
   Eye,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -197,6 +198,71 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleExportCsv = () => {
+    const headers = [
+      'Type',
+      'Business Name',
+      'Chef Name',
+      'City',
+      'Email',
+      'Phone',
+      'Status',
+      'Created At',
+      'Plan',
+    ];
+
+    const rows: string[][] = [];
+
+    filteredChefs.forEach((chef) => {
+      rows.push([
+        'Chef',
+        chef.business_name || '',
+        chef.chef_name || '',
+        chef.city || '',
+        chef.contact_email || '',
+        chef.contact_phone || '',
+        chef.admin_status || 'new',
+        chef.created_at ? new Date(chef.created_at).toISOString() : '',
+        (chef as any).plan || '',
+      ]);
+    });
+
+    pendingProfiles.forEach((pending) => {
+      rows.push([
+        'Pending',
+        pending.business_name || '',
+        pending.chef_name || '',
+        pending.city || '',
+        pending.email || '',
+        pending.phone || '',
+        pending.current_step || 'pending',
+        pending.created_at ? new Date(pending.created_at).toISOString() : '',
+        '',
+      ]);
+    });
+
+    const csvContent = [headers, ...rows]
+      .map((row) =>
+        row
+          .map((value) => {
+            const safe = (value || '').toString().replace(/"/g, '""');
+            return `"${safe}"`;
+          })
+          .join(',')
+      )
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'chefs_export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const filteredChefs = chefs.filter((chef) => {
