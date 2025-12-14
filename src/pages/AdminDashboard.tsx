@@ -313,6 +313,29 @@ export default function AdminDashboard() {
           </Card>
         )}
 
+        {/* Plan Distribution */}
+        {analytics && analytics.planBreakdown && (
+          <Card className="mb-8 p-6">
+            <h2 className="font-display text-lg font-semibold mb-4">Plan Distribution</h2>
+            <div className="flex flex-wrap gap-3">
+              {Object.entries(analytics.planBreakdown).map(([plan, count]) => (
+                <Badge
+                  key={plan}
+                  variant="outline"
+                  className={`text-sm py-1 px-3 ${
+                    plan === 'advanced' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                    plan === 'pro' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                    plan === 'starter' ? 'bg-green-100 text-green-800 border-green-200' :
+                    'bg-gray-100 text-gray-800 border-gray-200'
+                  }`}
+                >
+                  {plan.charAt(0).toUpperCase() + plan.slice(1)}: {count}
+                </Badge>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* Admin Statistics */}
         <div className="mb-8">
           <AdminStatistics stats={adminStats} loading={statsLoading} error={statsError} />
