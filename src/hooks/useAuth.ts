@@ -21,18 +21,27 @@ export function useAuth() {
 
   const fetchUserRole = useCallback(async (userId: string) => {
     try {
+      // Fetch all roles for user (may have both admin and chef)
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
+        .eq('user_id', userId);
 
       if (error) {
         console.error('Error fetching role:', error);
         return null;
       }
 
-      return data?.role as AppRole | null;
+      if (!data || data.length === 0) {
+        return null;
+      }
+
+      // Prioritize admin role if user has multiple roles
+      const roles = data.map(r => r.role);
+      if (roles.includes('admin')) {
+        return 'admin' as AppRole;
+      }
+      return roles[0] as AppRole;
     } catch (err) {
       console.error('Error fetching role:', err);
       return null;
