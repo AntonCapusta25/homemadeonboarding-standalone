@@ -62,6 +62,7 @@ interface UseChefProfilesOptions {
 
 interface Analytics {
   totalChefs: number;
+  totalSignups: number;
   chefsLast30Days: number;
   chefsLast7Days: number;
   avgCompletion: number;
@@ -214,7 +215,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       // Use large range to get all records (bypass default 1000 limit)
       const { data: allChefs } = await supabase
         .from('chef_profiles')
-        .select('id, created_at, onboarding_completed, plan')
+        .select('id, created_at, onboarding_completed, plan, contact_email')
         .range(0, 9999);
 
       const { data: allAdminData } = await supabase
@@ -222,9 +223,10 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         .select('chef_profile_id, admin_status')
         .range(0, 9999);
 
-      const { count: pendingCountResult } = await supabase
+      const { data: allPendingProfiles } = await supabase
         .from('pending_profiles')
-        .select('id', { count: 'exact', head: true });
+        .select('id, email, created_at')
+        .range(0, 9999);
 
       if (allChefs) {
         const adminStatusMap = (allAdminData || []).reduce((acc, ad) => {
@@ -240,6 +242,9 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         const planBreakdown: Record<string, number> = {};
         let completedCount = 0;
 
+        // Track unique emails across both tables
+        const uniqueEmails = new Set<string>();
+
         allChefs.forEach((chef) => {
           const status = adminStatusMap[chef.id] || 'new';
           statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
@@ -248,22 +253,52 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           // Track plans from actual database field
           const plan = chef.plan || 'starter';
           planBreakdown[plan] = (planBreakdown[plan] || 0) + 1;
+
+          // Add email to unique set
+          if (chef.contact_email) {
+            uniqueEmails.add(chef.contact_email.toLowerCase());
+          }
         });
+
+        // Add pending profile emails (only those not already in chef_profiles)
+        (allPendingProfiles || []).forEach((pending) => {
+          if (pending.email) {
+            uniqueEmails.add(pending.email.toLowerCase());
+          }
+        });
+
+        // Count signups in last 30/7 days from both tables
+        const allSignupsWithDates = [
+          ...(allChefs || []).map(c => ({ created_at: c.created_at, email: c.contact_email })),
+          ...(allPendingProfiles || []).map(p => ({ created_at: p.created_at, email: p.email })),
+        ];
+
+        // Dedupe by email, keep earliest date
+        const emailDateMap = new Map<string, Date>();
+        allSignupsWithDates.forEach(s => {
+          if (s.email) {
+            const emailLower = s.email.toLowerCase();
+            const date = new Date(s.created_at);
+            if (!emailDateMap.has(emailLower) || date < emailDateMap.get(emailLower)!) {
+              emailDateMap.set(emailLower, date);
+            }
+          }
+        });
+
+        const signupsLast30Days = Array.from(emailDateMap.values()).filter(d => d >= thirtyDaysAgo).length;
+        const signupsLast7Days = Array.from(emailDateMap.values()).filter(d => d >= sevenDaysAgo).length;
 
         setAnalytics({
           totalChefs: allChefs.length,
-          chefsLast30Days: allChefs.filter(
-            (c) => new Date(c.created_at) >= thirtyDaysAgo
-          ).length,
-          chefsLast7Days: allChefs.filter(
-            (c) => new Date(c.created_at) >= sevenDaysAgo
-          ).length,
-          avgCompletion: allChefs.length > 0
-            ? Math.round((completedCount / allChefs.length) * 100)
+          totalSignups: uniqueEmails.size,
+          chefsLast30Days: signupsLast30Days,
+          chefsLast7Days: signupsLast7Days,
+          avgCompletion: uniqueEmails.size > 0
+            ? Math.round((allChefs.length / uniqueEmails.size) * 100)
             : 0,
           statusBreakdown,
           planBreakdown,
-          pendingCount: pendingCountResult || 0,
+          pendingCount: (allPendingProfiles || []).length,
         });
       }
     } catch (err) {

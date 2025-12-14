@@ -317,12 +317,14 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Chefs</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Signups</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analytics.totalChefs}</div>
-                <p className="text-xs text-muted-foreground">All time</p>
+                <div className="text-2xl font-bold">{analytics.totalSignups}</div>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.totalChefs} completed, {analytics.pendingCount} pending
+                </p>
               </CardContent>
             </Card>
 
