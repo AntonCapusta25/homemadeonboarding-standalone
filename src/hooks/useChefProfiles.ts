@@ -244,6 +244,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
         // Track unique emails across both tables
         const uniqueEmails = new Set<string>();
+        const chefEmails = new Set<string>();
 
         allChefs.forEach((chef) => {
           const status = adminStatusMap[chef.id] || 'new';
@@ -256,14 +257,21 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
           // Add email to unique set
           if (chef.contact_email) {
-            uniqueEmails.add(chef.contact_email.toLowerCase());
+            const emailLower = chef.contact_email.toLowerCase();
+            uniqueEmails.add(emailLower);
+            chefEmails.add(emailLower);
           }
         });
 
-        // Add pending profile emails (only those not already in chef_profiles)
+        // Count only pending profiles whose email is NOT already in chef_profiles
+        let uniquePendingCount = 0;
         (allPendingProfiles || []).forEach((pending) => {
           if (pending.email) {
-            uniqueEmails.add(pending.email.toLowerCase());
+            const emailLower = pending.email.toLowerCase();
+            uniqueEmails.add(emailLower);
+            if (!chefEmails.has(emailLower)) {
+              uniquePendingCount++;
+            }
           }
         });
 
@@ -298,7 +306,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             : 0,
           statusBreakdown,
           planBreakdown,
-          pendingCount: (allPendingProfiles || []).length,
+          pendingCount: uniquePendingCount,
         });
       }
     } catch (err) {
