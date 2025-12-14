@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.lookup-pending-profile]
 verify_jwt = false
+
+[functions.backfill-chef-profiles]
+verify_jwt = false
