@@ -66,6 +66,7 @@ interface Analytics {
   chefsLast7Days: number;
   avgCompletion: number;
   statusBreakdown: Record<string, number>;
+  planBreakdown: Record<string, number>;
   pendingCount: number;
 }
 
@@ -210,13 +211,16 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       }
 
       // Fetch analytics - need to get admin data for status breakdown
+      // Use large range to get all records (bypass default 1000 limit)
       const { data: allChefs } = await supabase
         .from('chef_profiles')
-        .select('id, created_at, onboarding_completed');
+        .select('id, created_at, onboarding_completed, plan')
+        .range(0, 9999);
 
       const { data: allAdminData } = await supabase
         .from('chef_admin_data')
-        .select('chef_profile_id, admin_status');
+        .select('chef_profile_id, admin_status')
+        .range(0, 9999);
 
       const { count: pendingCountResult } = await supabase
         .from('pending_profiles')
@@ -233,12 +237,17 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
         const statusBreakdown: Record<string, number> = {};
+        const planBreakdown: Record<string, number> = {};
         let completedCount = 0;
 
         allChefs.forEach((chef) => {
           const status = adminStatusMap[chef.id] || 'new';
           statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
           if (chef.onboarding_completed) completedCount++;
+          
+          // Track plans from actual database field
+          const plan = chef.plan || 'starter';
+          planBreakdown[plan] = (planBreakdown[plan] || 0) + 1;
         });
 
         setAnalytics({
@@ -253,6 +262,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             ? Math.round((completedCount / allChefs.length) * 100)
             : 0,
           statusBreakdown,
+          planBreakdown,
           pendingCount: pendingCountResult || 0,
         });
       }
