@@ -200,69 +200,127 @@ export default function AdminDashboard() {
     navigate('/auth');
   };
 
-  const handleExportCsv = () => {
-    const headers = [
-      'Type',
-      'Business Name',
-      'Chef Name',
-      'City',
-      'Email',
-      'Phone',
-      'Status',
-      'Created At',
-      'Plan',
-    ];
+  const handleExportCsv = async () => {
+    try {
+      toast({
+        title: 'Exporting...',
+        description: 'Fetching all chef data',
+      });
 
-    const rows: string[][] = [];
+      // Fetch ALL chef profiles (not paginated)
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: allChefProfiles, error: chefsError } = await supabase
+        .from('chef_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    filteredChefs.forEach((chef) => {
-      rows.push([
-        'Chef',
-        chef.business_name || '',
-        chef.chef_name || '',
-        chef.city || '',
-        chef.contact_email || '',
-        chef.contact_phone || '',
-        chef.admin_status || 'new',
-        chef.created_at ? new Date(chef.created_at).toISOString() : '',
-        (chef as any).plan || '',
-      ]);
-    });
+      if (chefsError) throw chefsError;
 
-    pendingProfiles.forEach((pending) => {
-      rows.push([
-        'Pending',
-        pending.business_name || '',
-        pending.chef_name || '',
-        pending.city || '',
-        pending.email || '',
-        pending.phone || '',
-        pending.current_step || 'pending',
-        pending.created_at ? new Date(pending.created_at).toISOString() : '',
-        '',
-      ]);
-    });
+      // Fetch ALL admin data
+      const { data: allAdminData, error: adminDataError } = await supabase
+        .from('chef_admin_data')
+        .select('*');
 
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((value) => {
-            const safe = (value || '').toString().replace(/"/g, '""');
-            return `"${safe}"`;
-          })
-          .join(',')
-      )
-      .join('\n');
+      if (adminDataError) throw adminDataError;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'chefs_export.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      // Fetch ALL pending profiles
+      const { data: allPending, error: pendingError } = await supabase
+        .from('pending_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (pendingError) throw pendingError;
+
+      // Merge admin data with chef profiles
+      const adminDataMap = new Map(
+        (allAdminData || []).map((ad) => [ad.chef_profile_id, ad])
+      );
+
+      const headers = [
+        'Type',
+        'Business Name',
+        'Chef Name',
+        'City',
+        'Email',
+        'Phone',
+        'Status',
+        'Created At',
+        'Plan',
+        'Cuisines',
+        'Service Type',
+        'Admin Notes',
+      ];
+
+      const rows: string[][] = [];
+
+      (allChefProfiles || []).forEach((chef) => {
+        const adminData = adminDataMap.get(chef.id);
+        rows.push([
+          'Chef',
+          chef.business_name || '',
+          chef.chef_name || '',
+          chef.city || '',
+          chef.contact_email || '',
+          chef.contact_phone || '',
+          adminData?.admin_status || 'new',
+          chef.created_at ? new Date(chef.created_at).toISOString() : '',
+          chef.plan || '',
+          (chef.cuisines || []).join('; '),
+          chef.service_type || '',
+          adminData?.admin_notes || '',
+        ]);
+      });
+
+      (allPending || []).forEach((pending) => {
+        rows.push([
+          'Pending',
+          pending.business_name || '',
+          pending.chef_name || '',
+          pending.city || '',
+          pending.email || '',
+          pending.phone || '',
+          pending.current_step || 'pending',
+          pending.created_at ? new Date(pending.created_at).toISOString() : '',
+          pending.plan || '',
+          (pending.cuisines || []).join('; '),
+          pending.service_type || '',
+          '',
+        ]);
+      });
+
+      const csvContent = [headers, ...rows]
+        .map((row) =>
+          row
+            .map((value) => {
+              const safe = (value || '').toString().replace(/"/g, '""');
+              return `"${safe}"`;
+            })
+            .join(',')
+        )
+        .join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `chefs_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Complete',
+        description: `Exported ${(allChefProfiles || []).length} chefs and ${(allPending || []).length} pending profiles`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Could not export data',
+        variant: 'destructive',
+      });
+    }
   };
 
   const filteredChefs = chefs.filter((chef) => {
