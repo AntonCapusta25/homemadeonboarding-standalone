@@ -24,15 +24,11 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Redirect based on role
+  // Only redirect non-admins away - admins must manually navigate after login
   useEffect(() => {
-    if (user && !authLoading) {
-      if (role === 'admin') {
-        navigate('/admin');
-      } else {
-        // Non-admins should use onboarding flow
-        navigate('/onboarding');
-      }
+    if (user && !authLoading && role && role !== 'admin') {
+      // Non-admins should use onboarding flow
+      navigate('/onboarding');
     }
   }, [user, authLoading, role, navigate]);
 
@@ -64,6 +60,8 @@ export default function Auth() {
         return;
       }
       toast.success('Welcome back!');
+      // Manually navigate to admin dashboard after successful login
+      navigate('/admin');
     } catch (err) {
       toast.error('Something went wrong');
     } finally {
