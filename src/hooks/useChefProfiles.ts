@@ -292,10 +292,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           }
         });
 
-        // Also count chef_profiles with onboarding_completed = false as "pending"
-        const incompleteChefProfiles = allChefs.filter(c => c.onboarding_completed !== true).length;
-        const totalPendingCount = uniquePendingFromTable + incompleteChefProfiles;
-
         // Use auth.users count as the source of truth for total signups
         const totalSignups = authUsersCount > 0 ? authUsersCount : (allChefs.length + uniquePendingFromTable);
         
@@ -306,14 +302,14 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           : 0;
 
         setAnalytics({
-          totalChefs: allChefs.length,
+          totalChefs: completedOnboarding, // Only count completed profiles
           totalSignups: totalSignups,
-          chefsLast30Days: authUsersLast30Days > 0 ? authUsersLast30Days : allChefs.length,
-          chefsLast7Days: authUsersLast7Days > 0 ? authUsersLast7Days : allChefs.length,
+          chefsLast30Days: authUsersLast30Days > 0 ? authUsersLast30Days : completedOnboarding,
+          chefsLast7Days: authUsersLast7Days > 0 ? authUsersLast7Days : completedOnboarding,
           avgCompletion: completionRate,
           statusBreakdown,
           planBreakdown,
-          pendingCount: totalPendingCount,
+          pendingCount: uniquePendingFromTable, // Only from pending_profiles table, not backfilled
         });
       }
     } catch (err) {
