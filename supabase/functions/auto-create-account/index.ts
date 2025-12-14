@@ -8,8 +8,10 @@ const corsHeaders = {
 
 interface CreateAccountRequest {
   email: string;
+  phone?: string;
   chefName?: string;
   businessName?: string;
+  pendingProfileId?: string;
 }
 
 serve(async (req) => {
@@ -30,7 +32,7 @@ serve(async (req) => {
       },
     });
 
-    const { email, chefName, businessName }: CreateAccountRequest = await req.json();
+    const { email, phone, chefName, businessName, pendingProfileId }: CreateAccountRequest = await req.json();
     
     if (!email) {
       return new Response(
@@ -52,8 +54,68 @@ serve(async (req) => {
     const existingUser = existingUsers.users.find(u => u.email === email);
     
     if (existingUser) {
-      // User already exists - generate a session for them silently
-      console.log(`User already exists: ${email}, generating session`);
+      // User already exists - check if they have a chef_profile
+      console.log(`User already exists: ${email}, checking chef_profile`);
+      
+      const { data: existingProfile } = await supabaseAdmin
+        .from("chef_profiles")
+        .select("id")
+        .eq("user_id", existingUser.id)
+        .maybeSingle();
+
+      // If no chef_profile exists, create one
+      if (!existingProfile) {
+        console.log(`Creating missing chef_profile for existing user: ${existingUser.id}`);
+        
+        // Try to get data from pending_profile if available
+        let profileData: any = {
+          user_id: existingUser.id,
+          contact_email: email,
+          contact_phone: phone,
+          chef_name: chefName,
+          business_name: businessName,
+          onboarding_completed: false,
+        };
+
+        if (pendingProfileId) {
+          const { data: pendingProfile } = await supabaseAdmin
+            .from("pending_profiles")
+            .select("*")
+            .eq("id", pendingProfileId)
+            .maybeSingle();
+
+          if (pendingProfile) {
+            profileData = {
+              user_id: existingUser.id,
+              contact_email: pendingProfile.email,
+              contact_phone: pendingProfile.phone,
+              chef_name: pendingProfile.chef_name,
+              business_name: pendingProfile.business_name,
+              city: pendingProfile.city,
+              address: pendingProfile.address,
+              cuisines: pendingProfile.cuisines,
+              dish_types: pendingProfile.dish_types,
+              availability: pendingProfile.availability,
+              service_type: pendingProfile.service_type,
+              food_safety_status: pendingProfile.food_safety_status,
+              kvk_status: pendingProfile.kvk_status,
+              plan: pendingProfile.plan,
+              logo_url: pendingProfile.logo_url,
+              onboarding_completed: false,
+            };
+          }
+        }
+
+        const { error: profileError } = await supabaseAdmin
+          .from("chef_profiles")
+          .insert(profileData);
+
+        if (profileError) {
+          console.error("Error creating chef_profile for existing user:", profileError);
+        } else {
+          console.log(`Chef profile created for existing user: ${existingUser.id}`);
+        }
+      }
       
       // Generate a magic link token for auto-login
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -114,6 +176,57 @@ serve(async (req) => {
     }
 
     console.log(`User created with ID: ${newUser.user.id}`);
+
+    // Create chef_profile for the new user
+    let profileData: any = {
+      user_id: newUser.user.id,
+      contact_email: email,
+      contact_phone: phone,
+      chef_name: chefName,
+      business_name: businessName,
+      onboarding_completed: false,
+    };
+
+    // Try to get more data from pending_profile if available
+    if (pendingProfileId) {
+      const { data: pendingProfile } = await supabaseAdmin
+        .from("pending_profiles")
+        .select("*")
+        .eq("id", pendingProfileId)
+        .maybeSingle();
+
+      if (pendingProfile) {
+        profileData = {
+          user_id: newUser.user.id,
+          contact_email: pendingProfile.email,
+          contact_phone: pendingProfile.phone,
+          chef_name: pendingProfile.chef_name,
+          business_name: pendingProfile.business_name,
+          city: pendingProfile.city,
+          address: pendingProfile.address,
+          cuisines: pendingProfile.cuisines,
+          dish_types: pendingProfile.dish_types,
+          availability: pendingProfile.availability,
+          service_type: pendingProfile.service_type,
+          food_safety_status: pendingProfile.food_safety_status,
+          kvk_status: pendingProfile.kvk_status,
+          plan: pendingProfile.plan,
+          logo_url: pendingProfile.logo_url,
+          onboarding_completed: false,
+        };
+      }
+    }
+
+    const { error: profileError } = await supabaseAdmin
+      .from("chef_profiles")
+      .insert(profileData);
+
+    if (profileError) {
+      console.error("Error creating chef_profile:", profileError);
+      // Don't fail the whole operation, just log the error
+    } else {
+      console.log(`Chef profile created for new user: ${newUser.user.id}`);
+    }
 
     // Generate a magic link for auto-login
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({

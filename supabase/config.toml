@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.send-notification-email]
 verify_jwt = false
+
+[functions.get-auth-users-count]
+verify_jwt = false
+
+[functions.lookup-pending-profile]
+verify_jwt = false
