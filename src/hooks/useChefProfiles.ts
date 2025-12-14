@@ -131,7 +131,10 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
+      // Order: profiles with contact_phone first (complete), then those without (backfilled/incomplete)
+      // Within each group, order by created_at descending
       query = query
+        .order('contact_phone', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .range(from, to);
 
