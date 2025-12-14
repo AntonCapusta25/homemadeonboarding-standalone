@@ -294,8 +294,11 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
         // Use auth.users count as the source of truth for total signups
         const totalSignups = authUsersCount > 0 ? authUsersCount : (allChefs.length + uniquePendingCount);
+        
+        // Completion rate = profiles with onboarding_completed=true / total signups
+        const completedOnboarding = allChefs.filter(c => c.onboarding_completed === true).length;
         const completionRate = totalSignups > 0
-          ? Math.round((allChefs.length / totalSignups) * 100)
+          ? Math.round((completedOnboarding / totalSignups) * 100)
           : 0;
 
         setAnalytics({
