@@ -49,6 +49,7 @@ import {
   AlertTriangle,
   Eye,
   Download,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -198,6 +199,49 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const [backfillLoading, setBackfillLoading] = useState(false);
+
+  const handleBackfillProfiles = async () => {
+    try {
+      setBackfillLoading(true);
+      toast({
+        title: 'Running backfill...',
+        description: 'Creating missing chef profiles',
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session?.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const { data, error } = await supabase.functions.invoke('backfill-chef-profiles', {
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Backfill Complete',
+        description: data?.message || `Created ${data?.created || 0} profiles`,
+      });
+
+      refetch();
+    } catch (error) {
+      console.error('Backfill error:', error);
+      toast({
+        title: 'Backfill Failed',
+        description: error instanceof Error ? error.message : 'Could not run backfill',
+        variant: 'destructive',
+      });
+    } finally {
+      setBackfillLoading(false);
+    }
   };
 
   const handleExportCsv = async () => {
@@ -567,6 +611,21 @@ export default function AdminDashboard() {
               >
                 <Download className="w-4 h-4" />
                 Export CSV
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackfillProfiles}
+                disabled={backfillLoading}
+                className="gap-2"
+              >
+                {backfillLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Backfill Profiles
               </Button>
             </div>
           </div>
