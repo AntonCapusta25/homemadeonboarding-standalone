@@ -297,6 +297,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         
         // Completion rate = profiles with onboarding_completed=true / total signups
         const completedOnboarding = allChefs.filter(c => c.onboarding_completed === true).length;
+        const incompleteChefProfiles = allChefs.filter(c => c.onboarding_completed !== true).length;
         const completionRate = totalSignups > 0
           ? Math.round((completedOnboarding / totalSignups) * 100)
           : 0;
@@ -309,7 +310,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           avgCompletion: completionRate,
           statusBreakdown,
           planBreakdown,
-          pendingCount: uniquePendingFromTable, // Only from pending_profiles table, not backfilled
+          pendingCount: uniquePendingFromTable + incompleteChefProfiles, // pending_profiles + incomplete chef_profiles
         });
       }
     } catch (err) {
