@@ -228,28 +228,45 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         .select('id, email, created_at')
         .range(0, 9999);
 
+      // Fetch auth users count from edge function
+      let authUsersCount = 0;
+      let authUsersLast30Days = 0;
+      let authUsersLast7Days = 0;
+      
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        if (session?.session?.access_token) {
+          const { data: authData, error: authError } = await supabase.functions.invoke('get-auth-users-count', {
+            headers: {
+              Authorization: `Bearer ${session.session.access_token}`,
+            },
+          });
+          
+          if (!authError && authData) {
+            authUsersCount = authData.totalAuthUsers || 0;
+            authUsersLast30Days = authData.usersLast30Days || 0;
+            authUsersLast7Days = authData.usersLast7Days || 0;
+          }
+        }
+      } catch (authErr) {
+        console.error('Error fetching auth users count:', authErr);
+      }
+
       if (allChefs) {
         const adminStatusMap = (allAdminData || []).reduce((acc, ad) => {
           acc[ad.chef_profile_id] = ad.admin_status;
           return acc;
         }, {} as Record<string, string | null>);
 
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
         const statusBreakdown: Record<string, number> = {};
         const planBreakdown: Record<string, number> = {};
-        let completedCount = 0;
 
         // Track unique emails across both tables
-        const uniqueEmails = new Set<string>();
         const chefEmails = new Set<string>();
 
         allChefs.forEach((chef) => {
           const status = adminStatusMap[chef.id] || 'new';
           statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
-          if (chef.onboarding_completed) completedCount++;
           
           // Track plans from actual database field
           const plan = chef.plan || 'starter';
@@ -257,9 +274,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
           // Add email to unique set
           if (chef.contact_email) {
-            const emailLower = chef.contact_email.toLowerCase();
-            uniqueEmails.add(emailLower);
-            chefEmails.add(emailLower);
+            chefEmails.add(chef.contact_email.toLowerCase());
           }
         });
 
@@ -268,42 +283,24 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         (allPendingProfiles || []).forEach((pending) => {
           if (pending.email) {
             const emailLower = pending.email.toLowerCase();
-            uniqueEmails.add(emailLower);
             if (!chefEmails.has(emailLower)) {
               uniquePendingCount++;
             }
           }
         });
 
-        // Count signups in last 30/7 days from both tables
-        const allSignupsWithDates = [
-          ...(allChefs || []).map(c => ({ created_at: c.created_at, email: c.contact_email })),
-          ...(allPendingProfiles || []).map(p => ({ created_at: p.created_at, email: p.email })),
-        ];
-
-        // Dedupe by email, keep earliest date
-        const emailDateMap = new Map<string, Date>();
-        allSignupsWithDates.forEach(s => {
-          if (s.email) {
-            const emailLower = s.email.toLowerCase();
-            const date = new Date(s.created_at);
-            if (!emailDateMap.has(emailLower) || date < emailDateMap.get(emailLower)!) {
-              emailDateMap.set(emailLower, date);
-            }
-          }
-        });
-
-        const signupsLast30Days = Array.from(emailDateMap.values()).filter(d => d >= thirtyDaysAgo).length;
-        const signupsLast7Days = Array.from(emailDateMap.values()).filter(d => d >= sevenDaysAgo).length;
+        // Use auth.users count as the source of truth for total signups
+        const totalSignups = authUsersCount > 0 ? authUsersCount : (allChefs.length + uniquePendingCount);
+        const completionRate = totalSignups > 0
+          ? Math.round((allChefs.length / totalSignups) * 100)
+          : 0;
 
         setAnalytics({
           totalChefs: allChefs.length,
-          totalSignups: uniqueEmails.size,
-          chefsLast30Days: signupsLast30Days,
-          chefsLast7Days: signupsLast7Days,
-          avgCompletion: uniqueEmails.size > 0
-            ? Math.round((allChefs.length / uniqueEmails.size) * 100)
-            : 0,
+          totalSignups: totalSignups,
+          chefsLast30Days: authUsersLast30Days > 0 ? authUsersLast30Days : allChefs.length,
+          chefsLast7Days: authUsersLast7Days > 0 ? authUsersLast7Days : allChefs.length,
+          avgCompletion: completionRate,
           statusBreakdown,
           planBreakdown,
           pendingCount: uniquePendingCount,
