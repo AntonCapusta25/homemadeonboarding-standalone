@@ -188,7 +188,11 @@ export function ChefDetailsModal({
     const businessName = chef.business_name || chef.chef_name || 'Chef';
     const dateStr = format(new Date(), 'yyyy-MM-dd');
 
-    // Group dishes by category
+    // Separate main dishes and upsells
+    const mainDishes = menu.dishes.filter(d => !d.is_upsell);
+    const upsells = menu.dishes.filter(d => d.is_upsell);
+
+    // Group all dishes by category for text export
     const dishesByCategory: Record<string, typeof menu.dishes> = {};
     menu.dishes.forEach((dish) => {
       const category = dish.category || 'Other';
@@ -197,6 +201,20 @@ export function ChefDetailsModal({
       }
       dishesByCategory[category].push(dish);
     });
+
+    // Build upsells option string for CSV (semicolon-separated variants)
+    const buildUpsellsOption = () => {
+      if (upsells.length === 0) return { id: '', name: '', variants: '' };
+      const optionId = `upsell-${Date.now()}`;
+      const variants = upsells.map(u => {
+        const price = Number(u.price).toFixed(0);
+        const desc = u.description || u.name;
+        return `${u.name},${price},0,1,${desc},,${u.id}`;
+      }).join(';');
+      return { id: optionId, name: 'Add-ons', variants };
+    };
+
+    const upsellOption = buildUpsellsOption();
 
     // Generate CSV (matching the uploaded format)
     const csvHeaders = [
@@ -211,36 +229,71 @@ export function ChefDetailsModal({
       'OPTION2.VIEW', 'OPTION2.VARIANTS'
     ];
 
-    const csvRows = menu.dishes.map((dish) => {
+    const escapeCSV = (val: string) => {
+      const str = String(val || '').replace(/"/g, '""');
+      return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
+    };
+
+    // Create rows for main dishes (with upsells as options)
+    const mainDishRows = mainDishes.map((dish) => {
       const desc = dish.description ? `<p>${dish.description}</p>` : '';
       const category = dish.category || 'Main Dishes';
-      const label = dish.is_upsell ? 'upsell' : '';
       
       return [
-        dish.id, // PRODUCT.ID
-        dish.name, // PRODUCT.NAME
-        desc, // PRODUCT.DESCRIPTION
-        '', // PRODUCT.SKU
-        Number(dish.price).toFixed(2), // PRODUCT.PRICE.SELLING
-        '', // PRODUCT.PRICE.COST
-        '', // PRODUCT.PRICE.COMPARE
-        '', // PRODUCT.TAX_PERCENT
-        'ACTIVE', // PRODUCT.STATUS
-        '100', // PRODUCT.INVENTORY
-        '"1,50"', // PRODUCT.MIN.MAX.QUANTITY
-        label, // PRODUCT.LABELS
-        `"${category}"`, // PRODUCT.CATEGORY
-        '', // PRODUCT.TAGS
-        '', // PRODUCT.IMAGES
-        '', '', '', '', '', '', '', '', // OPTION1.*
+        dish.id,
+        dish.name,
+        desc,
+        '', // SKU
+        Number(dish.price).toFixed(2),
+        '', // COST
+        '', // COMPARE
+        '', // TAX
+        'ACTIVE',
+        '100',
+        '1,50',
+        '', // LABELS
+        category,
+        '', // TAGS
+        '', // IMAGES
+        upsellOption.id, // OPTION1.ID
+        upsellOption.name, // OPTION1.NAME
+        upsells.length > 0 ? 'multiple' : '', // OPTION1.TYPE
+        upsells.length > 0 ? 'NO' : '', // OPTION1.ENABLE_RANGE
+        upsells.length > 0 ? '0,0' : '', // OPTION1.RANGE
+        upsells.length > 0 ? 'NO' : '', // OPTION1.REQUIRED
+        upsells.length > 0 ? 'LIST' : '', // OPTION1.VIEW
+        upsellOption.variants, // OPTION1.VARIANTS
         '', '', '', '', '', '', '', '' // OPTION2.*
-      ].map((val) => {
-        const str = String(val || '').replace(/"/g, '""');
-        return str.includes(',') || str.includes('"') ? `"${str}"` : str;
-      }).join(',');
+      ].map(escapeCSV).join(',');
     });
 
-    const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+    // Create rows for upsells as standalone dishes too
+    const upsellRows = upsells.map((dish) => {
+      const desc = dish.description ? `<p>${dish.description}</p>` : '';
+      const category = dish.category || 'Add-ons';
+      
+      return [
+        dish.id,
+        dish.name,
+        desc,
+        '', // SKU
+        Number(dish.price).toFixed(2),
+        '', // COST
+        '', // COMPARE
+        '', // TAX
+        'ACTIVE',
+        '100',
+        '1,50',
+        'upsell', // LABELS
+        category,
+        '', // TAGS
+        '', // IMAGES
+        '', '', '', '', '', '', '', '', // OPTION1.*
+        '', '', '', '', '', '', '', '' // OPTION2.*
+      ].map(escapeCSV).join(',');
+    });
+
+    const csvContent = [csvHeaders.join(','), ...mainDishRows, ...upsellRows].join('\n');
     const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const csvUrl = URL.createObjectURL(csvBlob);
     const csvLink = document.createElement('a');
@@ -262,7 +315,7 @@ export function ChefDetailsModal({
       });
       textContent += '\n---\n\n';
     });
-    textContent = textContent.replace(/\n---\n\n$/, '\n'); // Remove trailing separator
+    textContent = textContent.replace(/\n---\n\n$/, '\n');
 
     const textBlob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
     const textUrl = URL.createObjectURL(textBlob);
