@@ -155,7 +155,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           <FoodSafetyInfoStep
             onComplete={goToNext}
             onPrevious={goToPrevious}
-            onSkip={() => goToNext()}
+            onSkip={(tosData) => goToNext(tosData)}
             chefProfileId={chefProfileId}
             chefEmail={profile.email}
             chefName={profile.firstName || profile.restaurantName}

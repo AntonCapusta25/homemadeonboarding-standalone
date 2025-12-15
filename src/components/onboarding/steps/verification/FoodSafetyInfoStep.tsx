@@ -9,7 +9,7 @@ import { toast } from "sonner";
 interface FoodSafetyInfoStepProps {
   onComplete: (tosData?: TosAcceptanceData) => void;
   onPrevious: () => void;
-  onSkip: () => void;
+  onSkip: (tosData?: TosAcceptanceData) => void;
   chefProfileId: string | null;
   chefEmail?: string;
   chefName?: string;
@@ -53,6 +53,7 @@ export function FoodSafetyInfoStep({
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [showTosModal, setShowTosModal] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
+  const [pendingSkip, setPendingSkip] = useState(false);
 
   const handleWatchVideo = (videoId: string, url: string) => {
     window.open(url, "_blank");
@@ -64,7 +65,13 @@ export function FoodSafetyInfoStep({
     setQuizCompleted(true);
   };
 
-  const handleSkip = async () => {
+  const handleSkipClick = () => {
+    // Show TOS modal first, then skip
+    setPendingSkip(true);
+    setShowTosModal(true);
+  };
+
+  const performSkip = async (tosData: TosAcceptanceData) => {
     setIsSkipping(true);
     try {
       // Record skip timestamp in database
@@ -90,22 +97,27 @@ export function FoodSafetyInfoStep({
       }
 
       toast.info(t("verification.skippedFoodSafety", "We'll remind you to complete food safety training later."));
-      onSkip();
+      onSkip(tosData);
     } catch (error) {
       console.error('Error handling skip:', error);
-      onSkip();
+      onSkip(tosData);
     } finally {
       setIsSkipping(false);
     }
   };
 
   const handleCompleteClick = () => {
+    setPendingSkip(false);
     setShowTosModal(true);
   };
 
   const handleTosAccept = (tosData: TosAcceptanceData) => {
     setShowTosModal(false);
-    onComplete(tosData);
+    if (pendingSkip) {
+      performSkip(tosData);
+    } else {
+      onComplete(tosData);
+    }
   };
 
   const allVideosWatched = watchedVideos.size === foodSafetyVideos.length;
@@ -216,8 +228,8 @@ export function FoodSafetyInfoStep({
           <Button 
             variant="link" 
             className="text-muted-foreground hover:text-foreground"
-            onClick={handleSkip}
-            disabled={isSkipping}
+            onClick={handleSkipClick}
+            disabled={isSkipping || pendingSkip}
           >
             <Clock className="w-4 h-4 mr-2" />
             {isSkipping 
