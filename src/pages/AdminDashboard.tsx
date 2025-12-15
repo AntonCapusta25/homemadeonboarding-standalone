@@ -54,7 +54,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { calculateOnboardingProgress } from '@/lib/chefProgress';
+import { calculateOnboardingProgress, calculateVerificationProgress } from '@/lib/chefProgress';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -725,19 +725,36 @@ export default function AdminDashboard() {
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const progress = calculateOnboardingProgress(chef);
+                          const onboardingProgress = calculateOnboardingProgress(chef);
+                          const verificationProgress = calculateVerificationProgress(chef);
                           return (
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-secondary rounded-full h-2 min-w-[60px]">
-                                <div
-                                  className={cn(
-                                    "h-2 rounded-full transition-all",
-                                    progress === 100 ? "bg-green-500" : progress >= 75 ? "bg-blue-500" : progress >= 50 ? "bg-yellow-500" : "bg-orange-500"
-                                  )}
-                                  style={{ width: `${progress}%` }}
-                                />
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground w-12">Onboard</span>
+                                <div className="flex-1 bg-secondary rounded-full h-2 min-w-[40px]">
+                                  <div
+                                    className={cn(
+                                      "h-2 rounded-full transition-all",
+                                      onboardingProgress === 100 ? "bg-green-500" : "bg-primary"
+                                    )}
+                                    style={{ width: `${onboardingProgress}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium w-8">{onboardingProgress}%</span>
                               </div>
-                              <span className="text-xs font-medium min-w-[32px]">{progress}%</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground w-12">Verify</span>
+                                <div className="flex-1 bg-secondary rounded-full h-2 min-w-[40px]">
+                                  <div
+                                    className={cn(
+                                      "h-2 rounded-full transition-all",
+                                      verificationProgress === 100 ? "bg-green-500" : "bg-blue-500"
+                                    )}
+                                    style={{ width: `${verificationProgress}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium w-8">{verificationProgress}%</span>
+                              </div>
                             </div>
                           );
                         })()}
