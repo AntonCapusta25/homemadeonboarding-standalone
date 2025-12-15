@@ -5,6 +5,7 @@ import { useChefProfiles, ChefWithStats } from '@/hooks/useChefProfiles';
 import { useAdminStatistics } from '@/hooks/useAdminStatistics';
 import { AdminStatistics } from '@/components/admin/AdminStatistics';
 import { ChefDetailsModal } from '@/components/admin/ChefDetailsModal';
+import { LinkTypeformModal } from '@/components/admin/LinkTypeformModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +52,7 @@ import {
   Download,
   RefreshCw,
   Award,
+  Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -81,6 +83,7 @@ export default function AdminDashboard() {
   const [selectedChef, setSelectedChef] = useState<ChefWithStats | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [showAllPending, setShowAllPending] = useState(false);
+  const [isLinkTypeformOpen, setIsLinkTypeformOpen] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -657,6 +660,16 @@ export default function AdminDashboard() {
                 )}
                 Backfill Profiles
               </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsLinkTypeformOpen(true)}
+                className="gap-2"
+              >
+                <Link2 className="w-4 h-4" />
+                Link Quiz
+              </Button>
             </div>
           </div>
 
@@ -1029,6 +1042,18 @@ export default function AdminDashboard() {
           }}
         />
       )}
+
+      <LinkTypeformModal
+        open={isLinkTypeformOpen}
+        onOpenChange={setIsLinkTypeformOpen}
+        chefs={chefs.map(c => ({ 
+          id: c.id, 
+          business_name: c.business_name, 
+          chef_name: c.chef_name, 
+          contact_email: c.contact_email 
+        }))}
+        onSuccess={refetch}
+      />
     </div>
   );
 }
