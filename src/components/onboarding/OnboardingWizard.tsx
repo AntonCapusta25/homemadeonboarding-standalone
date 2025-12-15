@@ -538,6 +538,8 @@ export function OnboardingWizard() {
             onChange={(plan) => updateProfile({ plan })}
             onNext={handleCompleteOnboarding}
             onPrevious={goToPrevious}
+            chefName={`${profile.firstName || ''} ${profile.lastName || ''}`.trim()}
+            saving={saving}
           />
         );
       
