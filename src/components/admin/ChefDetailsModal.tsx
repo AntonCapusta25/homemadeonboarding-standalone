@@ -188,117 +188,219 @@ export function ChefDetailsModal({
       return;
     }
 
-    const businessName = chef.business_name || chef.chef_name || 'Chef';
-    const dateStr = format(new Date(), 'yyyy-MM-dd');
+    try {
+      const businessName = chef.business_name || chef.chef_name || 'Chef';
+      const safeBase = businessName
+        .replace(/[/\\?%*:|"<>]/g, '')
+        .trim()
+        .replace(/\s+/g, '-');
+      const dateStr = format(new Date(), 'yyyy-MM-dd');
 
-    // Separate main dishes and extras
-    const mainDishes = menu.dishes.filter(d => !d.is_upsell);
-    const extras = menu.dishes.filter(d => d.is_upsell);
+      // Separate main dishes and extras
+      const mainDishes = menu.dishes.filter((d) => !d.is_upsell);
+      const extras = menu.dishes.filter((d) => d.is_upsell);
 
-    // Build extras option string for CSV
-    const buildExtrasOption = () => {
-      if (extras.length === 0) return { id: '', name: '', variants: '' };
-      const optionId = `extras-${Date.now()}`;
-      const variants = extras.map(u => {
-        const price = Number(u.price).toFixed(0);
-        const desc = u.description || u.name;
-        return `${u.name},${price},0,1,${desc},,${u.id}`;
-      }).join(';');
-      return { id: optionId, name: 'Extras', variants };
-    };
+      // Build extras option string for CSV
+      const buildExtrasOption = () => {
+        if (extras.length === 0) return { id: '', name: '', variants: '' };
+        const optionId = `extras-${Date.now()}`;
+        const variants = extras
+          .map((u) => {
+            const price = Number(u.price).toFixed(0);
+            const desc = u.description || u.name;
+            return `${u.name},${price},0,1,${desc},,${u.id}`;
+          })
+          .join(';');
+        return { id: optionId, name: 'Extras', variants };
+      };
 
-    const extrasOption = buildExtrasOption();
+      const extrasOption = buildExtrasOption();
 
-    // Generate CSV content
-    const csvHeaders = [
-      'PRODUCT.ID', 'PRODUCT.NAME', 'PRODUCT.DESCRIPTION', 'PRODUCT.SKU',
-      'PRODUCT.PRICE.SELLING', 'PRODUCT.PRICE.COST', 'PRODUCT.PRICE.COMPARE',
-      'PRODUCT.TAX_PERCENT', 'PRODUCT.STATUS', 'PRODUCT.INVENTORY',
-      'PRODUCT.MIN.MAX.QUANTITY', 'PRODUCT.LABELS', 'PRODUCT.CATEGORY',
-      'PRODUCT.TAGS', 'PRODUCT.IMAGES', 'OPTION1.ID', 'OPTION1.NAME',
-      'OPTION1.TYPE', 'OPTION1.ENABLE_RANGE', 'OPTION1.RANGE', 'OPTION1.REQUIRED',
-      'OPTION1.VIEW', 'OPTION1.VARIANTS', 'OPTION2.ID', 'OPTION2.NAME',
-      'OPTION2.TYPE', 'OPTION2.ENABLE_RANGE', 'OPTION2.RANGE', 'OPTION2.REQUIRED',
-      'OPTION2.VIEW', 'OPTION2.VARIANTS'
-    ];
+      // Generate CSV content
+      const csvHeaders = [
+        'PRODUCT.ID',
+        'PRODUCT.NAME',
+        'PRODUCT.DESCRIPTION',
+        'PRODUCT.SKU',
+        'PRODUCT.PRICE.SELLING',
+        'PRODUCT.PRICE.COST',
+        'PRODUCT.PRICE.COMPARE',
+        'PRODUCT.TAX_PERCENT',
+        'PRODUCT.STATUS',
+        'PRODUCT.INVENTORY',
+        'PRODUCT.MIN.MAX.QUANTITY',
+        'PRODUCT.LABELS',
+        'PRODUCT.CATEGORY',
+        'PRODUCT.TAGS',
+        'PRODUCT.IMAGES',
+        'OPTION1.ID',
+        'OPTION1.NAME',
+        'OPTION1.TYPE',
+        'OPTION1.ENABLE_RANGE',
+        'OPTION1.RANGE',
+        'OPTION1.REQUIRED',
+        'OPTION1.VIEW',
+        'OPTION1.VARIANTS',
+        'OPTION2.ID',
+        'OPTION2.NAME',
+        'OPTION2.TYPE',
+        'OPTION2.ENABLE_RANGE',
+        'OPTION2.RANGE',
+        'OPTION2.REQUIRED',
+        'OPTION2.VIEW',
+        'OPTION2.VARIANTS',
+      ];
 
-    const escapeCSV = (val: string) => {
-      const str = String(val || '').replace(/"/g, '""');
-      return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
-    };
+      const escapeCSV = (val: string) => {
+        const str = String(val || '').replace(/"/g, '""');
+        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
+      };
 
-    const placeholderImage = 'https://placehold.co/400x300/f5f5f5/999999?text=Food+Image';
+      const placeholderImage = 'https://placehold.co/400x300/f5f5f5/999999?text=Food+Image';
 
-    const mainDishRows = mainDishes.map((dish) => {
-      const desc = dish.description ? `<p>${dish.description}</p>` : '';
-      const category = dish.category || 'Main Dishes';
-      
-      return [
-        dish.id, dish.name, desc, '',
-        Number(dish.price).toFixed(2), '', '', '',
-        'ACTIVE', '100', '1,50', '', category, '', placeholderImage,
-        extrasOption.id, extrasOption.name,
-        extras.length > 0 ? 'multiple' : '',
-        extras.length > 0 ? 'NO' : '',
-        extras.length > 0 ? '0,0' : '',
-        extras.length > 0 ? 'NO' : '',
-        extras.length > 0 ? 'LIST' : '',
-        extrasOption.variants,
-        '', '', '', '', '', '', '', ''
-      ].map(escapeCSV).join(',');
-    });
+      const mainDishRows = mainDishes.map((dish) => {
+        const desc = dish.description ? `<p>${dish.description}</p>` : '';
+        const category = dish.category || 'Main Dishes';
 
-    const extrasRows = extras.map((dish) => {
-      const desc = dish.description ? `<p>${dish.description}</p>` : '';
-      const category = dish.category || 'Extras';
-      
-      return [
-        dish.id, dish.name, desc, '',
-        Number(dish.price).toFixed(2), '', '', '',
-        'ACTIVE', '100', '1,50', 'extra', category, '', placeholderImage,
-        '', '', '', '', '', '', '', '',
-        '', '', '', '', '', '', '', ''
-      ].map(escapeCSV).join(',');
-    });
-
-    const csvContent = [csvHeaders.join(','), ...mainDishRows, ...extrasRows].join('\n');
-
-    // Generate text content
-    const dishesByCategory: Record<string, typeof menu.dishes> = {};
-    menu.dishes.forEach((dish) => {
-      const category = dish.category || 'Other';
-      if (!dishesByCategory[category]) {
-        dishesByCategory[category] = [];
-      }
-      dishesByCategory[category].push(dish);
-    });
-
-    let textContent = '';
-    Object.entries(dishesByCategory).forEach(([category, dishes]) => {
-      textContent += `## ${category}\n\n`;
-      dishes.forEach((dish) => {
-        const desc = dish.description || '';
-        const price = `€${Number(dish.price).toFixed(2)}`;
-        textContent += `**${dish.name}** — ${desc} — ${price}  \n`;
+        return [
+          dish.id,
+          dish.name,
+          desc,
+          '',
+          Number(dish.price).toFixed(2),
+          '',
+          '',
+          '',
+          'ACTIVE',
+          '100',
+          '1,50',
+          '',
+          category,
+          '',
+          placeholderImage,
+          extrasOption.id,
+          extrasOption.name,
+          extras.length > 0 ? 'multiple' : '',
+          extras.length > 0 ? 'NO' : '',
+          extras.length > 0 ? '0,0' : '',
+          extras.length > 0 ? 'NO' : '',
+          extras.length > 0 ? 'LIST' : '',
+          extrasOption.variants,
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ]
+          .map(escapeCSV)
+          .join(',');
       });
-      textContent += '\n---\n\n';
-    });
-    textContent = textContent.replace(/\n---\n\n$/, '\n');
 
-    // Create ZIP file with both
-    const zip = new JSZip();
-    zip.file(`${businessName}_menu.csv`, csvContent);
-    zip.file(`${businessName}_menu.txt`, textContent);
-    
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(zipBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${businessName}_menu_${dateStr}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    toast({ title: 'Downloaded', description: 'Menu ZIP file downloaded (CSV + Text)' });
+      const extrasRows = extras.map((dish) => {
+        const desc = dish.description ? `<p>${dish.description}</p>` : '';
+        const category = dish.category || 'Extras';
+
+        return [
+          dish.id,
+          dish.name,
+          desc,
+          '',
+          Number(dish.price).toFixed(2),
+          '',
+          '',
+          '',
+          'ACTIVE',
+          '100',
+          '1,50',
+          'extra',
+          category,
+          '',
+          placeholderImage,
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ]
+          .map(escapeCSV)
+          .join(',');
+      });
+
+      const csvContent = [csvHeaders.join(','), ...mainDishRows, ...extrasRows].join('\n');
+
+      // Generate text content
+      const dishesByCategory: Record<string, typeof menu.dishes> = {};
+      menu.dishes.forEach((dish) => {
+        const category = dish.category || 'Other';
+        if (!dishesByCategory[category]) dishesByCategory[category] = [];
+        dishesByCategory[category].push(dish);
+      });
+
+      let textContent = '';
+      Object.entries(dishesByCategory).forEach(([category, dishes]) => {
+        textContent += `## ${category}\n\n`;
+        dishes.forEach((dish) => {
+          const desc = dish.description || '';
+          const price = `€${Number(dish.price).toFixed(2)}`;
+          textContent += `**${dish.name}** — ${desc} — ${price}  \n`;
+        });
+        textContent += '\n---\n\n';
+      });
+      textContent = textContent.replace(/\n---\n\n$/, '\n');
+
+      // Create ZIP file with both
+      toast({ title: 'Preparing download…', description: 'Generating ZIP file…' });
+      const zip = new JSZip();
+      zip.file(`${safeBase || 'Chef'}_menu.csv`, csvContent);
+      zip.file(`${safeBase || 'Chef'}_menu.txt`, textContent);
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+
+      const inIframe = (() => {
+        try {
+          return window.self !== window.top;
+        } catch {
+          return true;
+        }
+      })();
+
+      if (inIframe) {
+        // Embedded previews can block downloads; open a new tab as a reliable fallback.
+        window.open(url, '_blank', 'noopener,noreferrer');
+        toast({ title: 'Download ready', description: 'Opened in a new tab (save the ZIP from there).' });
+        setTimeout(() => URL.revokeObjectURL(url), 15_000);
+        return;
+      }
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeBase || 'Chef'}_menu_${dateStr}.zip`;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2_000);
+
+      toast({ title: 'Downloaded', description: 'Menu ZIP file downloaded (CSV + Text)' });
+    } catch (err) {
+      console.error('Menu download failed:', err);
+      toast({ title: 'Download failed', description: 'Could not generate the ZIP file.', variant: 'destructive' });
+    }
   };
 
   const handleTaskClick = (task: TaskData) => {
