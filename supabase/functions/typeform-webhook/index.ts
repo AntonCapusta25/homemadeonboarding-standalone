@@ -6,6 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, typeform-signature',
 };
 
+interface TypeformVariable {
+  key: string;
+  type: string;
+  number?: number;
+  text?: string;
+}
+
 interface TypeformAnswer {
   field: {
     id: string;
@@ -33,9 +40,10 @@ interface TypeformPayload {
     token: string;
     landed_at: string;
     submitted_at: string;
-    calculated: {
+    calculated?: {
       score: number;
     };
+    variables?: TypeformVariable[];
     hidden?: {
       email?: string;
       chef_id?: string;
@@ -54,10 +62,32 @@ serve(async (req) => {
     const payload: TypeformPayload = await req.json();
     console.log('Received Typeform webhook:', JSON.stringify(payload, null, 2));
 
-    // Extract data from the payload
     const { form_response } = payload;
-    const score = form_response.calculated?.score || 0;
     const submittedAt = form_response.submitted_at;
+    
+    // Extract score from variables (Typeform quiz format)
+    let quizScore = 0;
+    let maxScore = 100;
+    
+    if (form_response.variables) {
+      const quizScoreVar = form_response.variables.find(v => v.key === 'Quiz_score' || v.key === 'quiz_score');
+      const maxScoreVar = form_response.variables.find(v => v.key === 'Max_score' || v.key === 'max_score');
+      
+      if (quizScoreVar?.number !== undefined) {
+        quizScore = quizScoreVar.number;
+      }
+      if (maxScoreVar?.number !== undefined) {
+        maxScore = maxScoreVar.number;
+      }
+    }
+    
+    // Fallback to calculated score if available
+    if (form_response.calculated?.score !== undefined && quizScore === 0) {
+      quizScore = form_response.calculated.score;
+    }
+    
+    // Calculate percentage score
+    const scorePercentage = maxScore > 0 ? Math.round((quizScore / maxScore) * 100) : 0;
     
     // Get email from hidden fields or answers
     let chefEmail = form_response.hidden?.email;
@@ -66,12 +96,12 @@ serve(async (req) => {
     // If not in hidden fields, look for email in answers
     if (!chefEmail) {
       const emailAnswer = form_response.answers.find(a => a.type === 'email');
-      if (emailAnswer) {
+      if (emailAnswer?.email) {
         chefEmail = emailAnswer.email;
       }
     }
 
-    console.log(`Quiz completed - Email: ${chefEmail}, Chef ID: ${chefId}, Score: ${score}`);
+    console.log(`Quiz completed - Email: ${chefEmail}, Chef ID: ${chefId}, Raw Score: ${quizScore}/${maxScore}, Percentage: ${scorePercentage}%`);
 
     if (!chefEmail && !chefId) {
       console.error('No email or chef_id found in webhook payload');
@@ -86,9 +116,9 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Determine passing score (e.g., 70%)
-    const PASSING_SCORE = 70;
-    const passed = score >= PASSING_SCORE;
+    // Determine passing score (70%)
+    const PASSING_THRESHOLD = 70;
+    const passed = scorePercentage >= PASSING_THRESHOLD;
 
     // Find the chef profile
     let chefProfileId = chefId;
@@ -112,7 +142,7 @@ serve(async (req) => {
     if (!chefProfileId) {
       console.error('Could not find chef profile for:', chefEmail || chefId);
       return new Response(
-        JSON.stringify({ error: 'Chef profile not found' }),
+        JSON.stringify({ error: 'Chef profile not found', email: chefEmail }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -122,10 +152,10 @@ serve(async (req) => {
       .from('chef_verification')
       .update({
         food_safety_quiz_completed: true,
-        food_safety_quiz_score: score,
+        food_safety_quiz_score: scorePercentage,
         food_safety_quiz_passed: passed,
         food_safety_quiz_completed_at: submittedAt,
-        food_safety_viewed: true, // Also mark as viewed
+        food_safety_viewed: true,
       })
       .eq('chef_profile_id', chefProfileId);
 
@@ -138,7 +168,7 @@ serve(async (req) => {
         .insert({
           chef_profile_id: chefProfileId,
           food_safety_quiz_completed: true,
-          food_safety_quiz_score: score,
+          food_safety_quiz_score: scorePercentage,
           food_safety_quiz_passed: passed,
           food_safety_quiz_completed_at: submittedAt,
           food_safety_viewed: true,
@@ -153,15 +183,17 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Quiz results saved for chef ${chefProfileId}: Score ${score}%, Passed: ${passed}`);
+    console.log(`Quiz results saved for chef ${chefProfileId}: Score ${scorePercentage}% (${quizScore}/${maxScore}), Passed: ${passed}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         chefProfileId,
-        score,
+        rawScore: quizScore,
+        maxScore,
+        scorePercentage,
         passed,
-        message: `Quiz results recorded. Score: ${score}%, ${passed ? 'PASSED' : 'FAILED'}` 
+        message: `Quiz results recorded. Score: ${scorePercentage}% (${quizScore}/${maxScore}), ${passed ? 'PASSED' : 'FAILED'}` 
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
