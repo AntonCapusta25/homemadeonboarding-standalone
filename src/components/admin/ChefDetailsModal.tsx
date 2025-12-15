@@ -18,8 +18,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store
+  Download, Store, Wifi, AlertTriangle
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -105,6 +106,9 @@ export function ChefDetailsModal({
   const [adminNotes, setAdminNotes] = useState(chef.admin_notes || '');
   const [saving, setSaving] = useState(false);
   const [creatingMerchant, setCreatingMerchant] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     if (isOpen && chef.id) {
@@ -195,8 +199,43 @@ export function ChefDetailsModal({
     }
   };
 
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setHyperzodError(null);
+    setConnectionStatus('idle');
+    try {
+      const { data, error } = await supabase.functions.invoke('test-hyperzod-connection');
+
+      if (error) {
+        setConnectionStatus('error');
+        setHyperzodError({ error: error.message, details: { field: 'network', message: 'Failed to reach edge function' } });
+        toast({ title: 'Connection Test Failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success) {
+        setConnectionStatus('success');
+        toast({ 
+          title: 'Connection Successful', 
+          description: `Tenant: ${data.details?.tenant_id}, API Key Valid: ✓` 
+        });
+      } else {
+        setConnectionStatus('error');
+        setHyperzodError({ error: data?.error || 'Unknown error', details: data?.details });
+        toast({ title: 'Connection Failed', description: data?.error, variant: 'destructive' });
+      }
+    } catch (err: any) {
+      setConnectionStatus('error');
+      setHyperzodError({ error: err?.message || 'Network error', details: { field: 'network', message: 'Could not reach API' } });
+      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   const handleCreateMerchant = async () => {
     setCreatingMerchant(true);
+    setHyperzodError(null);
     try {
       const { data, error } = await supabase.functions.invoke('create-hyperzod-merchant', {
         body: { chef }
@@ -204,6 +243,7 @@ export function ChefDetailsModal({
 
       if (error) {
         console.error('Merchant creation error:', error);
+        setHyperzodError({ error: error.message, details: { field: 'network', message: 'Edge function error' } });
         toast({ 
           title: 'Error', 
           description: error.message || 'Failed to create merchant', 
@@ -213,19 +253,37 @@ export function ChefDetailsModal({
       }
 
       if (data?.success) {
+        setHyperzodError(null);
         toast({ 
           title: 'Merchant Created', 
           description: `Successfully created merchant in Hyperzod` 
         });
       } else {
+        // Parse detailed error from Hyperzod
+        const errorMsg = data?.error || 'Failed to create merchant';
+        let details = null;
+        
+        // Try to extract validation errors
+        if (errorMsg.includes('422') || errorMsg.toLowerCase().includes('validation')) {
+          details = { field: 'validation', message: 'Missing or invalid fields. Check chef profile data.' };
+        } else if (errorMsg.includes('401')) {
+          details = { field: 'api_key', message: 'Invalid API key. Check HYPERZOD_API_KEY secret.' };
+        } else if (errorMsg.includes('403')) {
+          details = { field: 'permissions', message: 'API key lacks permission. Check Hyperzod dashboard.' };
+        } else {
+          details = { field: 'unknown', message: errorMsg };
+        }
+        
+        setHyperzodError({ error: errorMsg, details });
         toast({ 
           title: 'Error', 
-          description: data?.error || 'Failed to create merchant', 
+          description: errorMsg, 
           variant: 'destructive' 
         });
       }
     } catch (err: any) {
       console.error('Error creating merchant:', err);
+      setHyperzodError({ error: err?.message || 'Network error', details: { field: 'network', message: 'Could not reach API' } });
       toast({ 
         title: 'Error', 
         description: err?.message || 'Failed to create merchant', 
@@ -594,24 +652,59 @@ export function ChefDetailsModal({
             </Badge>
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           </DialogTitle>
-          <Button 
-            onClick={handleCreateMerchant} 
-            disabled={creatingMerchant}
-            className="ml-auto mr-8"
-          >
-            {creatingMerchant ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Store className="w-4 h-4 mr-2" />
-                Create Merchant
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-2 ml-auto mr-8">
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={handleTestConnection} 
+              disabled={testingConnection}
+            >
+              {testingConnection ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <Wifi className={cn("w-4 h-4 mr-2", connectionStatus === 'success' && "text-green-500", connectionStatus === 'error' && "text-red-500")} />
+                  Test Connection
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={handleCreateMerchant} 
+              disabled={creatingMerchant}
+            >
+              {creatingMerchant ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Store className="w-4 h-4 mr-2" />
+                  Create Merchant
+                </>
+              )}
+            </Button>
+          </div>
         </DialogHeader>
+
+        {/* Hyperzod Error Display */}
+        {hyperzodError && (
+          <Alert variant="destructive" className="mx-1">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Hyperzod Error</AlertTitle>
+            <AlertDescription className="mt-2 space-y-1">
+              <p className="font-medium">{hyperzodError.error}</p>
+              {hyperzodError.details && (
+                <p className="text-sm opacity-80">
+                  {hyperzodError.details.field && <span className="font-semibold">[{hyperzodError.details.field}]</span>} {hyperzodError.details.message}
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
