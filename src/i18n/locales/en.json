@@ -316,7 +316,19 @@
     "skip": "Skip",
     "continue": "Continue",
     "saving": "Saving...",
-    "saveAndContinue": "Save & Continue"
+    "saveAndContinue": "Save & Continue",
+    "processing": "Processing..."
+  },
+  "tos": {
+    "title": "Terms of Service Agreement",
+    "subtitle": "Please read and accept the terms to complete your registration",
+    "selectedPlan": "Selected Plan",
+    "commission": "Commission",
+    "signatureLabel": "Type your full name to sign",
+    "signaturePlaceholder": "Your full legal name",
+    "termsCheckbox": "I have read and agree to the Terms of Service agreement above",
+    "privacyCheckbox": "I agree to the Privacy Policy and consent to the processing of my personal data",
+    "acceptButton": "Accept & Complete"
   },
   "verification": {
     "menuReview": "Review Your Menu",

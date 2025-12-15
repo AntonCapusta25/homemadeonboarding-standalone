@@ -9,10 +9,16 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, FileText, CheckCircle } from 'lucide-react';
 import { PlanType } from '@/types/onboarding';
 
+export interface TosAcceptanceData {
+  signature: string;
+  acceptedAt: string;
+  planAccepted: PlanType;
+}
+
 interface TermsOfServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAccept: () => void;
+  onAccept: (data: TosAcceptanceData) => void;
   plan: PlanType;
   chefName?: string;
   loading?: boolean;
@@ -292,7 +298,11 @@ export function TermsOfServiceModal({
 
   const handleAccept = () => {
     if (canAccept) {
-      onAccept();
+      onAccept({
+        signature: signature.trim(),
+        acceptedAt: new Date().toISOString(),
+        planAccepted: plan,
+      });
     }
   };
 

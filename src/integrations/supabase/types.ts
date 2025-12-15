@@ -126,6 +126,9 @@ export type Database = {
           onboarding_completed: boolean | null
           plan: Database["public"]["Enums"]["plan_type"] | null
           service_type: Database["public"]["Enums"]["service_type"] | null
+          tos_accepted_at: string | null
+          tos_plan_accepted: string | null
+          tos_signature: string | null
           updated_at: string
           user_id: string
         }
@@ -149,6 +152,9 @@ export type Database = {
           onboarding_completed?: boolean | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
+          tos_accepted_at?: string | null
+          tos_plan_accepted?: string | null
+          tos_signature?: string | null
           updated_at?: string
           user_id: string
         }
@@ -172,6 +178,9 @@ export type Database = {
           onboarding_completed?: boolean | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
+          tos_accepted_at?: string | null
+          tos_plan_accepted?: string | null
+          tos_signature?: string | null
           updated_at?: string
           user_id?: string
         }
