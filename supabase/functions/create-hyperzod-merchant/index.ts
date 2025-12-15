@@ -100,13 +100,21 @@ serve(async (req) => {
 
         const responseText = await response.text();
         console.log(`${endpoint} response status: ${response.status}`);
+        console.log(`${endpoint} response body: ${responseText.substring(0, 500)}`);
         
         if (response.ok) {
           try {
             merchantData = JSON.parse(responseText);
+            // Check if the response indicates actual success
+            if (merchantData.success === false || merchantData.error) {
+              lastError = `API returned error: ${JSON.stringify(merchantData)}`;
+              console.log(`${endpoint} returned 200 but with error in body`);
+              continue;
+            }
             success = true;
             workingEndpoint = endpoint;
             console.log(`SUCCESS with endpoint: ${endpoint}`);
+            console.log(`Merchant data: ${JSON.stringify(merchantData)}`);
             break;
           } catch {
             merchantData = { raw: responseText };
