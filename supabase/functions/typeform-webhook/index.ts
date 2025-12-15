@@ -238,10 +238,11 @@ serve(async (req) => {
     let chefProfileId = chefIdFromHidden;
     
     if (!chefProfileId && chefEmail) {
+      // Case-insensitive email matching for reliability
       const { data: chefProfile, error: profileError } = await supabase
         .from('chef_profiles')
-        .select('id')
-        .eq('contact_email', chefEmail)
+        .select('id, contact_email')
+        .ilike('contact_email', chefEmail)
         .maybeSingle();
 
       if (profileError) {
@@ -250,7 +251,9 @@ serve(async (req) => {
       
       if (chefProfile) {
         chefProfileId = chefProfile.id;
-        console.log(`Found chef profile by email: ${chefProfileId}`);
+        console.log(`Found chef profile by email (case-insensitive): ${chefProfileId}`);
+      } else {
+        console.log(`No chef profile found for email: ${chefEmail}`);
       }
     }
 
