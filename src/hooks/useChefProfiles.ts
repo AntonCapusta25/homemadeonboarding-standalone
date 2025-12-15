@@ -62,6 +62,7 @@ interface UseChefProfilesOptions {
   assignedToMe?: boolean;
   adminId?: string;
   includePending?: boolean;
+  searchQuery?: string;
 }
 
 interface Analytics {
@@ -76,7 +77,7 @@ interface Analytics {
 }
 
 export function useChefProfiles(options: UseChefProfilesOptions = {}) {
-  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId, includePending = true } = options;
+  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId, includePending = true, searchQuery } = options;
 
   const [chefs, setChefs] = useState<ChefWithStats[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
@@ -123,7 +124,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     setError(null);
 
     try {
-      // First fetch chef profiles
+      // First fetch chef profiles - for universal search, fetch ALL matching records then paginate
       let query = supabase
         .from('chef_profiles')
         .select('*', { count: 'exact' });
@@ -132,15 +133,24 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         query = query.eq('city', cityFilter);
       }
 
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
+      // Apply search filter at database level for universal search
+      if (searchQuery && searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        query = query.or(`business_name.ilike.%${q}%,chef_name.ilike.%${q}%,contact_email.ilike.%${q}%,city.ilike.%${q}%,contact_phone.ilike.%${q}%`);
+      }
 
       // Exclude backfilled profiles (those with null contact_phone) from main view
       // They can still be accessed via CSV export
       query = query
         .not('contact_phone', 'is', null)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+        .order('created_at', { ascending: false });
+
+      // Only paginate when not searching (search returns all results then paginates client-side)
+      if (!searchQuery?.trim()) {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        query = query.range(from, to);
+      }
 
       const { data: profilesData, error: fetchError, count } = await query;
 
@@ -345,7 +355,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId, includePending]);
+  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId, includePending, searchQuery]);
 
   useEffect(() => {
     fetchChefs();

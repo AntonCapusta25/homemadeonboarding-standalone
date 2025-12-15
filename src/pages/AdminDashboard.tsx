@@ -74,11 +74,21 @@ export default function AdminDashboard() {
 
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
   const [selectedChef, setSelectedChef] = useState<ChefWithStats | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [showAllPending, setShowAllPending] = useState(false);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+      setPage(1); // Reset to first page on search
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
   
 
   const {
@@ -102,6 +112,7 @@ export default function AdminDashboard() {
     statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
     adminId: user?.id,
     includePending: true,
+    searchQuery: searchQuery.trim() || undefined,
   });
 
   const { stats: adminStats, loading: statsLoading, error: statsError } = useAdminStatistics();
@@ -373,16 +384,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const filteredChefs = chefs.filter((chef) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      chef.business_name?.toLowerCase().includes(query) ||
-      chef.chef_name?.toLowerCase().includes(query) ||
-      chef.contact_email?.toLowerCase().includes(query) ||
-      chef.city?.toLowerCase().includes(query)
-    );
-  });
+  // With server-side search, chefs already filtered - use directly
+  const filteredChefs = chefs;
 
   if (authLoading || chefsLoading) {
     return (
@@ -603,11 +606,16 @@ export default function AdminDashboard() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search chefs..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search all chefs..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="pl-9 w-full sm:w-64"
                 />
+                {searchQuery && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    Global
+                  </span>
+                )}
               </div>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
