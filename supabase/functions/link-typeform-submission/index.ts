@@ -24,16 +24,15 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { submissionToken, chefProfileId, formId } = await req.json();
+    const { submissionToken, formId } = await req.json();
 
-    if (!submissionToken || !chefProfileId) {
+    if (!submissionToken) {
       return new Response(
-        JSON.stringify({ error: 'Missing submissionToken or chefProfileId' }),
+        JSON.stringify({ error: 'Missing submissionToken' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use the food safety quiz form ID by default
     const targetFormId = formId || 'fORAE4HR';
 
     console.log(`Fetching Typeform submission: ${submissionToken} from form: ${targetFormId}`);
@@ -58,7 +57,6 @@ Deno.serve(async (req) => {
     }
 
     const typeformData = await typeformResponse.json();
-    console.log(`Typeform response items: ${typeformData.items?.length || 0}`);
 
     if (!typeformData.items || typeformData.items.length === 0) {
       return new Response(
@@ -69,6 +67,67 @@ Deno.serve(async (req) => {
 
     const submission = typeformData.items[0];
     
+    // Extract email from submission answers
+    let chefEmail: string | null = null;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    // Check hidden fields first
+    if (submission.hidden) {
+      for (const [key, value] of Object.entries(submission.hidden)) {
+        if (typeof value === 'string' && emailRegex.test(value)) {
+          chefEmail = value;
+          break;
+        }
+      }
+    }
+    
+    // Check answers for email field
+    if (!chefEmail && submission.answers) {
+      for (const answer of submission.answers) {
+        if (answer.type === 'email' && answer.email) {
+          chefEmail = answer.email;
+          break;
+        }
+        if (answer.type === 'text' && answer.text && emailRegex.test(answer.text)) {
+          chefEmail = answer.text;
+          break;
+        }
+      }
+    }
+
+    if (!chefEmail) {
+      return new Response(
+        JSON.stringify({ error: 'No email found in submission' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Found email in submission: ${chefEmail}`);
+
+    // Find chef by email (case-insensitive)
+    const { data: chefProfile, error: profileError } = await supabase
+      .from('chef_profiles')
+      .select('id, chef_name, business_name')
+      .ilike('contact_email', chefEmail)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Profile lookup error:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to lookup chef profile' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!chefProfile) {
+      return new Response(
+        JSON.stringify({ error: `No chef found with email: ${chefEmail}` }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Found chef: ${chefProfile.id} (${chefProfile.business_name || chefProfile.chef_name})`);
+
     // Extract quiz score from variables
     let quizScore: number | null = null;
     let maxScore: number | null = null;
@@ -84,19 +143,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Calculate percentage
     let scorePercentage: number | null = null;
     if (quizScore !== null && maxScore !== null && maxScore > 0) {
       scorePercentage = Math.round((quizScore / maxScore) * 100);
     }
 
-    console.log(`Extracted score: ${quizScore}/${maxScore} = ${scorePercentage}%`);
-
     if (scorePercentage === null) {
       return new Response(
         JSON.stringify({ 
           error: 'Could not extract quiz score from submission',
-          variables: submission.variables 
+          chefFound: chefProfile.business_name || chefProfile.chef_name
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -106,7 +162,7 @@ Deno.serve(async (req) => {
     const { data: existingVerification } = await supabase
       .from('chef_verification')
       .select('id')
-      .eq('chef_profile_id', chefProfileId)
+      .eq('chef_profile_id', chefProfile.id)
       .maybeSingle();
 
     const verificationData = {
@@ -120,7 +176,7 @@ Deno.serve(async (req) => {
       const { error: updateError } = await supabase
         .from('chef_verification')
         .update(verificationData)
-        .eq('chef_profile_id', chefProfileId);
+        .eq('chef_profile_id', chefProfile.id);
 
       if (updateError) {
         console.error('Update error:', updateError);
@@ -133,7 +189,7 @@ Deno.serve(async (req) => {
       const { error: insertError } = await supabase
         .from('chef_verification')
         .insert({
-          chef_profile_id: chefProfileId,
+          chef_profile_id: chefProfile.id,
           ...verificationData,
         });
 
@@ -146,11 +202,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Successfully linked submission to chef: ${chefProfileId}`);
+    console.log(`Successfully linked submission to chef: ${chefProfile.id}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
+        chefName: chefProfile.business_name || chefProfile.chef_name,
+        email: chefEmail,
         score: scorePercentage,
         passed: scorePercentage >= 80,
         submittedAt: submission.submitted_at
