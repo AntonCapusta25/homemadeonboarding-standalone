@@ -7,6 +7,7 @@ const corsHeaders = {
 
 const HYPERZOD_API_KEY = Deno.env.get("HYPERZOD_API_KEY");
 const TENANT_ID = "3331";
+const BASE_URL = "https://api.hyperzod.app";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,127 +17,245 @@ serve(async (req) => {
   try {
     const { chef } = await req.json();
 
-    if (!HYPERZOD_API_KEY) {
-      return new Response(JSON.stringify({ success: false, error: "No API key" }), {
-        status: 500,
+    if (!chef || !HYPERZOD_API_KEY) {
+      return new Response(JSON.stringify({ success: false, error: "Missing chef or API key" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log("\n" + "=".repeat(80));
-    console.log("TESTING HYPERZOD API - ULTRA MINIMAL");
-    console.log("=".repeat(80));
+    console.log("Creating merchant for:", chef.business_name || chef.chef_name);
 
-    // ABSOLUTE MINIMAL PAYLOAD
-    const minimalPayload = {
-      merchant_type: "ecommerce",
-      name: "MINIMAL TEST " + Date.now(),
-      phone: "+31612345678",
-      country_code: "NL",
-      accepted_order_types: ["delivery"],
-      status: true,
-      tenant_id: TENANT_ID,
-      apikey: HYPERZOD_API_KEY,
-    };
+    // Extract postal code
+    const postalCode = chef.address?.match(/\d{4}\s*[A-Z]{2}/i)?.[0]?.replace(/\s/g, "") || "";
 
-    console.log("\nPayload being sent:");
-    console.log(JSON.stringify(minimalPayload, null, 2));
+    // CRITICAL: Try EVERY possible combination until one works
+    // Starting from most likely to least likely
 
-    console.log("\nHeaders being sent:");
-    const headers = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "x-tenant": TENANT_ID,
-    };
-    console.log(JSON.stringify(headers, null, 2));
-
-    console.log("\nMaking request to: https://api.hyperzod.app/admin/v1/merchant/create");
-
-    const response = await fetch("https://api.hyperzod.app/admin/v1/merchant/create", {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(minimalPayload),
-    });
-
-    const responseText = await response.text();
-
-    console.log("\n" + "=".repeat(80));
-    console.log("RESPONSE RECEIVED");
-    console.log("=".repeat(80));
-    console.log("Status:", response.status);
-    console.log("Status Text:", response.statusText);
-    console.log("\nResponse Headers:");
-    response.headers.forEach((value, key) => {
-      console.log(`  ${key}: ${value}`);
-    });
-    console.log("\nResponse Body:");
-    console.log(responseText);
-    console.log("=".repeat(80) + "\n");
-
-    // If 500 error, let's check if it's actually reaching Hyperzod
-    if (response.status === 500) {
-      console.error("\n⚠️ 500 ERROR ANALYSIS:");
-      console.error("This could mean:");
-      console.error("1. API key is invalid/expired");
-      console.error("2. Tenant ID is wrong");
-      console.error("3. Required field is missing/wrong format");
-      console.error("4. Hyperzod server is actually down");
-      console.error("\nAPI Key starts with:", HYPERZOD_API_KEY?.substring(0, 10) + "...");
-      console.error("API Key length:", HYPERZOD_API_KEY?.length);
-      console.error("Tenant ID:", TENANT_ID);
-    }
-
-    // Try to parse response
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch {
-      responseData = { raw: responseText };
-    }
-
-    if (response.ok) {
-      console.log("✅ SUCCESS!");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          merchant: responseData,
-          message: "Merchant created successfully!",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const variations = [
+      // Variation 1: EXACT copy of what browser sends (from form HTML)
+      {
+        name: "Browser-style (string status, lowercase types)",
+        payload: {
+          merchant_type: "ecommerce",
+          name: chef.business_name || chef.chef_name || "Test Chef",
+          phone: chef.contact_phone || "+31612345678",
+          country_code: "NL",
+          accepted_order_types: "delivery,pickup", // Maybe it wants comma-separated string?
+          status: "true", // Maybe it wants string?
+          tenant_id: TENANT_ID,
+          apikey: HYPERZOD_API_KEY,
         },
-      );
-    } else {
-      console.error("❌ FAILED");
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-          response_body: responseText,
-          payload_sent: minimalPayload,
-          headers_sent: headers,
-        }),
-        {
-          status: response.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+
+      // Variation 2: Numeric status
+      {
+        name: "Numeric status",
+        payload: {
+          merchant_type: "ecommerce",
+          name: chef.business_name || chef.chef_name || "Test Chef",
+          phone: chef.contact_phone || "+31612345678",
+          country_code: "NL",
+          accepted_order_types: ["delivery", "pickup"],
+          status: 1, // Numeric
+          tenant_id: TENANT_ID,
+          apikey: HYPERZOD_API_KEY,
         },
-      );
+      },
+
+      // Variation 3: With user object (maybe required)
+      {
+        name: "With user object",
+        payload: {
+          merchant_type: "ecommerce",
+          name: chef.business_name || chef.chef_name || "Test Chef",
+          phone: chef.contact_phone || "+31612345678",
+          country_code: "NL",
+          accepted_order_types: ["delivery", "pickup"],
+          status: true,
+          user: {
+            name: chef.chef_name || "Test User",
+            email: chef.contact_email || "test@example.com",
+            phone: chef.contact_phone || "+31612345678",
+          },
+          tenant_id: TENANT_ID,
+          apikey: HYPERZOD_API_KEY,
+        },
+      },
+
+      // Variation 4: Different field names (merchant_name instead of name)
+      {
+        name: "Alternative field names",
+        payload: {
+          merchant_type: "ecommerce",
+          merchant_name: chef.business_name || chef.chef_name || "Test Chef",
+          merchant_phone: chef.contact_phone || "+31612345678",
+          merchant_country_code: "NL",
+          accepted_order_types: ["delivery", "pickup"],
+          merchant_status: true,
+          tenant_id: TENANT_ID,
+          apikey: HYPERZOD_API_KEY,
+        },
+      },
+
+      // Variation 5: With ALL optional fields (maybe something is required that we think is optional)
+      {
+        name: "Kitchen sink - everything",
+        payload: {
+          merchant_type: "ecommerce",
+          name: chef.business_name || chef.chef_name || "Test Chef",
+          phone: chef.contact_phone || "+31612345678",
+          email: chef.contact_email || "",
+          address: chef.address || "",
+          city: chef.city || "",
+          state: "Noord-Holland",
+          postal_code: postalCode,
+          country: "Netherlands",
+          country_code: "NL",
+          accepted_order_types: ["delivery", "pickup"],
+          default_order_type: "delivery",
+          status: true,
+          language: "nl",
+          show_merchant_phone: true,
+          delivery_by: "tenant",
+          delivery_provider: "autozod",
+          share_customer_detail: true,
+          category: [],
+          featured: false,
+          sponsored: false,
+          merchant_commission: 15,
+          tax_method: "inclusive",
+          tenant_id: TENANT_ID,
+          apikey: HYPERZOD_API_KEY,
+        },
+      },
+
+      // Variation 6: Pick & Drop type (maybe ecommerce is broken)
+      {
+        name: "Pick & Drop type",
+        payload: {
+          merchant_type: "pick_drop", // Different type
+          name: chef.business_name || chef.chef_name || "Test Chef",
+          phone: chef.contact_phone || "+31612345678",
+          country_code: "NL",
+          accepted_order_types: ["delivery", "pickup"],
+          status: true,
+          tenant_id: TENANT_ID,
+          apikey: HYPERZOD_API_KEY,
+        },
+      },
+
+      // Variation 7: API key in header instead of body
+      {
+        name: "API key in header",
+        payload: {
+          merchant_type: "ecommerce",
+          name: chef.business_name || chef.chef_name || "Test Chef",
+          phone: chef.contact_phone || "+31612345678",
+          country_code: "NL",
+          accepted_order_types: ["delivery", "pickup"],
+          status: true,
+          tenant_id: TENANT_ID,
+          // NO apikey in body
+        },
+        useHeaderAuth: true, // Flag to use header
+      },
+    ];
+
+    // Try each variation
+    for (let i = 0; i < variations.length; i++) {
+      const { name: varName, payload, useHeaderAuth } = variations[i];
+
+      console.log(`\n[${i + 1}/${variations.length}] Testing: ${varName}`);
+      console.log("Fields:", Object.keys(payload).join(", "));
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-tenant": TENANT_ID,
+      };
+
+      // If using header auth
+      if (useHeaderAuth) {
+        headers["apikey"] = HYPERZOD_API_KEY;
+      }
+
+      try {
+        const response = await fetch(`${BASE_URL}/admin/v1/merchant/create`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        const responseText = await response.text();
+        console.log(`Status: ${response.status}`);
+
+        if (response.ok || response.status === 201) {
+          // SUCCESS!!!
+          console.log("✅✅✅ SUCCESS WITH:", varName);
+          console.log("Response:", responseText);
+
+          let merchantData;
+          try {
+            merchantData = JSON.parse(responseText);
+          } catch {
+            merchantData = { raw: responseText };
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              merchant: merchantData,
+              working_variation: varName,
+              variation_number: i + 1,
+              message: `Merchant created successfully using variation: ${varName}`,
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        // Not 200, log and continue
+        if (response.status !== 500) {
+          // If not generic 500, this is useful info!
+          console.log(`⚠️ Got ${response.status} (not 500):`, responseText.substring(0, 200));
+        } else {
+          console.log("❌ Still 500");
+        }
+      } catch (err: any) {
+        console.log("Network error:", err.message);
+      }
     }
-  } catch (error: any) {
-    console.error("\n" + "=".repeat(80));
-    console.error("FATAL ERROR:");
-    console.error("=".repeat(80));
-    console.error(error);
-    console.error("Stack:", error?.stack);
-    console.error("=".repeat(80) + "\n");
+
+    // All failed
+    console.error("\n❌ ALL VARIATIONS FAILED");
+    console.error("This means:");
+    console.error("1. API key doesn't have create permission, OR");
+    console.error("2. Account needs approval from Hyperzod, OR");
+    console.error("3. The endpoint is actually broken on their side");
+    console.error("\nEmail: siddiquiazam966@gmail.com");
+    console.error("Subject: Cannot create merchants via API - always 500 error");
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Internal error",
-        details: error?.message || String(error),
-        stack: error?.stack,
+        error: "All variations failed with 500 errors",
+        variations_tried: variations.length,
+        message: "API key may not have create permission. Contact Hyperzod support: siddiquiazam966@gmail.com",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  } catch (error: any) {
+    console.error("Fatal error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error?.message || String(error),
       }),
       {
         status: 500,
