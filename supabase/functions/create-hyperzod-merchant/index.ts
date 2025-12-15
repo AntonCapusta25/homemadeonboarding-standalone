@@ -94,6 +94,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${HYPERZOD_API_KEY}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'x-tenant': TENANT_ID,
           },
           body: JSON.stringify(merchantPayload),
         });
