@@ -230,8 +230,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Determine passing score (70%)
-    const PASSING_THRESHOLD = 70;
+    // Determine passing score (80%)
+    const PASSING_THRESHOLD = 80;
     const passed = scorePercentage >= PASSING_THRESHOLD;
 
     // Find the chef profile
