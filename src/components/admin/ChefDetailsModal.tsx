@@ -25,7 +25,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ChefWithStats } from '@/hooks/useChefProfiles';
-import { calculateFullProgress } from '@/lib/chefProgress';
+import { calculateOnboardingProgress } from '@/lib/chefProgress';
 import JSZip from 'jszip';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -422,11 +422,9 @@ export function ChefDetailsModal({
 
   const completedOnboarding = onboardingTasks.filter(t => t.completed).length;
   const completedVerification = verificationTasks.filter(t => t.completed).length;
-  const totalTasks = onboardingTasks.length + verificationTasks.length;
-  const completedTasks = completedOnboarding + completedVerification;
   
-  // Use shared progress calculation for consistency with table view
-  const progressPercent = calculateFullProgress(chef, verification);
+  // Use same calculation as table view for consistency
+  const progressPercent = calculateOnboardingProgress(chef);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -565,7 +563,8 @@ export function ChefDetailsModal({
                     <span className="font-semibold">{progressPercent}%</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {completedTasks} of {totalTasks} tasks completed
+                    {completedOnboarding} of {onboardingTasks.length} onboarding tasks completed
+                    {completedVerification > 0 && ` • ${completedVerification} of ${verificationTasks.length} verification tasks`}
                   </p>
                 </Card>
               </TabsContent>
