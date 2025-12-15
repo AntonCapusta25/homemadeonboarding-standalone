@@ -65,6 +65,12 @@ interface VerificationData {
   kvk_document_url: string | null;
   haccp_document_url: string | null;
   nvwa_document_url: string | null;
+  food_safety_skipped_at: string | null;
+  food_safety_followup_sent: boolean;
+  food_safety_quiz_completed: boolean;
+  food_safety_quiz_score: number | null;
+  food_safety_quiz_passed: boolean;
+  food_safety_quiz_completed_at: string | null;
 }
 
 interface MenuData {
@@ -126,6 +132,12 @@ export function ChefDetailsModal({
           kvk_document_url: verificationData.kvk_document_url,
           haccp_document_url: verificationData.haccp_document_url,
           nvwa_document_url: verificationData.nvwa_document_url,
+          food_safety_skipped_at: verificationData.food_safety_skipped_at,
+          food_safety_followup_sent: verificationData.food_safety_followup_sent || false,
+          food_safety_quiz_completed: verificationData.food_safety_quiz_completed || false,
+          food_safety_quiz_score: verificationData.food_safety_quiz_score,
+          food_safety_quiz_passed: verificationData.food_safety_quiz_passed || false,
+          food_safety_quiz_completed_at: verificationData.food_safety_quiz_completed_at,
         });
       }
 
@@ -701,6 +713,58 @@ export function ChefDetailsModal({
                     <p className="text-xs text-muted-foreground mt-1">
                       {completedVerification} of {verificationTasks.length} tasks
                     </p>
+                  </div>
+                </Card>
+
+                {/* Food Safety Status Card */}
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Food Safety Status
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Videos Watched</p>
+                      <Badge variant={verification?.food_safety_viewed ? 'default' : 'secondary'} className={verification?.food_safety_viewed ? 'bg-green-100 text-green-800' : ''}>
+                        {verification?.food_safety_viewed ? 'Completed' : 'Not Completed'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Quiz Status</p>
+                      {verification?.food_safety_quiz_completed ? (
+                        <Badge className={verification.food_safety_quiz_passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                          {verification.food_safety_quiz_passed ? 'Passed' : 'Failed'} ({verification.food_safety_quiz_score}%)
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Not Taken</Badge>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Quiz Completed At</p>
+                      <p className="font-medium">
+                        {verification?.food_safety_quiz_completed_at 
+                          ? format(new Date(verification.food_safety_quiz_completed_at), 'MMM d, yyyy HH:mm') 
+                          : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Skipped Status</p>
+                      {verification?.food_safety_skipped_at ? (
+                        <div>
+                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            Skipped
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(verification.food_safety_skipped_at), 'MMM d, yyyy')}
+                          </p>
+                          {verification.food_safety_followup_sent && (
+                            <p className="text-xs text-blue-600 mt-0.5">Follow-up sent</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="font-medium">Not Skipped</p>
+                      )}
+                    </div>
                   </div>
                 </Card>
 
