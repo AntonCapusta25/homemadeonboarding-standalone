@@ -1046,12 +1046,6 @@ export default function AdminDashboard() {
       <LinkTypeformModal
         open={isLinkTypeformOpen}
         onOpenChange={setIsLinkTypeformOpen}
-        chefs={chefs.map(c => ({ 
-          id: c.id, 
-          business_name: c.business_name, 
-          chef_name: c.chef_name, 
-          contact_email: c.contact_email 
-        }))}
         onSuccess={refetch}
       />
     </div>
