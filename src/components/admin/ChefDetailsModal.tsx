@@ -234,6 +234,9 @@ export function ChefDetailsModal({
       return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
     };
 
+    // Placeholder image URL
+    const placeholderImage = 'https://placehold.co/400x300/f5f5f5/999999?text=Food+Image';
+
     // Create rows for main dishes (with upsells as options)
     const mainDishRows = mainDishes.map((dish) => {
       const desc = dish.description ? `<p>${dish.description}</p>` : '';
@@ -254,7 +257,7 @@ export function ChefDetailsModal({
         '', // LABELS
         category,
         '', // TAGS
-        '', // IMAGES
+        placeholderImage, // IMAGES
         upsellOption.id, // OPTION1.ID
         upsellOption.name, // OPTION1.NAME
         upsells.length > 0 ? 'multiple' : '', // OPTION1.TYPE
@@ -287,7 +290,7 @@ export function ChefDetailsModal({
         'upsell', // LABELS
         category,
         '', // TAGS
-        '', // IMAGES
+        placeholderImage, // IMAGES
         '', '', '', '', '', '', '', '', // OPTION1.*
         '', '', '', '', '', '', '', '' // OPTION2.*
       ].map(escapeCSV).join(',');
@@ -304,28 +307,30 @@ export function ChefDetailsModal({
     document.body.removeChild(csvLink);
     URL.revokeObjectURL(csvUrl);
 
-    // Generate Text Document
-    let textContent = '';
-    Object.entries(dishesByCategory).forEach(([category, dishes]) => {
-      textContent += `## ${category}\n\n`;
-      dishes.forEach((dish) => {
-        const desc = dish.description || '';
-        const price = `€${Number(dish.price).toFixed(2)}`;
-        textContent += `**${dish.name}** — ${desc} — ${price}  \n`;
+    // Generate Text Document with delay to allow both downloads
+    setTimeout(() => {
+      let textContent = '';
+      Object.entries(dishesByCategory).forEach(([category, dishes]) => {
+        textContent += `## ${category}\n\n`;
+        dishes.forEach((dish) => {
+          const desc = dish.description || '';
+          const price = `€${Number(dish.price).toFixed(2)}`;
+          textContent += `**${dish.name}** — ${desc} — ${price}  \n`;
+        });
+        textContent += '\n---\n\n';
       });
-      textContent += '\n---\n\n';
-    });
-    textContent = textContent.replace(/\n---\n\n$/, '\n');
+      textContent = textContent.replace(/\n---\n\n$/, '\n');
 
-    const textBlob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
-    const textUrl = URL.createObjectURL(textBlob);
-    const textLink = document.createElement('a');
-    textLink.href = textUrl;
-    textLink.setAttribute('download', `${businessName}_menu_${dateStr}.txt`);
-    document.body.appendChild(textLink);
-    textLink.click();
-    document.body.removeChild(textLink);
-    URL.revokeObjectURL(textUrl);
+      const textBlob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
+      const textUrl = URL.createObjectURL(textBlob);
+      const textLink = document.createElement('a');
+      textLink.href = textUrl;
+      textLink.setAttribute('download', `${businessName}_menu_${dateStr}.txt`);
+      document.body.appendChild(textLink);
+      textLink.click();
+      document.body.removeChild(textLink);
+      URL.revokeObjectURL(textUrl);
+    }, 500);
 
     toast({ title: 'Downloaded', description: 'Menu CSV and text files downloaded' });
   };
