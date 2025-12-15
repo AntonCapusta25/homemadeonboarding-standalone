@@ -192,6 +192,10 @@ export type Database = {
           created_at: string
           documents_uploaded: boolean | null
           food_safety_followup_sent: boolean | null
+          food_safety_quiz_completed: boolean | null
+          food_safety_quiz_completed_at: string | null
+          food_safety_quiz_passed: boolean | null
+          food_safety_quiz_score: number | null
           food_safety_skipped_at: string | null
           food_safety_viewed: boolean | null
           haccp_document_url: string | null
@@ -207,6 +211,10 @@ export type Database = {
           created_at?: string
           documents_uploaded?: boolean | null
           food_safety_followup_sent?: boolean | null
+          food_safety_quiz_completed?: boolean | null
+          food_safety_quiz_completed_at?: string | null
+          food_safety_quiz_passed?: boolean | null
+          food_safety_quiz_score?: number | null
           food_safety_skipped_at?: string | null
           food_safety_viewed?: boolean | null
           haccp_document_url?: string | null
@@ -222,6 +230,10 @@ export type Database = {
           created_at?: string
           documents_uploaded?: boolean | null
           food_safety_followup_sent?: boolean | null
+          food_safety_quiz_completed?: boolean | null
+          food_safety_quiz_completed_at?: string | null
+          food_safety_quiz_passed?: boolean | null
+          food_safety_quiz_score?: number | null
           food_safety_skipped_at?: string | null
           food_safety_viewed?: boolean | null
           haccp_document_url?: string | null
