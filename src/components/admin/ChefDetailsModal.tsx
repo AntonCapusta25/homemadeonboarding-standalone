@@ -17,7 +17,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
-  Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield
+  Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
+  Download
 } from 'lucide-react';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { useAuth } from '@/hooks/useAuth';
@@ -176,6 +177,104 @@ export function ChefDetailsModal({
         toast({ title: 'Error', description: 'Failed to save notes', variant: 'destructive' });
       }
     }
+  };
+
+  const handleMenuDownload = () => {
+    if (!menu || menu.dishes.length === 0) {
+      toast({ title: 'No menu', description: 'This chef has no menu to download', variant: 'destructive' });
+      return;
+    }
+
+    const businessName = chef.business_name || chef.chef_name || 'Chef';
+    const dateStr = format(new Date(), 'yyyy-MM-dd');
+
+    // Group dishes by category
+    const dishesByCategory: Record<string, typeof menu.dishes> = {};
+    menu.dishes.forEach((dish) => {
+      const category = dish.category || 'Other';
+      if (!dishesByCategory[category]) {
+        dishesByCategory[category] = [];
+      }
+      dishesByCategory[category].push(dish);
+    });
+
+    // Generate CSV (matching the uploaded format)
+    const csvHeaders = [
+      'PRODUCT.ID', 'PRODUCT.NAME', 'PRODUCT.DESCRIPTION', 'PRODUCT.SKU',
+      'PRODUCT.PRICE.SELLING', 'PRODUCT.PRICE.COST', 'PRODUCT.PRICE.COMPARE',
+      'PRODUCT.TAX_PERCENT', 'PRODUCT.STATUS', 'PRODUCT.INVENTORY',
+      'PRODUCT.MIN.MAX.QUANTITY', 'PRODUCT.LABELS', 'PRODUCT.CATEGORY',
+      'PRODUCT.TAGS', 'PRODUCT.IMAGES', 'OPTION1.ID', 'OPTION1.NAME',
+      'OPTION1.TYPE', 'OPTION1.ENABLE_RANGE', 'OPTION1.RANGE', 'OPTION1.REQUIRED',
+      'OPTION1.VIEW', 'OPTION1.VARIANTS', 'OPTION2.ID', 'OPTION2.NAME',
+      'OPTION2.TYPE', 'OPTION2.ENABLE_RANGE', 'OPTION2.RANGE', 'OPTION2.REQUIRED',
+      'OPTION2.VIEW', 'OPTION2.VARIANTS'
+    ];
+
+    const csvRows = menu.dishes.map((dish) => {
+      const desc = dish.description ? `<p>${dish.description}</p>` : '';
+      const category = dish.category || 'Main Dishes';
+      const label = dish.is_upsell ? 'upsell' : '';
+      
+      return [
+        dish.id, // PRODUCT.ID
+        dish.name, // PRODUCT.NAME
+        desc, // PRODUCT.DESCRIPTION
+        '', // PRODUCT.SKU
+        Number(dish.price).toFixed(2), // PRODUCT.PRICE.SELLING
+        '', // PRODUCT.PRICE.COST
+        '', // PRODUCT.PRICE.COMPARE
+        '', // PRODUCT.TAX_PERCENT
+        'ACTIVE', // PRODUCT.STATUS
+        '100', // PRODUCT.INVENTORY
+        '"1,50"', // PRODUCT.MIN.MAX.QUANTITY
+        label, // PRODUCT.LABELS
+        `"${category}"`, // PRODUCT.CATEGORY
+        '', // PRODUCT.TAGS
+        '', // PRODUCT.IMAGES
+        '', '', '', '', '', '', '', '', // OPTION1.*
+        '', '', '', '', '', '', '', '' // OPTION2.*
+      ].map((val) => {
+        const str = String(val || '').replace(/"/g, '""');
+        return str.includes(',') || str.includes('"') ? `"${str}"` : str;
+      }).join(',');
+    });
+
+    const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+    const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const csvUrl = URL.createObjectURL(csvBlob);
+    const csvLink = document.createElement('a');
+    csvLink.href = csvUrl;
+    csvLink.setAttribute('download', `${businessName}_menu_${dateStr}.csv`);
+    document.body.appendChild(csvLink);
+    csvLink.click();
+    document.body.removeChild(csvLink);
+    URL.revokeObjectURL(csvUrl);
+
+    // Generate Text Document
+    let textContent = '';
+    Object.entries(dishesByCategory).forEach(([category, dishes]) => {
+      textContent += `## ${category}\n\n`;
+      dishes.forEach((dish) => {
+        const desc = dish.description || '';
+        const price = `€${Number(dish.price).toFixed(2)}`;
+        textContent += `**${dish.name}** — ${desc} — ${price}  \n`;
+      });
+      textContent += '\n---\n\n';
+    });
+    textContent = textContent.replace(/\n---\n\n$/, '\n'); // Remove trailing separator
+
+    const textBlob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
+    const textUrl = URL.createObjectURL(textBlob);
+    const textLink = document.createElement('a');
+    textLink.href = textUrl;
+    textLink.setAttribute('download', `${businessName}_menu_${dateStr}.txt`);
+    document.body.appendChild(textLink);
+    textLink.click();
+    document.body.removeChild(textLink);
+    URL.revokeObjectURL(textUrl);
+
+    toast({ title: 'Downloaded', description: 'Menu CSV and text files downloaded' });
   };
 
   const handleTaskClick = (task: TaskData) => {
@@ -514,6 +613,12 @@ export function ChefDetailsModal({
                   <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
                 ) : (
                   <>
+                    <div className="flex justify-end">
+                      <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
+                        <Download className="w-4 h-4" />
+                        Download Menu
+                      </Button>
+                    </div>
                     {menu.summary && (
                       <Card className="p-4">
                         <h4 className="font-medium mb-2">Menu Summary</h4>

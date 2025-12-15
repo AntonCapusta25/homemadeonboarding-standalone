@@ -66,6 +66,26 @@ const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   call_later: { label: 'Call Later', color: 'bg-orange-100 text-orange-800 border-orange-200' },
 };
 
+// Calculate chef progress based on completed onboarding fields
+const calculateChefProgress = (chef: ChefWithStats): number => {
+  const tasks = [
+    !!chef.city,
+    (chef.cuisines?.length || 0) > 0,
+    !!chef.contact_email && !!chef.contact_phone,
+    !!chef.address,
+    !!chef.business_name,
+    !!chef.logo_url,
+    !!chef.service_type && chef.service_type !== 'unsure',
+    (chef.availability?.length || 0) > 0,
+    (chef.dish_types?.length || 0) > 0,
+    !!chef.food_safety_status,
+    !!chef.kvk_status,
+    !!chef.plan,
+  ];
+  const completed = tasks.filter(Boolean).length;
+  return Math.round((completed / tasks.length) * 100);
+};
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, role, loading: authLoading, signOut, isAdmin } = useAuth();
@@ -655,6 +675,7 @@ export default function AdminDashboard() {
                 <TableRow>
                   <TableHead className="min-w-[200px]">Chef</TableHead>
                   <TableHead className="min-w-[100px]">City</TableHead>
+                  <TableHead className="min-w-[120px]">Progress</TableHead>
                   <TableHead className="min-w-[140px]">Assigned To</TableHead>
                   <TableHead className="min-w-[150px]">Status</TableHead>
                   <TableHead className="min-w-[180px]">Notes</TableHead>
@@ -668,7 +689,7 @@ export default function AdminDashboard() {
               <TableBody>
                 {filteredChefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       No chefs found
                     </TableCell>
                   </TableRow>
@@ -720,6 +741,25 @@ export default function AdminDashboard() {
                             {chef.city}
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const progress = calculateChefProgress(chef);
+                          return (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-secondary rounded-full h-2 min-w-[60px]">
+                                <div
+                                  className={cn(
+                                    "h-2 rounded-full transition-all",
+                                    progress === 100 ? "bg-green-500" : progress >= 75 ? "bg-blue-500" : progress >= 50 ? "bg-yellow-500" : "bg-orange-500"
+                                  )}
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-medium min-w-[32px]">{progress}%</span>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Select
