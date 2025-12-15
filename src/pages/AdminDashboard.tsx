@@ -54,6 +54,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { calculateOnboardingProgress } from '@/lib/chefProgress';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -64,26 +65,6 @@ const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   active: { label: 'Active Chef', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
   inactive: { label: 'Inactive', color: 'bg-gray-100 text-gray-800 border-gray-200' },
   call_later: { label: 'Call Later', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-};
-
-// Calculate chef progress based on completed onboarding fields
-const calculateChefProgress = (chef: ChefWithStats): number => {
-  const tasks = [
-    !!chef.city,
-    (chef.cuisines?.length || 0) > 0,
-    !!chef.contact_email && !!chef.contact_phone,
-    !!chef.address,
-    !!chef.business_name,
-    !!chef.logo_url,
-    !!chef.service_type && chef.service_type !== 'unsure',
-    (chef.availability?.length || 0) > 0,
-    (chef.dish_types?.length || 0) > 0,
-    !!chef.food_safety_status,
-    !!chef.kvk_status,
-    !!chef.plan,
-  ];
-  const completed = tasks.filter(Boolean).length;
-  return Math.round((completed / tasks.length) * 100);
 };
 
 export default function AdminDashboard() {
@@ -744,7 +725,7 @@ export default function AdminDashboard() {
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const progress = calculateChefProgress(chef);
+                          const progress = calculateOnboardingProgress(chef);
                           return (
                             <div className="flex items-center gap-2">
                               <div className="flex-1 bg-secondary rounded-full h-2 min-w-[60px]">
