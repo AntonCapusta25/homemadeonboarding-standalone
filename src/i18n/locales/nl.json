@@ -315,7 +315,19 @@
     "skip": "Overslaan",
     "continue": "Doorgaan",
     "saving": "Opslaan...",
-    "saveAndContinue": "Opslaan & Doorgaan"
+    "saveAndContinue": "Opslaan & Doorgaan",
+    "processing": "Verwerken..."
+  },
+  "tos": {
+    "title": "Algemene Voorwaarden",
+    "subtitle": "Lees en accepteer de voorwaarden om je registratie te voltooien",
+    "selectedPlan": "Geselecteerd Plan",
+    "commission": "Commissie",
+    "signatureLabel": "Typ je volledige naam om te ondertekenen",
+    "signaturePlaceholder": "Je volledige wettelijke naam",
+    "termsCheckbox": "Ik heb de bovenstaande Algemene Voorwaarden gelezen en ga ermee akkoord",
+    "privacyCheckbox": "Ik ga akkoord met het Privacybeleid en geef toestemming voor de verwerking van mijn persoonsgegevens",
+    "acceptButton": "Accepteren & Voltooien"
   },
   "verification": {
     "menuReview": "Bekijk je Menu",

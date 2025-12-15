@@ -29,6 +29,7 @@ import { LanguageSelector } from '@/components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { TosAcceptanceData } from './TermsOfServiceModal';
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
@@ -168,7 +169,7 @@ export function OnboardingWizard() {
     }
   };
 
-  const handleCompleteOnboarding = async () => {
+  const handleCompleteOnboarding = async (tosData?: TosAcceptanceData) => {
     setSaving(true);
     try {
       // User is already logged in (account created at contact step)
@@ -177,29 +178,33 @@ export function OnboardingWizard() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // Create or update chef profile
-        const profileData = {
-          user_id: user.id,
-          contact_email: profile.email,
-          contact_phone: profile.phone,
-          chef_name: `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
-          business_name: profile.restaurantName,
-          city: profile.city,
-          address: `${profile.streetAddress || ''}, ${profile.zipCode || ''}, ${profile.city || ''}, ${profile.country || ''}`,
-          cuisines: profile.primaryCuisines,
-          dish_types: profile.dishTypes,
-          availability: profile.availabilityBuckets,
-          service_type: profile.serviceType as 'delivery' | 'pickup' | 'both' | 'unsure',
-          food_safety_status: mapFoodSafetyStatus(profile.foodSafetyStatus),
-          kvk_status: mapKvkStatus(profile.kvkStatus),
-          plan: mapPlanType(profile.plan),
-          logo_url: profile.logoUrl,
-          onboarding_completed: true,
-        };
-
+        // Create or update chef profile with TOS data
         const { data: chefProfile, error: upsertError } = await supabase
           .from('chef_profiles')
-          .upsert(profileData, { 
+          .upsert({
+            user_id: user.id,
+            contact_email: profile.email,
+            contact_phone: profile.phone,
+            chef_name: `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
+            business_name: profile.restaurantName,
+            city: profile.city,
+            address: `${profile.streetAddress || ''}, ${profile.zipCode || ''}, ${profile.city || ''}, ${profile.country || ''}`,
+            cuisines: profile.primaryCuisines,
+            dish_types: profile.dishTypes,
+            availability: profile.availabilityBuckets,
+            service_type: profile.serviceType as 'delivery' | 'pickup' | 'both' | 'unsure',
+            food_safety_status: mapFoodSafetyStatus(profile.foodSafetyStatus),
+            kvk_status: mapKvkStatus(profile.kvkStatus),
+            plan: mapPlanType(profile.plan),
+            logo_url: profile.logoUrl,
+            onboarding_completed: true,
+            // TOS acceptance data
+            ...(tosData ? {
+              tos_signature: tosData.signature,
+              tos_accepted_at: tosData.acceptedAt,
+              tos_plan_accepted: tosData.planAccepted,
+            } : {}),
+          }, { 
             onConflict: 'user_id',
             ignoreDuplicates: false 
           })

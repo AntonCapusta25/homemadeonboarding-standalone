@@ -4,12 +4,12 @@ import { Check, Star, Sparkles, Building, ChevronDown, ChevronUp, Shield } from 
 import { cn } from '@/lib/utils';
 import { PlanType } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
-import { TermsOfServiceModal } from '../TermsOfServiceModal';
+import { TermsOfServiceModal, TosAcceptanceData } from '../TermsOfServiceModal';
 
 interface PlanStepProps {
   value: PlanType;
   onChange: (plan: PlanType) => void;
-  onNext: () => void;
+  onNext: (tosData: TosAcceptanceData) => void;
   onPrevious: () => void;
   chefName?: string;
   saving?: boolean;
@@ -53,9 +53,9 @@ export function PlanStep({ value, onChange, onNext, onPrevious, chefName, saving
     setShowTosModal(true);
   };
 
-  const handleTosAccept = () => {
+  const handleTosAccept = (tosData: TosAcceptanceData) => {
     setShowTosModal(false);
-    onNext();
+    onNext(tosData);
   };
 
   return (
