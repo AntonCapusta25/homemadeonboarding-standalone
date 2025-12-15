@@ -30,6 +30,10 @@ export interface ChefWithStats extends ChefProfile {
   call_attempts?: number | null;
   assigned_admin_id?: string | null;
   crm_updated_by?: string | null;
+  // Verification data (joined from chef_verification table)
+  verification_menu_reviewed?: boolean;
+  verification_food_safety_viewed?: boolean;
+  verification_documents_uploaded?: boolean;
 }
 
 export interface PendingProfile {
@@ -145,22 +149,41 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       // Fetch admin data for these profiles
       const profileIds = (profilesData || []).map(p => p.id);
       let adminDataMap: Record<string, ChefAdminData> = {};
+      let verificationDataMap: Record<string, { menu_reviewed: boolean; food_safety_viewed: boolean; documents_uploaded: boolean }> = {};
 
       if (profileIds.length > 0) {
-        const { data: adminData, error: adminError } = await supabase
-          .from('chef_admin_data')
-          .select('*')
-          .in('chef_profile_id', profileIds);
+        // Fetch admin data and verification data in parallel
+        const [adminResult, verificationResult] = await Promise.all([
+          supabase
+            .from('chef_admin_data')
+            .select('*')
+            .in('chef_profile_id', profileIds),
+          supabase
+            .from('chef_verification')
+            .select('chef_profile_id, menu_reviewed, food_safety_viewed, documents_uploaded')
+            .in('chef_profile_id', profileIds)
+        ]);
 
-        if (!adminError && adminData) {
-          adminDataMap = adminData.reduce((acc, ad) => {
+        if (!adminResult.error && adminResult.data) {
+          adminDataMap = adminResult.data.reduce((acc, ad) => {
             acc[ad.chef_profile_id] = ad;
             return acc;
           }, {} as Record<string, ChefAdminData>);
         }
+
+        if (!verificationResult.error && verificationResult.data) {
+          verificationDataMap = verificationResult.data.reduce((acc, v) => {
+            acc[v.chef_profile_id] = {
+              menu_reviewed: v.menu_reviewed || false,
+              food_safety_viewed: v.food_safety_viewed || false,
+              documents_uploaded: v.documents_uploaded || false,
+            };
+            return acc;
+          }, {} as Record<string, { menu_reviewed: boolean; food_safety_viewed: boolean; documents_uploaded: boolean }>);
+        }
       }
 
-      // Merge chef profiles with admin data
+      // Merge chef profiles with admin data and verification data
       let mergedData: ChefWithStats[] = (profilesData || []).map(chef => ({
         ...chef,
         admin_notes: adminDataMap[chef.id]?.admin_notes || null,
@@ -170,6 +193,9 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         call_attempts: adminDataMap[chef.id]?.call_attempts || 0,
         assigned_admin_id: adminDataMap[chef.id]?.assigned_admin_id || null,
         crm_updated_by: adminDataMap[chef.id]?.crm_updated_by || null,
+        verification_menu_reviewed: verificationDataMap[chef.id]?.menu_reviewed || false,
+        verification_food_safety_viewed: verificationDataMap[chef.id]?.food_safety_viewed || false,
+        verification_documents_uploaded: verificationDataMap[chef.id]?.documents_uploaded || false,
       }));
 
       // Apply status filter after merging (since status is now in admin_data)
