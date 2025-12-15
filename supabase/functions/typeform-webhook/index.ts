@@ -44,12 +44,110 @@ interface TypeformPayload {
       score: number;
     };
     variables?: TypeformVariable[];
-    hidden?: {
-      email?: string;
-      chef_id?: string;
-    };
+    hidden?: Record<string, string>;
     answers: TypeformAnswer[];
   };
+}
+
+// Helper to extract email from various sources in the payload
+function extractEmail(payload: TypeformPayload): string | null {
+  const { form_response } = payload;
+  
+  // 1. Check hidden fields (case-insensitive)
+  if (form_response.hidden) {
+    for (const [key, value] of Object.entries(form_response.hidden)) {
+      if (key.toLowerCase().includes('email') && value) {
+        console.log(`Found email in hidden field '${key}': ${value}`);
+        return value;
+      }
+    }
+  }
+  
+  // 2. Check for email-type answer
+  const emailAnswer = form_response.answers.find(a => a.type === 'email');
+  if (emailAnswer?.email) {
+    console.log(`Found email in email-type answer: ${emailAnswer.email}`);
+    return emailAnswer.email;
+  }
+  
+  // 3. Check text answers for email pattern
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  for (const answer of form_response.answers) {
+    if (answer.type === 'text' && answer.text && emailRegex.test(answer.text.trim())) {
+      console.log(`Found email in text answer: ${answer.text}`);
+      return answer.text.trim();
+    }
+  }
+  
+  // 4. Check variables for email
+  if (form_response.variables) {
+    for (const variable of form_response.variables) {
+      if (variable.key.toLowerCase().includes('email') && variable.text) {
+        console.log(`Found email in variable '${variable.key}': ${variable.text}`);
+        return variable.text;
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Helper to extract chef_id from hidden fields
+function extractChefId(payload: TypeformPayload): string | null {
+  const { form_response } = payload;
+  
+  if (form_response.hidden) {
+    for (const [key, value] of Object.entries(form_response.hidden)) {
+      if ((key.toLowerCase().includes('chef') || key.toLowerCase() === 'id') && value) {
+        console.log(`Found chef_id in hidden field '${key}': ${value}`);
+        return value;
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Helper to extract quiz score
+function extractScore(payload: TypeformPayload): { score: number; maxScore: number } {
+  const { form_response } = payload;
+  let quizScore = 0;
+  let maxScore = 100;
+  
+  // Check variables first (most reliable for Typeform quizzes)
+  if (form_response.variables) {
+    const quizScoreVar = form_response.variables.find(
+      v => v.key.toLowerCase() === 'quiz_score' || v.key.toLowerCase() === 'score'
+    );
+    const maxScoreVar = form_response.variables.find(
+      v => v.key.toLowerCase() === 'max_score' || v.key.toLowerCase() === 'total'
+    );
+    const correctVar = form_response.variables.find(
+      v => v.key.toLowerCase() === 'correct_answers'
+    );
+    const totalQuestionsVar = form_response.variables.find(
+      v => v.key.toLowerCase() === 'total_scorable_questions'
+    );
+    
+    if (quizScoreVar?.number !== undefined) {
+      quizScore = quizScoreVar.number;
+    } else if (correctVar?.number !== undefined) {
+      quizScore = correctVar.number;
+    }
+    
+    if (maxScoreVar?.number !== undefined) {
+      maxScore = maxScoreVar.number;
+    } else if (totalQuestionsVar?.number !== undefined) {
+      maxScore = totalQuestionsVar.number;
+    }
+  }
+  
+  // Fallback to calculated score
+  if (form_response.calculated?.score !== undefined && quizScore === 0) {
+    quizScore = form_response.calculated.score;
+  }
+  
+  return { score: quizScore, maxScore };
 }
 
 serve(async (req) => {
@@ -65,48 +163,27 @@ serve(async (req) => {
     const { form_response } = payload;
     const submittedAt = form_response.submitted_at;
     
-    // Extract score from variables (Typeform quiz format)
-    let quizScore = 0;
-    let maxScore = 100;
-    
-    if (form_response.variables) {
-      const quizScoreVar = form_response.variables.find(v => v.key === 'Quiz_score' || v.key === 'quiz_score');
-      const maxScoreVar = form_response.variables.find(v => v.key === 'Max_score' || v.key === 'max_score');
-      
-      if (quizScoreVar?.number !== undefined) {
-        quizScore = quizScoreVar.number;
-      }
-      if (maxScoreVar?.number !== undefined) {
-        maxScore = maxScoreVar.number;
-      }
-    }
-    
-    // Fallback to calculated score if available
-    if (form_response.calculated?.score !== undefined && quizScore === 0) {
-      quizScore = form_response.calculated.score;
-    }
+    // Extract data using helper functions
+    const chefEmail = extractEmail(payload);
+    const chefIdFromHidden = extractChefId(payload);
+    const { score: quizScore, maxScore } = extractScore(payload);
     
     // Calculate percentage score
     const scorePercentage = maxScore > 0 ? Math.round((quizScore / maxScore) * 100) : 0;
     
-    // Get email from hidden fields or answers
-    let chefEmail = form_response.hidden?.email;
-    let chefId = form_response.hidden?.chef_id;
+    console.log(`Quiz completed - Email: ${chefEmail}, Chef ID: ${chefIdFromHidden}, Raw Score: ${quizScore}/${maxScore}, Percentage: ${scorePercentage}%`);
 
-    // If not in hidden fields, look for email in answers
-    if (!chefEmail) {
-      const emailAnswer = form_response.answers.find(a => a.type === 'email');
-      if (emailAnswer?.email) {
-        chefEmail = emailAnswer.email;
-      }
-    }
-
-    console.log(`Quiz completed - Email: ${chefEmail}, Chef ID: ${chefId}, Raw Score: ${quizScore}/${maxScore}, Percentage: ${scorePercentage}%`);
-
-    if (!chefEmail && !chefId) {
-      console.error('No email or chef_id found in webhook payload');
+    if (!chefEmail && !chefIdFromHidden) {
+      console.error('No email or chef_id found in webhook payload. Make sure your Typeform has an email field or hidden fields.');
+      console.log('Available answers:', JSON.stringify(form_response.answers, null, 2));
+      console.log('Hidden fields:', JSON.stringify(form_response.hidden, null, 2));
+      console.log('Variables:', JSON.stringify(form_response.variables, null, 2));
+      
       return new Response(
-        JSON.stringify({ error: 'No email or chef_id found' }),
+        JSON.stringify({ 
+          error: 'No email or chef_id found',
+          hint: 'Add an email field to your Typeform or use hidden fields (email or chef_id)'
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -121,7 +198,7 @@ serve(async (req) => {
     const passed = scorePercentage >= PASSING_THRESHOLD;
 
     // Find the chef profile
-    let chefProfileId = chefId;
+    let chefProfileId = chefIdFromHidden;
     
     if (!chefProfileId && chefEmail) {
       const { data: chefProfile, error: profileError } = await supabase
@@ -136,13 +213,18 @@ serve(async (req) => {
       
       if (chefProfile) {
         chefProfileId = chefProfile.id;
+        console.log(`Found chef profile by email: ${chefProfileId}`);
       }
     }
 
     if (!chefProfileId) {
-      console.error('Could not find chef profile for:', chefEmail || chefId);
+      console.error('Could not find chef profile for:', chefEmail || chefIdFromHidden);
       return new Response(
-        JSON.stringify({ error: 'Chef profile not found', email: chefEmail }),
+        JSON.stringify({ 
+          error: 'Chef profile not found', 
+          email: chefEmail,
+          hint: 'Make sure the email matches the contact_email in chef_profiles table'
+        }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -189,6 +271,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         chefProfileId,
+        email: chefEmail,
         rawScore: quizScore,
         maxScore,
         scorePercentage,
