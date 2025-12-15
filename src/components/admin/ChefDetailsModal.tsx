@@ -179,7 +179,7 @@ export function ChefDetailsModal({
     }
   };
 
-  const handleMenuDownload = () => {
+  const handleMenuDownload = (fileType: 'csv' | 'txt') => {
     if (!menu || menu.dishes.length === 0) {
       toast({ title: 'No menu', description: 'This chef has no menu to download', variant: 'destructive' });
       return;
@@ -188,127 +188,97 @@ export function ChefDetailsModal({
     const businessName = chef.business_name || chef.chef_name || 'Chef';
     const dateStr = format(new Date(), 'yyyy-MM-dd');
 
-    // Separate main dishes and upsells
+    // Separate main dishes and extras
     const mainDishes = menu.dishes.filter(d => !d.is_upsell);
-    const upsells = menu.dishes.filter(d => d.is_upsell);
+    const extras = menu.dishes.filter(d => d.is_upsell);
 
-    // Group all dishes by category for text export
-    const dishesByCategory: Record<string, typeof menu.dishes> = {};
-    menu.dishes.forEach((dish) => {
-      const category = dish.category || 'Other';
-      if (!dishesByCategory[category]) {
-        dishesByCategory[category] = [];
-      }
-      dishesByCategory[category].push(dish);
-    });
+    if (fileType === 'csv') {
+      // Build extras option string for CSV (semicolon-separated variants)
+      const buildExtrasOption = () => {
+        if (extras.length === 0) return { id: '', name: '', variants: '' };
+        const optionId = `extras-${Date.now()}`;
+        const variants = extras.map(u => {
+          const price = Number(u.price).toFixed(0);
+          const desc = u.description || u.name;
+          return `${u.name},${price},0,1,${desc},,${u.id}`;
+        }).join(';');
+        return { id: optionId, name: 'Extras', variants };
+      };
 
-    // Build upsells option string for CSV (semicolon-separated variants)
-    const buildUpsellsOption = () => {
-      if (upsells.length === 0) return { id: '', name: '', variants: '' };
-      const optionId = `upsell-${Date.now()}`;
-      const variants = upsells.map(u => {
-        const price = Number(u.price).toFixed(0);
-        const desc = u.description || u.name;
-        return `${u.name},${price},0,1,${desc},,${u.id}`;
-      }).join(';');
-      return { id: optionId, name: 'Add-ons', variants };
-    };
+      const extrasOption = buildExtrasOption();
 
-    const upsellOption = buildUpsellsOption();
+      const csvHeaders = [
+        'PRODUCT.ID', 'PRODUCT.NAME', 'PRODUCT.DESCRIPTION', 'PRODUCT.SKU',
+        'PRODUCT.PRICE.SELLING', 'PRODUCT.PRICE.COST', 'PRODUCT.PRICE.COMPARE',
+        'PRODUCT.TAX_PERCENT', 'PRODUCT.STATUS', 'PRODUCT.INVENTORY',
+        'PRODUCT.MIN.MAX.QUANTITY', 'PRODUCT.LABELS', 'PRODUCT.CATEGORY',
+        'PRODUCT.TAGS', 'PRODUCT.IMAGES', 'OPTION1.ID', 'OPTION1.NAME',
+        'OPTION1.TYPE', 'OPTION1.ENABLE_RANGE', 'OPTION1.RANGE', 'OPTION1.REQUIRED',
+        'OPTION1.VIEW', 'OPTION1.VARIANTS', 'OPTION2.ID', 'OPTION2.NAME',
+        'OPTION2.TYPE', 'OPTION2.ENABLE_RANGE', 'OPTION2.RANGE', 'OPTION2.REQUIRED',
+        'OPTION2.VIEW', 'OPTION2.VARIANTS'
+      ];
 
-    // Generate CSV (matching the uploaded format)
-    const csvHeaders = [
-      'PRODUCT.ID', 'PRODUCT.NAME', 'PRODUCT.DESCRIPTION', 'PRODUCT.SKU',
-      'PRODUCT.PRICE.SELLING', 'PRODUCT.PRICE.COST', 'PRODUCT.PRICE.COMPARE',
-      'PRODUCT.TAX_PERCENT', 'PRODUCT.STATUS', 'PRODUCT.INVENTORY',
-      'PRODUCT.MIN.MAX.QUANTITY', 'PRODUCT.LABELS', 'PRODUCT.CATEGORY',
-      'PRODUCT.TAGS', 'PRODUCT.IMAGES', 'OPTION1.ID', 'OPTION1.NAME',
-      'OPTION1.TYPE', 'OPTION1.ENABLE_RANGE', 'OPTION1.RANGE', 'OPTION1.REQUIRED',
-      'OPTION1.VIEW', 'OPTION1.VARIANTS', 'OPTION2.ID', 'OPTION2.NAME',
-      'OPTION2.TYPE', 'OPTION2.ENABLE_RANGE', 'OPTION2.RANGE', 'OPTION2.REQUIRED',
-      'OPTION2.VIEW', 'OPTION2.VARIANTS'
-    ];
+      const escapeCSV = (val: string) => {
+        const str = String(val || '').replace(/"/g, '""');
+        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
+      };
 
-    const escapeCSV = (val: string) => {
-      const str = String(val || '').replace(/"/g, '""');
-      return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
-    };
+      const placeholderImage = 'https://placehold.co/400x300/f5f5f5/999999?text=Food+Image';
 
-    // Placeholder image URL
-    const placeholderImage = 'https://placehold.co/400x300/f5f5f5/999999?text=Food+Image';
+      const mainDishRows = mainDishes.map((dish) => {
+        const desc = dish.description ? `<p>${dish.description}</p>` : '';
+        const category = dish.category || 'Main Dishes';
+        
+        return [
+          dish.id, dish.name, desc, '',
+          Number(dish.price).toFixed(2), '', '', '',
+          'ACTIVE', '100', '1,50', '', category, '', placeholderImage,
+          extrasOption.id, extrasOption.name,
+          extras.length > 0 ? 'multiple' : '',
+          extras.length > 0 ? 'NO' : '',
+          extras.length > 0 ? '0,0' : '',
+          extras.length > 0 ? 'NO' : '',
+          extras.length > 0 ? 'LIST' : '',
+          extrasOption.variants,
+          '', '', '', '', '', '', '', ''
+        ].map(escapeCSV).join(',');
+      });
 
-    // Create rows for main dishes (with upsells as options)
-    const mainDishRows = mainDishes.map((dish) => {
-      const desc = dish.description ? `<p>${dish.description}</p>` : '';
-      const category = dish.category || 'Main Dishes';
-      
-      return [
-        dish.id,
-        dish.name,
-        desc,
-        '', // SKU
-        Number(dish.price).toFixed(2),
-        '', // COST
-        '', // COMPARE
-        '', // TAX
-        'ACTIVE',
-        '100',
-        '1,50',
-        '', // LABELS
-        category,
-        '', // TAGS
-        placeholderImage, // IMAGES
-        upsellOption.id, // OPTION1.ID
-        upsellOption.name, // OPTION1.NAME
-        upsells.length > 0 ? 'multiple' : '', // OPTION1.TYPE
-        upsells.length > 0 ? 'NO' : '', // OPTION1.ENABLE_RANGE
-        upsells.length > 0 ? '0,0' : '', // OPTION1.RANGE
-        upsells.length > 0 ? 'NO' : '', // OPTION1.REQUIRED
-        upsells.length > 0 ? 'LIST' : '', // OPTION1.VIEW
-        upsellOption.variants, // OPTION1.VARIANTS
-        '', '', '', '', '', '', '', '' // OPTION2.*
-      ].map(escapeCSV).join(',');
-    });
+      const extrasRows = extras.map((dish) => {
+        const desc = dish.description ? `<p>${dish.description}</p>` : '';
+        const category = dish.category || 'Extras';
+        
+        return [
+          dish.id, dish.name, desc, '',
+          Number(dish.price).toFixed(2), '', '', '',
+          'ACTIVE', '100', '1,50', 'extra', category, '', placeholderImage,
+          '', '', '', '', '', '', '', '',
+          '', '', '', '', '', '', '', ''
+        ].map(escapeCSV).join(',');
+      });
 
-    // Create rows for upsells as standalone dishes too
-    const upsellRows = upsells.map((dish) => {
-      const desc = dish.description ? `<p>${dish.description}</p>` : '';
-      const category = dish.category || 'Add-ons';
-      
-      return [
-        dish.id,
-        dish.name,
-        desc,
-        '', // SKU
-        Number(dish.price).toFixed(2),
-        '', // COST
-        '', // COMPARE
-        '', // TAX
-        'ACTIVE',
-        '100',
-        '1,50',
-        'upsell', // LABELS
-        category,
-        '', // TAGS
-        placeholderImage, // IMAGES
-        '', '', '', '', '', '', '', '', // OPTION1.*
-        '', '', '', '', '', '', '', '' // OPTION2.*
-      ].map(escapeCSV).join(',');
-    });
+      const csvContent = [csvHeaders.join(','), ...mainDishRows, ...extrasRows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${businessName}_menu_${dateStr}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Downloaded', description: 'Menu CSV file downloaded' });
 
-    const csvContent = [csvHeaders.join(','), ...mainDishRows, ...upsellRows].join('\n');
-    const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const csvUrl = URL.createObjectURL(csvBlob);
-    const csvLink = document.createElement('a');
-    csvLink.href = csvUrl;
-    csvLink.setAttribute('download', `${businessName}_menu_${dateStr}.csv`);
-    document.body.appendChild(csvLink);
-    csvLink.click();
-    document.body.removeChild(csvLink);
-    URL.revokeObjectURL(csvUrl);
+    } else {
+      // Text document
+      const dishesByCategory: Record<string, typeof menu.dishes> = {};
+      menu.dishes.forEach((dish) => {
+        const category = dish.category || 'Other';
+        if (!dishesByCategory[category]) {
+          dishesByCategory[category] = [];
+        }
+        dishesByCategory[category].push(dish);
+      });
 
-    // Generate Text Document with delay to allow both downloads
-    setTimeout(() => {
       let textContent = '';
       Object.entries(dishesByCategory).forEach(([category, dishes]) => {
         textContent += `## ${category}\n\n`;
@@ -321,18 +291,15 @@ export function ChefDetailsModal({
       });
       textContent = textContent.replace(/\n---\n\n$/, '\n');
 
-      const textBlob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
-      const textUrl = URL.createObjectURL(textBlob);
-      const textLink = document.createElement('a');
-      textLink.href = textUrl;
-      textLink.setAttribute('download', `${businessName}_menu_${dateStr}.txt`);
-      document.body.appendChild(textLink);
-      textLink.click();
-      document.body.removeChild(textLink);
-      URL.revokeObjectURL(textUrl);
-    }, 500);
-
-    toast({ title: 'Downloaded', description: 'Menu CSV and text files downloaded' });
+      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${businessName}_menu_${dateStr}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Downloaded', description: 'Menu text file downloaded' });
+    }
   };
 
   const handleTaskClick = (task: TaskData) => {
@@ -671,10 +638,14 @@ export function ChefDetailsModal({
                   <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
                 ) : (
                   <>
-                    <div className="flex justify-end">
-                      <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleMenuDownload('csv')} className="gap-2">
                         <Download className="w-4 h-4" />
-                        Download Menu
+                        Download CSV
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleMenuDownload('txt')} className="gap-2">
+                        <Download className="w-4 h-4" />
+                        Download Text
                       </Button>
                     </div>
                     {menu.summary && (
