@@ -703,6 +703,38 @@ export function ChefDetailsModal({
                     </p>
                   </div>
                 </Card>
+
+                {/* TOS Acceptance Card */}
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <FileCheck className="w-4 h-4" />
+                    Terms of Service Acceptance
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <Badge variant={chef.tos_accepted_at ? 'default' : 'secondary'} className={chef.tos_accepted_at ? 'bg-green-100 text-green-800' : ''}>
+                        {chef.tos_accepted_at ? 'Accepted' : 'Not Accepted'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Accepted At</p>
+                      <p className="font-medium">
+                        {chef.tos_accepted_at ? format(new Date(chef.tos_accepted_at), 'MMM d, yyyy HH:mm') : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Plan Accepted</p>
+                      <p className="font-medium capitalize">{chef.tos_plan_accepted || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Signature</p>
+                      <p className="font-medium truncate" title={chef.tos_signature || undefined}>
+                        {chef.tos_signature || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
               </TabsContent>
 
               <TabsContent value="onboarding" className="space-y-3">
