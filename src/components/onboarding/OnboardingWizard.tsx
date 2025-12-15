@@ -29,7 +29,7 @@ import { LanguageSelector } from '@/components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { TosAcceptanceData } from './TermsOfServiceModal';
+
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
@@ -169,7 +169,7 @@ export function OnboardingWizard() {
     }
   };
 
-  const handleCompleteOnboarding = async (tosData?: TosAcceptanceData) => {
+  const handleCompleteOnboarding = async () => {
     setSaving(true);
     try {
       // User is already logged in (account created at contact step)
@@ -178,7 +178,7 @@ export function OnboardingWizard() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // Create or update chef profile with TOS data
+        // Create or update chef profile (TOS acceptance moved to food safety step in verification)
         const { data: chefProfile, error: upsertError } = await supabase
           .from('chef_profiles')
           .upsert({
@@ -198,12 +198,6 @@ export function OnboardingWizard() {
             plan: mapPlanType(profile.plan),
             logo_url: profile.logoUrl,
             onboarding_completed: true,
-            // TOS acceptance data
-            ...(tosData ? {
-              tos_signature: tosData.signature,
-              tos_accepted_at: tosData.acceptedAt,
-              tos_plan_accepted: tosData.planAccepted,
-            } : {}),
           }, { 
             onConflict: 'user_id',
             ignoreDuplicates: false 
