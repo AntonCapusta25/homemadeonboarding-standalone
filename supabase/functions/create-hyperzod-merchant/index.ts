@@ -9,19 +9,9 @@ const HYPERZOD_API_KEY = Deno.env.get('HYPERZOD_API_KEY');
 const TENANT_ID = '3331';
 const BASE_URL = 'https://api.hyperzod.app';
 
-// Endpoints to try for merchant creation
-const ENDPOINTS_TO_TRY = [
-  '/merchant/v1/merchant',
-  '/merchant/v1/merchants',
-  '/merchant/v1/create',
-  '/admin/v1/merchant',
-  '/admin/v1/merchant/create',
-  '/admin/v1/merchants',
-  '/v1/merchant',
-  '/v1/merchants',
-  '/merchant',
-  '/merchants'
-];
+// Confirmed working endpoint for merchant creation (Hyperzod)
+// Captured from Hyperzod SDK / console: POST /admin/v1/merchant/create
+const MERCHANT_CREATE_ENDPOINT = '/admin/v1/merchant/create';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -79,66 +69,56 @@ serve(async (req) => {
     console.log('Creating Hyperzod merchant:', merchantPayload.name);
 
     let success = false;
-    let merchantData = null;
-    let workingEndpoint = null;
+    let merchantData: any = null;
+    let workingEndpoint: string | null = null;
     let lastError = '';
 
-    // Try each endpoint until one works
-    for (const endpoint of ENDPOINTS_TO_TRY) {
-      console.log(`Trying endpoint: ${endpoint}`);
-      
-      try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${HYPERZOD_API_KEY}`,
-            'x-api-key': HYPERZOD_API_KEY,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'x-tenant': TENANT_ID,
-          },
-          body: JSON.stringify(merchantPayload),
-        });
+    // Use the confirmed working endpoint only
+    const endpoint = MERCHANT_CREATE_ENDPOINT;
+    console.log(`Creating merchant via confirmed endpoint: ${endpoint}`);
 
+    try {
+      const response = await fetch(`${BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HYPERZOD_API_KEY}`,
+          'x-api-key': HYPERZOD_API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-tenant': TENANT_ID,
+        },
+        body: JSON.stringify(merchantPayload),
+      });
 
-        const responseText = await response.text();
-        console.log(`${endpoint} response status: ${response.status}`);
-        console.log(`${endpoint} response body: ${responseText.substring(0, 500)}`);
+      const responseText = await response.text();
+      console.log(`${endpoint} response status: ${response.status}`);
+      console.log(`${endpoint} response body: ${responseText.substring(0, 500)}`);
 
-        // If auth fails on the *known* working admin endpoint, stop immediately.
-        if (response.status === 401 || response.status === 403) {
-          lastError = `${response.status}: ${responseText.substring(0, 200)}`;
-          console.log(`Auth failed at ${endpoint}, stopping early: ${lastError}`);
-          break;
-        }
-        
-        if (response.ok) {
-          try {
-            merchantData = JSON.parse(responseText);
-            // Check if the response indicates actual success
-            if (merchantData.success === false || merchantData.error) {
-              lastError = `API returned error: ${JSON.stringify(merchantData)}`;
-              console.log(`${endpoint} returned 200 but with error in body`);
-              continue;
-            }
+      if (response.status === 401 || response.status === 403) {
+        lastError = `${response.status}: ${responseText.substring(0, 200)}`;
+        console.log(`Auth/permission failed at ${endpoint}: ${lastError}`);
+      } else if (response.ok) {
+        try {
+          merchantData = JSON.parse(responseText);
+          if (merchantData?.success === false || merchantData?.error) {
+            lastError = `API returned error: ${JSON.stringify(merchantData)}`;
+          } else {
             success = true;
             workingEndpoint = endpoint;
             console.log(`SUCCESS with endpoint: ${endpoint}`);
             console.log(`Merchant data: ${JSON.stringify(merchantData)}`);
-            break;
-          } catch {
-            merchantData = { raw: responseText };
-            success = true;
-            workingEndpoint = endpoint;
-            break;
           }
-        } else {
-          lastError = `${response.status}: ${responseText.substring(0, 200)}`;
+        } catch {
+          merchantData = { raw: responseText };
+          success = true;
+          workingEndpoint = endpoint;
         }
-      } catch (err: any) {
-        lastError = err?.message || String(err);
-        console.log(`Error with ${endpoint}: ${lastError}`);
+      } else {
+        lastError = `${response.status}: ${responseText.substring(0, 200)}`;
       }
+    } catch (err: any) {
+      lastError = err?.message || String(err);
+      console.log(`Network error calling ${endpoint}: ${lastError}`);
     }
 
     if (success) {
