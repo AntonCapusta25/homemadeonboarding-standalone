@@ -330,11 +330,15 @@ export function TermsOfServiceModal({
         </div>
 
         {/* Contract Scroll Area */}
-        <ScrollArea className="flex-1 border rounded-lg p-4 bg-muted/30 min-h-[300px] max-h-[400px]">
-          <pre className="whitespace-pre-wrap text-xs font-mono text-foreground/80 leading-relaxed">
-            {contractText}
-          </pre>
-        </ScrollArea>
+        <div className="flex-1 border rounded-lg bg-muted/30 min-h-[250px] max-h-[350px] overflow-hidden">
+          <ScrollArea className="h-[350px] w-full">
+            <div className="p-4">
+              <pre className="whitespace-pre-wrap text-xs font-mono text-foreground/80 leading-relaxed">
+                {contractText}
+              </pre>
+            </div>
+          </ScrollArea>
+        </div>
 
         {/* Signature and Checkboxes */}
         <div className="space-y-4 pt-4 border-t">
