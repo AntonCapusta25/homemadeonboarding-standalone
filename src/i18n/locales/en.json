@@ -362,7 +362,9 @@
     "videoStorage": "Food Storage",
     "takeQuiz": "Take the Quiz",
     "quizRequired": "You must watch all videos before taking the quiz",
-    "openQuiz": "Open Food Safety Quiz"
+    "openQuiz": "Open Food Safety Quiz",
+    "skipForNow": "Skip for now, I'll do it later",
+    "skippedFoodSafety": "We'll remind you to complete food safety training later."
   },
   "onboarding": {
     "menuGenerating": "Generating your menu...",

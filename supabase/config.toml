@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.backfill-chef-profiles]
 verify_jwt = false
+
+[functions.food-safety-followup-cron]
+verify_jwt = false

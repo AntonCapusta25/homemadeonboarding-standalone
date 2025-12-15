@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
-import { ShieldCheck, ArrowLeft, ExternalLink, CheckCircle, Play } from "lucide-react";
+import { ShieldCheck, ArrowLeft, ExternalLink, CheckCircle, Play, Clock } from "lucide-react";
+import { TermsOfServiceModal, TosAcceptanceData } from "@/components/onboarding/TermsOfServiceModal";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface FoodSafetyInfoStepProps {
-  onComplete: () => void;
+  onComplete: (tosData?: TosAcceptanceData) => void;
   onPrevious: () => void;
+  onSkip: () => void;
+  chefProfileId: string | null;
+  chefEmail?: string;
+  chefName?: string;
+  plan?: string;
 }
 
 const foodSafetyVideos = [
@@ -31,10 +39,20 @@ const foodSafetyVideos = [
 
 const foodSafetyQuizUrl = "https://zol4dc90rf4.typeform.com/to/fORAE4HR";
 
-export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoStepProps) {
+export function FoodSafetyInfoStep({ 
+  onComplete, 
+  onPrevious, 
+  onSkip,
+  chefProfileId,
+  chefEmail,
+  chefName,
+  plan
+}: FoodSafetyInfoStepProps) {
   const { t, i18n } = useTranslation();
   const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set());
   const [quizCompleted, setQuizCompleted] = useState(false);
+  const [showTosModal, setShowTosModal] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
 
   const handleWatchVideo = (videoId: string, url: string) => {
     window.open(url, "_blank");
@@ -44,6 +62,50 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
   const handleTakeQuiz = () => {
     window.open(foodSafetyQuizUrl, "_blank");
     setQuizCompleted(true);
+  };
+
+  const handleSkip = async () => {
+    setIsSkipping(true);
+    try {
+      // Record skip timestamp in database
+      if (chefProfileId) {
+        await supabase
+          .from('chef_verification')
+          .update({ 
+            food_safety_skipped_at: new Date().toISOString(),
+            food_safety_followup_sent: false
+          })
+          .eq('chef_profile_id', chefProfileId);
+      }
+
+      // Send immediate follow-up email
+      if (chefEmail) {
+        await supabase.functions.invoke('send-notification-email', {
+          body: {
+            type: 'food_safety_skipped',
+            chefName: chefName || 'Chef',
+            email: chefEmail,
+          }
+        });
+      }
+
+      toast.info(t("verification.skippedFoodSafety", "We'll remind you to complete food safety training later."));
+      onSkip();
+    } catch (error) {
+      console.error('Error handling skip:', error);
+      onSkip();
+    } finally {
+      setIsSkipping(false);
+    }
+  };
+
+  const handleCompleteClick = () => {
+    setShowTosModal(true);
+  };
+
+  const handleTosAccept = (tosData: TosAcceptanceData) => {
+    setShowTosModal(false);
+    onComplete(tosData);
   };
 
   const allVideosWatched = watchedVideos.size === foodSafetyVideos.length;
@@ -138,15 +200,40 @@ export function FoodSafetyInfoStep({ onComplete, onPrevious }: FoodSafetyInfoSte
         </div>
       </div>
 
-      <div className="flex justify-between pt-8 mt-auto border-t border-border">
-        <Button variant="ghost" onClick={onPrevious}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t("common.back", "Back")}
-        </Button>
-        <Button onClick={onComplete} size="lg" variant="default" disabled={!canComplete}>
-          {t("verification.complete", "Complete")}
-        </Button>
+      <div className="flex flex-col gap-3 pt-8 mt-auto border-t border-border">
+        <div className="flex justify-between">
+          <Button variant="ghost" onClick={onPrevious}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            {t("common.back", "Back")}
+          </Button>
+          <Button onClick={handleCompleteClick} size="lg" variant="default" disabled={!canComplete}>
+            {t("verification.complete", "Complete")}
+          </Button>
+        </div>
+        
+        {/* Skip button */}
+        <div className="flex justify-center">
+          <Button 
+            variant="link" 
+            className="text-muted-foreground hover:text-foreground"
+            onClick={handleSkip}
+            disabled={isSkipping}
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            {isSkipping 
+              ? t("common.loading", "Loading...") 
+              : t("verification.skipForNow", "Skip for now, I'll do it later")}
+          </Button>
+        </div>
       </div>
+
+      {/* TOS Modal */}
+      <TermsOfServiceModal
+        isOpen={showTosModal}
+        onClose={() => setShowTosModal(false)}
+        onAccept={handleTosAccept}
+        plan={(plan as 'basic' | 'pro' | 'advanced') || 'basic'}
+      />
     </div>
   );
 }
