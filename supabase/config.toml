@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.create-hyperzod-merchant]
 verify_jwt = false
+
+[functions.test-hyperzod-connection]
+verify_jwt = false
