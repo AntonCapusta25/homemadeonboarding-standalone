@@ -361,7 +361,9 @@
     "videoStorage": "Voedselopslag",
     "takeQuiz": "Maak de Quiz",
     "quizRequired": "Je moet alle video's bekijken voordat je de quiz kunt maken",
-    "openQuiz": "Open Voedselveiligheidsquiz"
+    "openQuiz": "Open Voedselveiligheidsquiz",
+    "skipForNow": "Sla voor nu over, ik doe het later",
+    "skippedFoodSafety": "We sturen je een herinnering om de voedselveiligheidstraining te voltooien."
   },
   "onboarding": {
     "menuGenerating": "Menu wordt gegenereerd...",

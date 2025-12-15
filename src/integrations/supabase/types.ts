@@ -191,6 +191,8 @@ export type Database = {
           chef_profile_id: string
           created_at: string
           documents_uploaded: boolean | null
+          food_safety_followup_sent: boolean | null
+          food_safety_skipped_at: string | null
           food_safety_viewed: boolean | null
           haccp_document_url: string | null
           id: string
@@ -204,6 +206,8 @@ export type Database = {
           chef_profile_id: string
           created_at?: string
           documents_uploaded?: boolean | null
+          food_safety_followup_sent?: boolean | null
+          food_safety_skipped_at?: string | null
           food_safety_viewed?: boolean | null
           haccp_document_url?: string | null
           id?: string
@@ -217,6 +221,8 @@ export type Database = {
           chef_profile_id?: string
           created_at?: string
           documents_uploaded?: boolean | null
+          food_safety_followup_sent?: boolean | null
+          food_safety_skipped_at?: string | null
           food_safety_viewed?: boolean | null
           haccp_document_url?: string | null
           id?: string

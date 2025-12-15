@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface NotificationEmailRequest {
-  type: 'abandonment' | 'welcome' | 'new_signup';
+  type: 'abandonment' | 'welcome' | 'new_signup' | 'food_safety_skipped' | 'food_safety_followup';
   chefName: string;
   email: string;
   phone?: string;
@@ -157,6 +157,62 @@ const handler = async (req: Request): Promise<Response> => {
           
           <p style="font-size: 16px; color: #333; background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fecaca;">
             <strong>⏰ Action Required:</strong> Please review their profile and reach out to complete their verification.
+          </p>
+        </div>
+      `;
+    } else if (type === 'food_safety_skipped') {
+      // Send reminder email to chef who skipped food safety
+      toEmail = email;
+      subject = `Don't forget to complete your Food Safety Training! 🍳`;
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #f97316;">Hi ${chefName}! 👋</h1>
+          <p style="font-size: 16px; color: #333;">
+            We noticed you skipped the food safety training step. No worries - you can complete it whenever you're ready!
+          </p>
+          <div style="background: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fed7aa;">
+            <h3 style="margin-top: 0; color: #c2410c;">Why complete Food Safety Training?</h3>
+            <ul style="color: #333;">
+              <li>Required for approval to start selling on Homemade</li>
+              <li>Learn essential food handling practices</li>
+              <li>Protect your customers and your business</li>
+              <li>Takes only about 30 minutes to complete</li>
+            </ul>
+          </div>
+          <p style="font-size: 16px; color: #333;">
+            When you're ready, just log back into your account and complete the training videos and quiz.
+          </p>
+          <p style="color: #666;">
+            Best regards,<br>
+            The Homemade Team
+          </p>
+        </div>
+      `;
+    } else if (type === 'food_safety_followup') {
+      // Send 3-day follow-up reminder
+      toEmail = email;
+      subject = `Reminder: Complete your Food Safety Training to get approved! ⏰`;
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #f97316;">Hi ${chefName}! 👋</h1>
+          <p style="font-size: 16px; color: #333;">
+            This is a friendly reminder that your food safety training is still waiting to be completed.
+          </p>
+          <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fcd34d;">
+            <h3 style="margin-top: 0; color: #92400e;">⚠️ Action Required</h3>
+            <p style="color: #333; margin-bottom: 0;">
+              Complete your food safety training to get approved and start earning on Homemade!
+            </p>
+          </div>
+          <p style="font-size: 16px; color: #333;">
+            The training only takes about 30 minutes. Watch 3 short videos and complete a simple quiz.
+          </p>
+          <p style="font-size: 16px; color: #333;">
+            Need help? Reply to this email or contact us anytime!
+          </p>
+          <p style="color: #666;">
+            Best regards,<br>
+            The Homemade Team
           </p>
         </div>
       `;
