@@ -25,6 +25,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ChefWithStats } from '@/hooks/useChefProfiles';
+import { calculateFullProgress } from '@/lib/chefProgress';
+import JSZip from 'jszip';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -179,7 +181,7 @@ export function ChefDetailsModal({
     }
   };
 
-  const handleMenuDownload = (fileType: 'csv' | 'txt') => {
+  const handleMenuDownload = async () => {
     if (!menu || menu.dishes.length === 0) {
       toast({ title: 'No menu', description: 'This chef has no menu to download', variant: 'destructive' });
       return;
@@ -192,114 +194,110 @@ export function ChefDetailsModal({
     const mainDishes = menu.dishes.filter(d => !d.is_upsell);
     const extras = menu.dishes.filter(d => d.is_upsell);
 
-    if (fileType === 'csv') {
-      // Build extras option string for CSV (semicolon-separated variants)
-      const buildExtrasOption = () => {
-        if (extras.length === 0) return { id: '', name: '', variants: '' };
-        const optionId = `extras-${Date.now()}`;
-        const variants = extras.map(u => {
-          const price = Number(u.price).toFixed(0);
-          const desc = u.description || u.name;
-          return `${u.name},${price},0,1,${desc},,${u.id}`;
-        }).join(';');
-        return { id: optionId, name: 'Extras', variants };
-      };
+    // Build extras option string for CSV
+    const buildExtrasOption = () => {
+      if (extras.length === 0) return { id: '', name: '', variants: '' };
+      const optionId = `extras-${Date.now()}`;
+      const variants = extras.map(u => {
+        const price = Number(u.price).toFixed(0);
+        const desc = u.description || u.name;
+        return `${u.name},${price},0,1,${desc},,${u.id}`;
+      }).join(';');
+      return { id: optionId, name: 'Extras', variants };
+    };
 
-      const extrasOption = buildExtrasOption();
+    const extrasOption = buildExtrasOption();
 
-      const csvHeaders = [
-        'PRODUCT.ID', 'PRODUCT.NAME', 'PRODUCT.DESCRIPTION', 'PRODUCT.SKU',
-        'PRODUCT.PRICE.SELLING', 'PRODUCT.PRICE.COST', 'PRODUCT.PRICE.COMPARE',
-        'PRODUCT.TAX_PERCENT', 'PRODUCT.STATUS', 'PRODUCT.INVENTORY',
-        'PRODUCT.MIN.MAX.QUANTITY', 'PRODUCT.LABELS', 'PRODUCT.CATEGORY',
-        'PRODUCT.TAGS', 'PRODUCT.IMAGES', 'OPTION1.ID', 'OPTION1.NAME',
-        'OPTION1.TYPE', 'OPTION1.ENABLE_RANGE', 'OPTION1.RANGE', 'OPTION1.REQUIRED',
-        'OPTION1.VIEW', 'OPTION1.VARIANTS', 'OPTION2.ID', 'OPTION2.NAME',
-        'OPTION2.TYPE', 'OPTION2.ENABLE_RANGE', 'OPTION2.RANGE', 'OPTION2.REQUIRED',
-        'OPTION2.VIEW', 'OPTION2.VARIANTS'
-      ];
+    // Generate CSV content
+    const csvHeaders = [
+      'PRODUCT.ID', 'PRODUCT.NAME', 'PRODUCT.DESCRIPTION', 'PRODUCT.SKU',
+      'PRODUCT.PRICE.SELLING', 'PRODUCT.PRICE.COST', 'PRODUCT.PRICE.COMPARE',
+      'PRODUCT.TAX_PERCENT', 'PRODUCT.STATUS', 'PRODUCT.INVENTORY',
+      'PRODUCT.MIN.MAX.QUANTITY', 'PRODUCT.LABELS', 'PRODUCT.CATEGORY',
+      'PRODUCT.TAGS', 'PRODUCT.IMAGES', 'OPTION1.ID', 'OPTION1.NAME',
+      'OPTION1.TYPE', 'OPTION1.ENABLE_RANGE', 'OPTION1.RANGE', 'OPTION1.REQUIRED',
+      'OPTION1.VIEW', 'OPTION1.VARIANTS', 'OPTION2.ID', 'OPTION2.NAME',
+      'OPTION2.TYPE', 'OPTION2.ENABLE_RANGE', 'OPTION2.RANGE', 'OPTION2.REQUIRED',
+      'OPTION2.VIEW', 'OPTION2.VARIANTS'
+    ];
 
-      const escapeCSV = (val: string) => {
-        const str = String(val || '').replace(/"/g, '""');
-        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
-      };
+    const escapeCSV = (val: string) => {
+      const str = String(val || '').replace(/"/g, '""');
+      return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
+    };
 
-      const placeholderImage = 'https://placehold.co/400x300/f5f5f5/999999?text=Food+Image';
+    const placeholderImage = 'https://placehold.co/400x300/f5f5f5/999999?text=Food+Image';
 
-      const mainDishRows = mainDishes.map((dish) => {
-        const desc = dish.description ? `<p>${dish.description}</p>` : '';
-        const category = dish.category || 'Main Dishes';
-        
-        return [
-          dish.id, dish.name, desc, '',
-          Number(dish.price).toFixed(2), '', '', '',
-          'ACTIVE', '100', '1,50', '', category, '', placeholderImage,
-          extrasOption.id, extrasOption.name,
-          extras.length > 0 ? 'multiple' : '',
-          extras.length > 0 ? 'NO' : '',
-          extras.length > 0 ? '0,0' : '',
-          extras.length > 0 ? 'NO' : '',
-          extras.length > 0 ? 'LIST' : '',
-          extrasOption.variants,
-          '', '', '', '', '', '', '', ''
-        ].map(escapeCSV).join(',');
+    const mainDishRows = mainDishes.map((dish) => {
+      const desc = dish.description ? `<p>${dish.description}</p>` : '';
+      const category = dish.category || 'Main Dishes';
+      
+      return [
+        dish.id, dish.name, desc, '',
+        Number(dish.price).toFixed(2), '', '', '',
+        'ACTIVE', '100', '1,50', '', category, '', placeholderImage,
+        extrasOption.id, extrasOption.name,
+        extras.length > 0 ? 'multiple' : '',
+        extras.length > 0 ? 'NO' : '',
+        extras.length > 0 ? '0,0' : '',
+        extras.length > 0 ? 'NO' : '',
+        extras.length > 0 ? 'LIST' : '',
+        extrasOption.variants,
+        '', '', '', '', '', '', '', ''
+      ].map(escapeCSV).join(',');
+    });
+
+    const extrasRows = extras.map((dish) => {
+      const desc = dish.description ? `<p>${dish.description}</p>` : '';
+      const category = dish.category || 'Extras';
+      
+      return [
+        dish.id, dish.name, desc, '',
+        Number(dish.price).toFixed(2), '', '', '',
+        'ACTIVE', '100', '1,50', 'extra', category, '', placeholderImage,
+        '', '', '', '', '', '', '', '',
+        '', '', '', '', '', '', '', ''
+      ].map(escapeCSV).join(',');
+    });
+
+    const csvContent = [csvHeaders.join(','), ...mainDishRows, ...extrasRows].join('\n');
+
+    // Generate text content
+    const dishesByCategory: Record<string, typeof menu.dishes> = {};
+    menu.dishes.forEach((dish) => {
+      const category = dish.category || 'Other';
+      if (!dishesByCategory[category]) {
+        dishesByCategory[category] = [];
+      }
+      dishesByCategory[category].push(dish);
+    });
+
+    let textContent = '';
+    Object.entries(dishesByCategory).forEach(([category, dishes]) => {
+      textContent += `## ${category}\n\n`;
+      dishes.forEach((dish) => {
+        const desc = dish.description || '';
+        const price = `€${Number(dish.price).toFixed(2)}`;
+        textContent += `**${dish.name}** — ${desc} — ${price}  \n`;
       });
+      textContent += '\n---\n\n';
+    });
+    textContent = textContent.replace(/\n---\n\n$/, '\n');
 
-      const extrasRows = extras.map((dish) => {
-        const desc = dish.description ? `<p>${dish.description}</p>` : '';
-        const category = dish.category || 'Extras';
-        
-        return [
-          dish.id, dish.name, desc, '',
-          Number(dish.price).toFixed(2), '', '', '',
-          'ACTIVE', '100', '1,50', 'extra', category, '', placeholderImage,
-          '', '', '', '', '', '', '', '',
-          '', '', '', '', '', '', '', ''
-        ].map(escapeCSV).join(',');
-      });
-
-      const csvContent = [csvHeaders.join(','), ...mainDishRows, ...extrasRows].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${businessName}_menu_${dateStr}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: 'Downloaded', description: 'Menu CSV file downloaded' });
-
-    } else {
-      // Text document
-      const dishesByCategory: Record<string, typeof menu.dishes> = {};
-      menu.dishes.forEach((dish) => {
-        const category = dish.category || 'Other';
-        if (!dishesByCategory[category]) {
-          dishesByCategory[category] = [];
-        }
-        dishesByCategory[category].push(dish);
-      });
-
-      let textContent = '';
-      Object.entries(dishesByCategory).forEach(([category, dishes]) => {
-        textContent += `## ${category}\n\n`;
-        dishes.forEach((dish) => {
-          const desc = dish.description || '';
-          const price = `€${Number(dish.price).toFixed(2)}`;
-          textContent += `**${dish.name}** — ${desc} — ${price}  \n`;
-        });
-        textContent += '\n---\n\n';
-      });
-      textContent = textContent.replace(/\n---\n\n$/, '\n');
-
-      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${businessName}_menu_${dateStr}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: 'Downloaded', description: 'Menu text file downloaded' });
-    }
+    // Create ZIP file with both
+    const zip = new JSZip();
+    zip.file(`${businessName}_menu.csv`, csvContent);
+    zip.file(`${businessName}_menu.txt`, textContent);
+    
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${businessName}_menu_${dateStr}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({ title: 'Downloaded', description: 'Menu ZIP file downloaded (CSV + Text)' });
   };
 
   const handleTaskClick = (task: TaskData) => {
@@ -426,7 +424,9 @@ export function ChefDetailsModal({
   const completedVerification = verificationTasks.filter(t => t.completed).length;
   const totalTasks = onboardingTasks.length + verificationTasks.length;
   const completedTasks = completedOnboarding + completedVerification;
-  const progressPercent = Math.round((completedTasks / totalTasks) * 100);
+  
+  // Use shared progress calculation for consistency with table view
+  const progressPercent = calculateFullProgress(chef, verification);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -638,14 +638,10 @@ export function ChefDetailsModal({
                   <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
                 ) : (
                   <>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleMenuDownload('csv')} className="gap-2">
+                    <div className="flex justify-end">
+                      <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
                         <Download className="w-4 h-4" />
-                        Download CSV
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleMenuDownload('txt')} className="gap-2">
-                        <Download className="w-4 h-4" />
-                        Download Text
+                        Download Menu (ZIP)
                       </Button>
                     </div>
                     {menu.summary && (
