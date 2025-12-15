@@ -50,6 +50,7 @@ import {
   Eye,
   Download,
   RefreshCw,
+  Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -666,6 +667,7 @@ export default function AdminDashboard() {
                   <TableHead className="min-w-[200px]">Chef</TableHead>
                   <TableHead className="min-w-[100px]">City</TableHead>
                   <TableHead className="min-w-[120px]">Progress</TableHead>
+                  <TableHead className="min-w-[80px]">Quiz</TableHead>
                   <TableHead className="min-w-[140px]">Assigned To</TableHead>
                   <TableHead className="min-w-[150px]">Status</TableHead>
                   <TableHead className="min-w-[180px]">Notes</TableHead>
@@ -809,6 +811,24 @@ export default function AdminDashboard() {
                             </div>
                           );
                         })()}
+                      </TableCell>
+                      <TableCell>
+                        {chef.verification_quiz_completed ? (
+                          <div className="flex items-center gap-1">
+                            <Award className={cn(
+                              "w-4 h-4",
+                              chef.verification_quiz_passed ? "text-green-600" : "text-orange-500"
+                            )} />
+                            <span className={cn(
+                              "text-sm font-medium",
+                              chef.verification_quiz_passed ? "text-green-600" : "text-orange-500"
+                            )}>
+                              {chef.verification_quiz_score}%
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Select
