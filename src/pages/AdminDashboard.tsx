@@ -54,7 +54,8 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { calculateOnboardingProgress, calculateVerificationProgress } from '@/lib/chefProgress';
+import { calculateOnboardingProgress, calculateVerificationProgress, getOnboardingTasks, getVerificationTasks, getIncompleteTasks } from '@/lib/chefProgress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -727,34 +728,76 @@ export default function AdminDashboard() {
                         {(() => {
                           const onboardingProgress = calculateOnboardingProgress(chef);
                           const verificationProgress = calculateVerificationProgress(chef);
+                          const incompleteOnboarding = getIncompleteTasks(getOnboardingTasks(chef));
+                          const incompleteVerification = getIncompleteTasks(getVerificationTasks(chef));
                           return (
                             <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground w-12">Onboard</span>
-                                <div className="flex-1 bg-secondary rounded-full h-2 min-w-[40px]">
-                                  <div
-                                    className={cn(
-                                      "h-2 rounded-full transition-all",
-                                      onboardingProgress === 100 ? "bg-green-500" : "bg-primary"
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2 cursor-help">
+                                      <span className="text-xs text-muted-foreground w-12">Onboard</span>
+                                      <div className="flex-1 bg-secondary rounded-full h-2 min-w-[40px]">
+                                        <div
+                                          className={cn(
+                                            "h-2 rounded-full transition-all",
+                                            onboardingProgress === 100 ? "bg-green-500" : "bg-primary"
+                                          )}
+                                          style={{ width: `${onboardingProgress}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs font-medium w-8">{onboardingProgress}%</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-[200px]">
+                                    {incompleteOnboarding.length === 0 ? (
+                                      <p className="text-green-600">All tasks complete!</p>
+                                    ) : (
+                                      <div>
+                                        <p className="font-medium mb-1">Missing:</p>
+                                        <ul className="text-xs space-y-0.5">
+                                          {incompleteOnboarding.map(t => (
+                                            <li key={t}>• {t}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
                                     )}
-                                    style={{ width: `${onboardingProgress}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs font-medium w-8">{onboardingProgress}%</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground w-12">Verify</span>
-                                <div className="flex-1 bg-secondary rounded-full h-2 min-w-[40px]">
-                                  <div
-                                    className={cn(
-                                      "h-2 rounded-full transition-all",
-                                      verificationProgress === 100 ? "bg-green-500" : "bg-blue-500"
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2 cursor-help">
+                                      <span className="text-xs text-muted-foreground w-12">Verify</span>
+                                      <div className="flex-1 bg-secondary rounded-full h-2 min-w-[40px]">
+                                        <div
+                                          className={cn(
+                                            "h-2 rounded-full transition-all",
+                                            verificationProgress === 100 ? "bg-green-500" : "bg-blue-500"
+                                          )}
+                                          style={{ width: `${verificationProgress}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs font-medium w-8">{verificationProgress}%</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-[200px]">
+                                    {incompleteVerification.length === 0 ? (
+                                      <p className="text-green-600">All tasks complete!</p>
+                                    ) : (
+                                      <div>
+                                        <p className="font-medium mb-1">Missing:</p>
+                                        <ul className="text-xs space-y-0.5">
+                                          {incompleteVerification.map(t => (
+                                            <li key={t}>• {t}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
                                     )}
-                                    style={{ width: `${verificationProgress}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs font-medium w-8">{verificationProgress}%</span>
-                              </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                           );
                         })()}
