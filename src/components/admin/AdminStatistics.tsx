@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, TrendingUp, Phone, Calendar, Activity, ChevronDown, ChevronUp, Star, Award, Trophy, Medal } from 'lucide-react';
+import { TrendingUp, Phone, Calendar, Activity, ChevronDown, ChevronUp, Star, Award, Trophy, Medal } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { AdminStats } from '@/hooks/useAdminStatistics';
@@ -55,8 +55,8 @@ const getRatingTier = (score: number): { label: string; color: string; icon: typ
   if (score >= 80) return { label: 'Top Performer', color: 'text-yellow-500', icon: Trophy, stars: 5 };
   if (score >= 60) return { label: 'High Achiever', color: 'text-emerald-500', icon: Award, stars: 4 };
   if (score >= 40) return { label: 'Solid Progress', color: 'text-blue-500', icon: Medal, stars: 3 };
-  if (score >= 20) return { label: 'Building Up', color: 'text-orange-500', icon: Star, stars: 2 };
-  return { label: 'Getting Started', color: 'text-gray-500', icon: Star, stars: 1 };
+  if (score >= 20) return { label: 'Building Up', color: 'text-orange-500', icon: Medal, stars: 2 };
+  return { label: 'Rookie', color: 'text-gray-500', icon: Award, stars: 1 };
 };
 
 export const AdminStatistics = ({ stats, loading, error }: AdminStatisticsProps) => {
