@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.typeform-webhook]
 verify_jwt = false
+
+[functions.sync-typeform-quizzes]
+verify_jwt = false
+
+[functions.create-hyperzod-merchant]
+verify_jwt = false

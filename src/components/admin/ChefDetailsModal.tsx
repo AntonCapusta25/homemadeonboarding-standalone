@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download
+  Download, Store
 } from 'lucide-react';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { useAuth } from '@/hooks/useAuth';
@@ -104,6 +104,7 @@ export function ChefDetailsModal({
   const [adminStatus, setAdminStatus] = useState(chef.admin_status || 'new');
   const [adminNotes, setAdminNotes] = useState(chef.admin_notes || '');
   const [saving, setSaving] = useState(false);
+  const [creatingMerchant, setCreatingMerchant] = useState(false);
 
   useEffect(() => {
     if (isOpen && chef.id) {
@@ -191,6 +192,47 @@ export function ChefDetailsModal({
       if (error) {
         toast({ title: 'Error', description: 'Failed to save notes', variant: 'destructive' });
       }
+    }
+  };
+
+  const handleCreateMerchant = async () => {
+    setCreatingMerchant(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-hyperzod-merchant', {
+        body: { chef }
+      });
+
+      if (error) {
+        console.error('Merchant creation error:', error);
+        toast({ 
+          title: 'Error', 
+          description: error.message || 'Failed to create merchant', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      if (data?.success) {
+        toast({ 
+          title: 'Merchant Created', 
+          description: `Successfully created merchant in Hyperzod` 
+        });
+      } else {
+        toast({ 
+          title: 'Error', 
+          description: data?.error || 'Failed to create merchant', 
+          variant: 'destructive' 
+        });
+      }
+    } catch (err: any) {
+      console.error('Error creating merchant:', err);
+      toast({ 
+        title: 'Error', 
+        description: err?.message || 'Failed to create merchant', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setCreatingMerchant(false);
     }
   };
 
@@ -544,7 +586,7 @@ export function ChefDetailsModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between gap-4">
           <DialogTitle className="flex items-center gap-3">
             <span>{chef.business_name || chef.chef_name || 'Chef Details'}</span>
             <Badge className={progressPercent === 100 ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>
@@ -552,6 +594,23 @@ export function ChefDetailsModal({
             </Badge>
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           </DialogTitle>
+          <Button 
+            onClick={handleCreateMerchant} 
+            disabled={creatingMerchant}
+            className="ml-auto mr-8"
+          >
+            {creatingMerchant ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Store className="w-4 h-4 mr-2" />
+                Create Merchant
+              </>
+            )}
+          </Button>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
