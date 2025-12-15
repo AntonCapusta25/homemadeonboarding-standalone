@@ -132,20 +132,41 @@ export const AdminStatistics = ({ stats, loading, error }: AdminStatisticsProps)
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {rankedStats.map((admin) => {
             const TierIcon = admin.tier.icon;
+            // Top 3 get special trophy colors
+            const rankColor = admin.rank === 1 
+              ? 'text-yellow-500' 
+              : admin.rank === 2 
+                ? 'text-gray-400' 
+                : admin.rank === 3 
+                  ? 'text-amber-600' 
+                  : admin.tier.color;
+            const RankIcon = admin.rank <= 3 ? Trophy : TierIcon;
+            
             return (
               <Card key={admin.adminId} className={cn(
                 "hover:shadow-lg transition-shadow h-full relative overflow-hidden",
-                admin.rank === 1 && "ring-2 ring-yellow-400/50 bg-gradient-to-br from-yellow-50/50 to-transparent"
+                admin.rank === 1 && "ring-2 ring-yellow-400/50 bg-gradient-to-br from-yellow-50/50 to-transparent",
+                admin.rank === 2 && "ring-2 ring-gray-300/50 bg-gradient-to-br from-gray-50/50 to-transparent",
+                admin.rank === 3 && "ring-2 ring-amber-400/50 bg-gradient-to-br from-amber-50/50 to-transparent"
               )}>
                 {/* Rank Badge */}
                 <div className={cn(
-                  "absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
-                  admin.rank === 1 && "bg-yellow-100 text-yellow-700",
-                  admin.rank === 2 && "bg-gray-200 text-gray-700",
-                  admin.rank === 3 && "bg-orange-100 text-orange-700",
-                  admin.rank > 3 && "bg-muted text-muted-foreground"
+                  "absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center",
+                  admin.rank === 1 && "bg-yellow-100",
+                  admin.rank === 2 && "bg-gray-100",
+                  admin.rank === 3 && "bg-amber-100",
+                  admin.rank > 3 && "bg-muted"
                 )}>
-                  #{admin.rank}
+                  {admin.rank <= 3 ? (
+                    <Trophy className={cn(
+                      "h-5 w-5",
+                      admin.rank === 1 && "text-yellow-500 fill-yellow-200",
+                      admin.rank === 2 && "text-gray-400 fill-gray-200",
+                      admin.rank === 3 && "text-amber-600 fill-amber-200"
+                    )} />
+                  ) : (
+                    <span className="text-sm font-bold text-muted-foreground">#{admin.rank}</span>
+                  )}
                 </div>
 
                 <CardHeader className="pb-3">
@@ -160,9 +181,9 @@ export const AdminStatistics = ({ stats, loading, error }: AdminStatisticsProps)
 
                   {/* Performance Rating */}
                   <div className="flex items-center gap-2 mt-3">
-                    <TierIcon className={cn("h-5 w-5", admin.tier.color)} />
-                    <span className={cn("text-sm font-semibold", admin.tier.color)}>
-                      {admin.tier.label}
+                    <RankIcon className={cn("h-5 w-5", rankColor)} />
+                    <span className={cn("text-sm font-semibold", rankColor)}>
+                      {admin.rank <= 3 ? `#${admin.rank} ${admin.tier.label}` : admin.tier.label}
                     </span>
                     <div className="flex items-center ml-auto">
                       {Array.from({ length: 5 }).map((_, i) => (
