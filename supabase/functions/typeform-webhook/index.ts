@@ -6,6 +6,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, typeform-signature',
 };
 
+const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
+
+// Only process the real Food Safety quiz form.
+// If Typeform sends test/other forms here, we acknowledge with 200 to avoid webhook failures.
+const ALLOWED_FORM_IDS = new Set(['fORAE4HR']);
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function sanitizeEmail(email: string | null): string | null {
+  const trimmed = email?.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > 255) return null;
+  return EMAIL_REGEX.test(trimmed) ? trimmed : null;
+}
+
+function sanitizeChefId(id: string | null): string | null {
+  const trimmed = id?.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > 64) return null;
+  return UUID_REGEX.test(trimmed) ? trimmed : null;
+}
+
+
 interface TypeformVariable {
   key: string;
   type: string;
@@ -158,33 +182,46 @@ serve(async (req) => {
 
   try {
     const payload: TypeformPayload = await req.json();
-    console.log('Received Typeform webhook:', JSON.stringify(payload, null, 2));
+
+    const formId = payload.form_response?.form_id;
+    const eventId = payload.event_id;
+
+    // Minimal logging (avoid dumping full quiz answers / PII)
+    console.log('Typeform webhook received', { eventId, formId });
+
+    if (!formId || !ALLOWED_FORM_IDS.has(formId)) {
+      return new Response(
+        JSON.stringify({ ignored: true, reason: 'unrecognized_form', formId }),
+        { status: 200, headers: jsonHeaders }
+      );
+    }
 
     const { form_response } = payload;
     const submittedAt = form_response.submitted_at;
-    
+
     // Extract data using helper functions
-    const chefEmail = extractEmail(payload);
-    const chefIdFromHidden = extractChefId(payload);
+    const chefEmail = sanitizeEmail(extractEmail(payload));
+    const chefIdFromHidden = sanitizeChefId(extractChefId(payload));
     const { score: quizScore, maxScore } = extractScore(payload);
-    
+
     // Calculate percentage score
     const scorePercentage = maxScore > 0 ? Math.round((quizScore / maxScore) * 100) : 0;
-    
-    console.log(`Quiz completed - Email: ${chefEmail}, Chef ID: ${chefIdFromHidden}, Raw Score: ${quizScore}/${maxScore}, Percentage: ${scorePercentage}%`);
+
+    console.log('Quiz identifiers extracted', {
+      hasEmail: !!chefEmail,
+      hasChefId: !!chefIdFromHidden,
+      scorePercentage,
+    });
 
     if (!chefEmail && !chefIdFromHidden) {
-      console.error('No email or chef_id found in webhook payload. Make sure your Typeform has an email field or hidden fields.');
-      console.log('Available answers:', JSON.stringify(form_response.answers, null, 2));
-      console.log('Hidden fields:', JSON.stringify(form_response.hidden, null, 2));
-      console.log('Variables:', JSON.stringify(form_response.variables, null, 2));
-      
+      // Acknowledge (200) so Typeform doesn't mark the webhook as failing.
       return new Response(
-        JSON.stringify({ 
-          error: 'No email or chef_id found',
-          hint: 'Add an email field to your Typeform or use hidden fields (email or chef_id)'
+        JSON.stringify({
+          ignored: true,
+          reason: 'missing_identifier',
+          hint: 'Add hidden fields to the form URL: ?email=...&chef_id=... (and create matching hidden fields in Typeform)',
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: jsonHeaders }
       );
     }
 
@@ -225,7 +262,7 @@ serve(async (req) => {
           email: chefEmail,
           hint: 'Make sure the email matches the contact_email in chef_profiles table'
         }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 404, headers: jsonHeaders }
       );
     }
 
@@ -260,7 +297,7 @@ serve(async (req) => {
         console.error('Error inserting chef_verification:', insertError);
         return new Response(
           JSON.stringify({ error: 'Failed to save quiz results' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 500, headers: jsonHeaders }
         );
       }
     }
@@ -268,17 +305,15 @@ serve(async (req) => {
     console.log(`Quiz results saved for chef ${chefProfileId}: Score ${scorePercentage}% (${quizScore}/${maxScore}), Passed: ${passed}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         chefProfileId,
-        email: chefEmail,
         rawScore: quizScore,
         maxScore,
         scorePercentage,
         passed,
-        message: `Quiz results recorded. Score: ${scorePercentage}% (${quizScore}/${maxScore}), ${passed ? 'PASSED' : 'FAILED'}` 
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: jsonHeaders }
     );
 
   } catch (error: unknown) {
@@ -286,7 +321,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: jsonHeaders }
     );
   }
 });

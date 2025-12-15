@@ -61,7 +61,20 @@ export function FoodSafetyInfoStep({
   };
 
   const handleTakeQuiz = () => {
-    window.open(foodSafetyQuizUrl, "_blank");
+    const params = new URLSearchParams();
+
+    const email = chefEmail?.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email && email.length <= 255 && emailRegex.test(email)) {
+      params.set('email', email);
+    }
+
+    if (chefProfileId) {
+      params.set('chef_id', chefProfileId);
+    }
+
+    const url = params.toString() ? `${foodSafetyQuizUrl}?${params.toString()}` : foodSafetyQuizUrl;
+    window.open(url, "_blank", "noopener,noreferrer");
     setQuizCompleted(true);
   };
 
