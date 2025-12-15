@@ -92,6 +92,7 @@ serve(async (req) => {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${HYPERZOD_API_KEY}`,
+            'x-api-key': HYPERZOD_API_KEY,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'x-tenant': TENANT_ID,
@@ -99,9 +100,17 @@ serve(async (req) => {
           body: JSON.stringify(merchantPayload),
         });
 
+
         const responseText = await response.text();
         console.log(`${endpoint} response status: ${response.status}`);
         console.log(`${endpoint} response body: ${responseText.substring(0, 500)}`);
+
+        // If auth fails on the *known* working admin endpoint, stop immediately.
+        if (response.status === 401 || response.status === 403) {
+          lastError = `${response.status}: ${responseText.substring(0, 200)}`;
+          console.log(`Auth failed at ${endpoint}, stopping early: ${lastError}`);
+          break;
+        }
         
         if (response.ok) {
           try {
@@ -149,7 +158,10 @@ serve(async (req) => {
           success: false, 
           error: `Failed to create merchant. ${lastError}` 
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: lastError.startsWith('401') ? 401 : lastError.startsWith('403') ? 403 : 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       );
     }
 
