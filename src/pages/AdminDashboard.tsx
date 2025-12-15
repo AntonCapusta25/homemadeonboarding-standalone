@@ -5,7 +5,7 @@ import { useChefProfiles, ChefWithStats } from '@/hooks/useChefProfiles';
 import { useAdminStatistics } from '@/hooks/useAdminStatistics';
 import { AdminStatistics } from '@/components/admin/AdminStatistics';
 import { ChefDetailsModal } from '@/components/admin/ChefDetailsModal';
-import { LinkTypeformModal } from '@/components/admin/LinkTypeformModal';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,7 +52,6 @@ import {
   Download,
   RefreshCw,
   Award,
-  Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -83,7 +82,6 @@ export default function AdminDashboard() {
   const [selectedChef, setSelectedChef] = useState<ChefWithStats | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [showAllPending, setShowAllPending] = useState(false);
-  const [isLinkTypeformOpen, setIsLinkTypeformOpen] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -127,6 +125,34 @@ export default function AdminDashboard() {
       navigate('/auth');
     }
   }, [user, isAdmin, authLoading, navigate]);
+
+  // Auto-sync Typeform quiz responses
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    const syncQuizzes = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('sync-typeform-quizzes');
+        
+        if (error) {
+          console.error('Quiz sync error:', error);
+          return;
+        }
+
+        if (data?.count > 0) {
+          toast({
+            title: 'Quiz Data Synced',
+            description: `Linked ${data.count} new quiz result(s): ${data.newlyLinked.join(', ')}`,
+          });
+          refetch();
+        }
+      } catch (err) {
+        console.error('Quiz sync failed:', err);
+      }
+    };
+
+    syncQuizzes();
+  }, [user, isAdmin]);
 
   const handleStatusChange = async (chefId: string, newStatus: string) => {
     if (!user) return;
@@ -661,15 +687,6 @@ export default function AdminDashboard() {
                 Backfill Profiles
               </Button>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsLinkTypeformOpen(true)}
-                className="gap-2"
-              >
-                <Link2 className="w-4 h-4" />
-                Link Quiz
-              </Button>
             </div>
           </div>
 
@@ -1042,12 +1059,6 @@ export default function AdminDashboard() {
           }}
         />
       )}
-
-      <LinkTypeformModal
-        open={isLinkTypeformOpen}
-        onOpenChange={setIsLinkTypeformOpen}
-        onSuccess={refetch}
-      />
     </div>
   );
 }

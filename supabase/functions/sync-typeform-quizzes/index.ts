@@ -5,21 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface TypeformResponse {
-  responseId: string;
-  email: string | null;
-  score: number | null;
-  maxScore: number | null;
-  scorePercentage: number | null;
-  passed: boolean | null;
-  submittedAt: string;
-  matchedChef: {
-    id: string;
-    name: string;
-  } | null;
-  alreadyLinked: boolean;
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,17 +23,15 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const formId = 'fORAE4HR'; // Food safety quiz form ID
+    const formId = 'fORAE4HR';
 
-    console.log(`Fetching all responses from Typeform form: ${formId}`);
+    console.log(`Auto-syncing Typeform responses from form: ${formId}`);
 
     // Fetch responses from Typeform API
     const typeformResponse = await fetch(
       `https://api.typeform.com/forms/${formId}/responses?page_size=100`,
       {
-        headers: {
-          'Authorization': `Bearer ${typeformApiKey}`,
-        },
+        headers: { 'Authorization': `Bearer ${typeformApiKey}` },
       }
     );
 
@@ -56,7 +39,7 @@ Deno.serve(async (req) => {
       const errorText = await typeformResponse.text();
       console.error(`Typeform API error: ${typeformResponse.status} - ${errorText}`);
       return new Response(
-        JSON.stringify({ error: `Failed to fetch from Typeform: ${typeformResponse.status}` }),
+        JSON.stringify({ error: `Typeform API error: ${typeformResponse.status}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -64,30 +47,31 @@ Deno.serve(async (req) => {
     const typeformData = await typeformResponse.json();
     console.log(`Fetched ${typeformData.items?.length || 0} responses`);
 
-    // Get all chef profiles for matching
+    // Get all chef profiles
     const { data: chefProfiles } = await supabase
       .from('chef_profiles')
       .select('id, chef_name, business_name, contact_email');
 
-    // Get all existing verifications to check which are already linked
+    // Get existing verifications
     const { data: verifications } = await supabase
       .from('chef_verification')
-      .select('chef_profile_id, food_safety_quiz_completed, food_safety_quiz_score');
+      .select('chef_profile_id, food_safety_quiz_completed');
 
-    const verificationMap = new Map(
-      (verifications || []).map(v => [v.chef_profile_id, v])
+    const linkedChefIds = new Set(
+      (verifications || [])
+        .filter(v => v.food_safety_quiz_completed)
+        .map(v => v.chef_profile_id)
     );
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const responses: TypeformResponse[] = [];
+    const newlyLinked: string[] = [];
 
     for (const item of typeformData.items || []) {
       // Extract email
       let email: string | null = null;
       
-      // Check hidden fields
       if (item.hidden) {
-        for (const [key, value] of Object.entries(item.hidden)) {
+        for (const value of Object.values(item.hidden)) {
           if (typeof value === 'string' && emailRegex.test(value)) {
             email = value.toLowerCase();
             break;
@@ -95,7 +79,6 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Check answers
       if (!email && item.answers) {
         for (const answer of item.answers) {
           if (answer.type === 'email' && answer.email) {
@@ -108,6 +91,15 @@ Deno.serve(async (req) => {
           }
         }
       }
+
+      if (!email) continue;
+
+      // Find matching chef
+      const chef = (chefProfiles || []).find(
+        c => c.contact_email?.toLowerCase() === email
+      );
+
+      if (!chef || linkedChefIds.has(chef.id)) continue;
 
       // Extract score
       let quizScore: number | null = null;
@@ -124,56 +116,45 @@ Deno.serve(async (req) => {
         }
       }
 
-      let scorePercentage: number | null = null;
-      if (quizScore !== null && maxScore !== null && maxScore > 0) {
-        scorePercentage = Math.round((quizScore / maxScore) * 100);
+      if (quizScore === null || maxScore === null || maxScore === 0) continue;
+
+      const scorePercentage = Math.round((quizScore / maxScore) * 100);
+
+      // Check if verification record exists
+      const { data: existingVerification } = await supabase
+        .from('chef_verification')
+        .select('id')
+        .eq('chef_profile_id', chef.id)
+        .maybeSingle();
+
+      const verificationData = {
+        food_safety_quiz_completed: true,
+        food_safety_quiz_score: scorePercentage,
+        food_safety_quiz_passed: scorePercentage >= 80,
+        food_safety_quiz_completed_at: item.submitted_at || new Date().toISOString(),
+      };
+
+      if (existingVerification) {
+        await supabase
+          .from('chef_verification')
+          .update(verificationData)
+          .eq('chef_profile_id', chef.id);
+      } else {
+        await supabase
+          .from('chef_verification')
+          .insert({ chef_profile_id: chef.id, ...verificationData });
       }
 
-      // Find matching chef
-      let matchedChef: { id: string; name: string } | null = null;
-      let alreadyLinked = false;
-
-      if (email) {
-        const chef = (chefProfiles || []).find(
-          c => c.contact_email?.toLowerCase() === email
-        );
-        if (chef) {
-          matchedChef = {
-            id: chef.id,
-            name: chef.business_name || chef.chef_name || 'Unknown',
-          };
-          
-          // Check if already linked
-          const verification = verificationMap.get(chef.id);
-          if (verification?.food_safety_quiz_completed) {
-            alreadyLinked = true;
-          }
-        }
-      }
-
-      responses.push({
-        responseId: item.response_id,
-        email,
-        score: quizScore,
-        maxScore,
-        scorePercentage,
-        passed: scorePercentage !== null ? scorePercentage >= 80 : null,
-        submittedAt: item.submitted_at,
-        matchedChef,
-        alreadyLinked,
-      });
+      linkedChefIds.add(chef.id);
+      newlyLinked.push(chef.business_name || chef.chef_name || email);
+      console.log(`Auto-linked quiz to ${chef.business_name || chef.chef_name}: ${scorePercentage}%`);
     }
-
-    // Sort by submitted date descending
-    responses.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
 
     return new Response(
       JSON.stringify({ 
-        responses,
-        total: responses.length,
-        matched: responses.filter(r => r.matchedChef).length,
-        linked: responses.filter(r => r.alreadyLinked).length,
-        unlinked: responses.filter(r => r.matchedChef && !r.alreadyLinked).length,
+        success: true,
+        newlyLinked,
+        count: newlyLinked.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
