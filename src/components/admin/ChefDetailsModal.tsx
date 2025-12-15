@@ -26,6 +26,7 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ChefWithStats } from '@/hooks/useChefProfiles';
 import { calculateOnboardingProgress } from '@/lib/chefProgress';
+import { cn } from '@/lib/utils';
 import JSZip from 'jszip';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -552,20 +553,53 @@ export function ChefDetailsModal({
 
                 {/* Progress Card */}
                 <Card className="p-4">
-                  <h3 className="font-semibold mb-3">Progress Overview</h3>
-                  <div className="flex items-center gap-4 mb-2">
-                    <div className="flex-1 bg-secondary rounded-full h-3">
-                      <div
-                        className="bg-primary h-3 rounded-full transition-all"
-                        style={{ width: `${progressPercent}%` }}
-                      />
+                  <h3 className="font-semibold mb-4">Progress Overview</h3>
+                  
+                  {/* Onboarding Progress */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium">Onboarding</span>
+                      <span className="text-sm font-semibold">{progressPercent}%</span>
                     </div>
-                    <span className="font-semibold">{progressPercent}%</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-secondary rounded-full h-2">
+                        <div
+                          className={cn(
+                            "h-2 rounded-full transition-all",
+                            progressPercent === 100 ? "bg-green-500" : "bg-primary"
+                          )}
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {completedOnboarding} of {onboardingTasks.length} tasks
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {completedOnboarding} of {onboardingTasks.length} onboarding tasks completed
-                    {completedVerification > 0 && ` • ${completedVerification} of ${verificationTasks.length} verification tasks`}
-                  </p>
+                  
+                  {/* Verification Progress */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium">Verification</span>
+                      <span className="text-sm font-semibold">
+                        {Math.round((completedVerification / verificationTasks.length) * 100)}%
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-secondary rounded-full h-2">
+                        <div
+                          className={cn(
+                            "h-2 rounded-full transition-all",
+                            completedVerification === verificationTasks.length ? "bg-green-500" : "bg-blue-500"
+                          )}
+                          style={{ width: `${(completedVerification / verificationTasks.length) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {completedVerification} of {verificationTasks.length} tasks
+                    </p>
+                  </div>
                 </Card>
               </TabsContent>
 
