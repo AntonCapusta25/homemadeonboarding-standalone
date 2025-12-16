@@ -2,19 +2,21 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefProfile } from '@/types/onboarding';
 import { useTranslation } from 'react-i18next';
-import { FileCheck, ArrowRight, ArrowLeft, Upload, Check, Loader2, CheckCircle } from 'lucide-react';
+import { FileCheck, ArrowRight, ArrowLeft, Upload, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VerificationProgress } from '@/hooks/useVerification';
+import { TermsOfServiceModal, TosAcceptanceData } from '@/components/onboarding/TermsOfServiceModal';
 
 interface DocumentUploadStepProps {
   profile: ChefProfile;
   onUpdateProfile: (updates: Partial<ChefProfile>) => void;
-  onNext: () => void;
+  onNext: (tosData?: TosAcceptanceData) => void;
   onPrevious: () => void;
   onSkip: () => void;
   onDocumentUpload?: (docType: 'kvk' | 'haccp' | 'nvwa', url: string) => Promise<void>;
   verificationProgress?: VerificationProgress | null;
+  chefProfileId?: string | null;
 }
 
 interface DocumentType {
@@ -34,9 +36,12 @@ export function DocumentUploadStep({
   onPrevious, 
   onSkip,
   onDocumentUpload,
-  verificationProgress 
+  verificationProgress,
+  chefProfileId
 }: DocumentUploadStepProps) {
   const { t } = useTranslation();
+  const [showTosModal, setShowTosModal] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
   
   const [document, setDocument] = useState<DocumentType>({
     id: 'id',
@@ -49,7 +54,6 @@ export function DocumentUploadStep({
 
   // Load existing document URL from verification progress
   useEffect(() => {
-    // Check if any document was uploaded (using kvk field as ID document)
     const url = verificationProgress?.kvkDocumentUrl;
     if (url) {
       setDocument(prev => ({ ...prev, uploaded: true, url }));
@@ -71,7 +75,6 @@ export function DocumentUploadStep({
       }
 
       const fileExt = file.name.split('.').pop();
-      // Store in user's folder for RLS policy compliance
       const filePath = `${user.id}/id-${Date.now()}.${fileExt}`;
 
       const { error } = await supabase.storage
@@ -80,13 +83,9 @@ export function DocumentUploadStep({
 
       if (error) throw error;
 
-      // Store the file path (not public URL) - access requires authentication
       const storedPath = `verification-documents/${filePath}`;
-
-      // Update document state
       setDocument(prev => ({ ...prev, uploading: false, uploaded: true, url: storedPath }));
 
-      // Save to verification progress in database (reusing kvk field for ID)
       if (onDocumentUpload) {
         await onDocumentUpload('kvk', storedPath);
       }
@@ -96,6 +95,38 @@ export function DocumentUploadStep({
       console.error('Upload error:', error);
       setDocument(prev => ({ ...prev, uploading: false }));
       toast.error(t('verification.uploadError', 'Failed to upload document'));
+    }
+  };
+
+  const handleFinishClick = () => {
+    setShowTosModal(true);
+  };
+
+  const handleSkipClick = () => {
+    setIsSkipping(true);
+    setShowTosModal(true);
+  };
+
+  const handleTosAccept = async (tosData: TosAcceptanceData) => {
+    setShowTosModal(false);
+    
+    // Save TOS data to database
+    if (chefProfileId) {
+      await supabase
+        .from('chef_profiles')
+        .update({
+          tos_signature: tosData.signature,
+          tos_accepted_at: tosData.acceptedAt,
+          tos_plan_accepted: tosData.planAccepted,
+        })
+        .eq('id', chefProfileId);
+    }
+
+    if (isSkipping) {
+      setIsSkipping(false);
+      onSkip();
+    } else {
+      onNext(tosData);
     }
   };
 
@@ -184,20 +215,45 @@ export function DocumentUploadStep({
         </div>
       </div>
 
-      <div className="flex justify-between pt-8 mt-auto border-t border-border">
-        <Button variant="ghost" onClick={onPrevious}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t('common.back', 'Back')}
-        </Button>
-        <Button 
-          onClick={onNext} 
-          size="lg"
-          disabled={!document.uploaded}
-        >
-          {t('verification.finishVerification', 'Finish Verification')}
-          <ArrowRight className="w-5 h-5 ml-2" />
-        </Button>
+      <div className="flex flex-col gap-3 pt-8 mt-auto border-t border-border">
+        <div className="flex justify-between">
+          <Button variant="ghost" onClick={onPrevious}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            {t('common.back', 'Back')}
+          </Button>
+          <Button 
+            onClick={handleFinishClick} 
+            size="lg"
+            disabled={!document.uploaded}
+          >
+            {t('verification.finishVerification', 'Finish Verification')}
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+        </div>
+        
+        {/* Skip button */}
+        <div className="flex justify-center">
+          <Button 
+            variant="link" 
+            className="text-muted-foreground hover:text-foreground"
+            onClick={handleSkipClick}
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            {t("verification.skipForNow", "Skip for now, I'll do it later")}
+          </Button>
+        </div>
       </div>
+
+      {/* TOS Modal - shown at the end of verification */}
+      <TermsOfServiceModal
+        isOpen={showTosModal}
+        onClose={() => {
+          setShowTosModal(false);
+          setIsSkipping(false);
+        }}
+        onAccept={handleTosAccept}
+        plan={(profile.plan as 'basic' | 'pro' | 'advanced') || 'basic'}
+      />
     </div>
   );
 }
