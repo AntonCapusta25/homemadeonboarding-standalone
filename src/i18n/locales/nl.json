@@ -114,6 +114,7 @@
     "verificationSent": "We hebben je profiel gevonden! Controleer je e-mail om te verifiëren en door te gaan.",
     "verificationResent": "Verificatielink opnieuw verzonden!",
     "verificationFailed": "Verzenden mislukt. Probeer het opnieuw.",
+    "rateLimitError": "Te veel verzoeken. Wacht even en probeer het opnieuw.",
     "verificationRequired": "Verifieer eerst je e-mail door op de link te klikken die we hebben gestuurd.",
     "verificationSuccess": "E-mail geverifieerd! Je voortgang wordt hersteld..."
   },
