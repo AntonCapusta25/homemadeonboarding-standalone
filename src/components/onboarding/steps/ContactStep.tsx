@@ -1,10 +1,12 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
-import { Mail, Phone, User, Loader2 } from 'lucide-react';
+import { Mail, Phone, User, Loader2, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ContactStepProps {
   email: string;
@@ -16,15 +18,50 @@ interface ContactStepProps {
   onPrevious: () => void;
   onAccountCreated?: (userId: string) => void;
   onLookupByEmail?: (email: string) => Promise<boolean>;
+  onVerificationRequired?: (email: string) => void;
 }
 
-export function ContactStep({ email, phone, firstName = '', lastName = '', onChange, onNext, onPrevious, onAccountCreated, onLookupByEmail }: ContactStepProps) {
+export function ContactStep({ 
+  email, 
+  phone, 
+  firstName = '', 
+  lastName = '', 
+  onChange, 
+  onNext, 
+  onPrevious, 
+  onAccountCreated, 
+  onLookupByEmail,
+  onVerificationRequired 
+}: ContactStepProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [errors, setErrors] = useState<{ email?: string; phone?: string; firstName?: string }>({});
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [hasLookedUp, setHasLookedUp] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [resending, setResending] = useState(false);
   const leadTrackedRef = useRef(false);
   const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check if user is already verified (came back from magic link)
+  useEffect(() => {
+    if (user && verificationRequired) {
+      // User is now authenticated - they verified via magic link
+      setVerificationRequired(false);
+      setVerificationSent(false);
+      toast.success(t('contact.verificationSuccess', 'Email verified! Restoring your progress...'));
+      
+      // Now restore the profile
+      if (onLookupByEmail) {
+        onLookupByEmail(email).then((found) => {
+          if (found) {
+            toast.success(t('contact.profileRestored', 'Welcome back! Your progress has been restored.'));
+          }
+        });
+      }
+    }
+  }, [user, verificationRequired, email, onLookupByEmail, t]);
 
   const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,9 +69,7 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
   };
 
   const validatePhone = (value: string) => {
-    // Remove spaces, dashes, parentheses for validation
     const cleaned = value.replace(/[\s\-\(\)\.]/g, '');
-    // Must be at least 8 digits and contain only digits and optionally start with +
     const phoneRegex = /^\+?\d{8,15}$/;
     return phoneRegex.test(cleaned);
   };
@@ -50,23 +85,19 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
       const fireLead = () => {
         let tracked = false;
         
-        // Meta Pixel
         if (typeof window !== 'undefined' && (window as any).fbq) {
           (window as any).fbq('track', 'Lead', {
             content_name: 'Chef Onboarding Contact',
             content_category: 'Onboarding',
           });
-          console.log('Meta Pixel Lead event tracked for phone:', cleaned);
           tracked = true;
         }
         
-        // TikTok Pixel
         if (typeof window !== 'undefined' && (window as any).ttq) {
           (window as any).ttq.track('SubmitForm', {
             content_name: 'Chef Onboarding Contact',
             content_category: 'Onboarding',
           });
-          console.log('TikTok Pixel SubmitForm event tracked for phone:', cleaned);
           tracked = true;
         }
         
@@ -76,10 +107,81 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
         return tracked;
       };
 
-      // Try immediately, then retry after a delay if pixels not ready
       if (!fireLead()) {
         setTimeout(fireLead, 500);
       }
+    }
+  };
+
+  const sendVerificationLink = async (emailToVerify: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('send-verification-link', {
+        body: { 
+          email: emailToVerify.trim().toLowerCase(),
+          redirectTo: `${window.location.origin}/onboarding?verified=true`
+        },
+      });
+
+      if (error) {
+        console.error('Error sending verification link:', error);
+        return false;
+      }
+
+      return data?.sent || false;
+    } catch (err) {
+      console.error('Failed to send verification link:', err);
+      return false;
+    }
+  };
+
+  const handleEmailLookup = async (emailValue: string) => {
+    if (!validateEmail(emailValue) || hasLookedUp) return;
+
+    setIsLookingUp(true);
+    
+    try {
+      // First check if this email exists without restoring data
+      const { data, error } = await supabase.functions.invoke('send-verification-link', {
+        body: { 
+          email: emailValue.trim().toLowerCase(),
+          redirectTo: `${window.location.origin}/onboarding?verified=true`
+        },
+      });
+
+      if (error) {
+        console.error('Lookup error:', error);
+        setIsLookingUp(false);
+        setHasLookedUp(true);
+        return;
+      }
+
+      if (data?.found) {
+        // Existing profile found - require verification
+        setVerificationRequired(true);
+        setVerificationSent(true);
+        toast.info(t('contact.verificationSent', 'We found your profile! Check your email to verify and continue.'));
+        
+        if (onVerificationRequired) {
+          onVerificationRequired(emailValue);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check email:', err);
+    } finally {
+      setIsLookingUp(false);
+      setHasLookedUp(true);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    const sent = await sendVerificationLink(email);
+    setResending(false);
+    
+    if (sent) {
+      toast.success(t('contact.verificationResent', 'Verification link sent again!'));
+    } else {
+      toast.error(t('contact.verificationFailed', 'Failed to send verification. Please try again.'));
     }
   };
 
@@ -107,9 +209,14 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
   };
 
   const handleNext = async () => {
+    if (verificationRequired) {
+      toast.error(t('contact.verificationRequired', 'Please verify your email first by clicking the link we sent.'));
+      return;
+    }
+    
     if (!validate()) return;
     
-    // Silently create account in background - no UI feedback
+    // Silently create account in background for new users
     supabase.functions.invoke('auto-create-account', {
       body: {
         email: email.trim(),
@@ -121,9 +228,6 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
         return;
       }
 
-      console.log('Account created/found (background):', data);
-
-      // If we got a verify token, use it to sign in silently
       if (data?.verifyToken) {
         supabase.auth.verifyOtp({
           token_hash: data.verifyToken,
@@ -131,7 +235,6 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
         }).catch(err => console.error('OTP verification error (background):', err));
       }
 
-      // Notify parent about account creation
       if (onAccountCreated && data?.userId) {
         onAccountCreated(data.userId);
       }
@@ -139,11 +242,80 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
       console.error('Error in background account creation:', err);
     });
 
-    // Continue immediately - don't wait for account creation
     onNext();
   };
 
   const isValid = email.trim().length > 0 && phone.trim().length > 0 && firstName.trim().length > 0 && validatePhone(phone);
+
+  // Show verification required screen
+  if (verificationRequired && verificationSent) {
+    return (
+      <StepLayout
+        title={t('contact.verifyEmailTitle', 'Verify Your Email')}
+        subtitle={t('contact.verifyEmailSubtitle', 'We found your existing profile')}
+        onNext={handleNext}
+        onPrevious={onPrevious}
+        isNextDisabled={true}
+        showNext={false}
+      >
+        <div className="max-w-md mx-auto text-center space-y-6">
+          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <ShieldCheck className="w-10 h-10 text-primary" />
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold text-foreground">
+              {t('contact.checkYourEmail', 'Check Your Email')}
+            </h3>
+            <p className="text-muted-foreground">
+              {t('contact.verificationInstructions', 'For security, we\'ve sent a verification link to:')}
+            </p>
+            <p className="font-medium text-primary">{email}</p>
+          </div>
+
+          <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
+            <p>
+              {t('contact.clickLinkToContinue', 'Click the link in your email to verify your identity and continue where you left off.')}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              variant="outline"
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="w-full"
+            >
+              {resending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('contact.sending', 'Sending...')}
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {t('contact.resendVerification', 'Resend Verification Link')}
+                </>
+              )}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setVerificationRequired(false);
+                setVerificationSent(false);
+                setHasLookedUp(false);
+                onChange('email', '');
+              }}
+              className="w-full text-muted-foreground"
+            >
+              {t('contact.useDifferentEmail', 'Use a Different Email')}
+            </Button>
+          </div>
+        </div>
+      </StepLayout>
+    );
+  }
 
   return (
     <StepLayout
@@ -151,7 +323,7 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
       subtitle={t('contact.subtitle')}
       onNext={handleNext}
       onPrevious={onPrevious}
-      isNextDisabled={!isValid}
+      isNextDisabled={!isValid || verificationRequired}
     >
       <div className="max-w-md mx-auto space-y-6 relative">
         <div className="grid grid-cols-2 gap-4">
@@ -209,16 +381,10 @@ export function ContactStep({ email, phone, firstName = '', lastName = '', onCha
                 if (lookupTimeoutRef.current) {
                   clearTimeout(lookupTimeoutRef.current);
                 }
-                if (validateEmail(newEmail) && !hasLookedUp && onLookupByEmail) {
-                  lookupTimeoutRef.current = setTimeout(async () => {
-                    setIsLookingUp(true);
-                    const found = await onLookupByEmail(newEmail);
-                    setIsLookingUp(false);
-                    setHasLookedUp(true);
-                    if (found) {
-                      toast.success(t('contact.profileRestored', 'Welcome back! Your progress has been restored.'));
-                    }
-                  }, 500);
+                if (validateEmail(newEmail) && !hasLookedUp) {
+                  lookupTimeoutRef.current = setTimeout(() => {
+                    handleEmailLookup(newEmail);
+                  }, 800);
                 }
               }}
               className="pl-10 pr-10"

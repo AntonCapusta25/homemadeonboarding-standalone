@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOnboarding, clearOnboardingProgress } from '@/hooks/useOnboarding';
 import { useAuth } from '@/hooks/useAuth';
 import { useAbandonmentTracking } from '@/hooks/useAbandonmentTracking';
@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
@@ -83,6 +84,28 @@ export function OnboardingWizard() {
       checkOnboarding();
     }
   }, [authLoading, user, navigate]);
+
+  // Handle magic link verification return
+  useEffect(() => {
+    const verified = searchParams.get('verified');
+    if (verified === 'true' && user) {
+      // User just verified via magic link - restore their profile
+      toast.success(t('contact.verificationSuccess', 'Email verified! Restoring your progress...'));
+      
+      // Look up and restore profile by user email
+      if (user.email) {
+        lookupByEmail(user.email).then((found) => {
+          if (found) {
+            toast.success(t('contact.profileRestored', 'Welcome back! Your progress has been restored.'));
+          }
+        });
+      }
+      
+      // Clear the verified param from URL
+      searchParams.delete('verified');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, user, lookupByEmail, setSearchParams, t]);
 
   // Map onboarding types to DB enum values
   const mapFoodSafetyStatus = (status: string) => {
