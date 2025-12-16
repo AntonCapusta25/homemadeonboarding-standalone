@@ -9,7 +9,6 @@ import { useVerification } from '@/hooks/useVerification';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { ContactButtons } from '@/components/onboarding/ContactButtons';
-import { TosAcceptanceData } from '@/components/onboarding/TermsOfServiceModal';
 
 interface FastVerificationFlowProps {
   profile: ChefProfile;
@@ -79,7 +78,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
     loadData();
   }, [getOrCreateProgress, onComplete]);
 
-  const goToNext = async (tosData?: TosAcceptanceData) => {
+  const goToNext = async () => {
     // Save progress for current step
     if (chefProfileId) {
       const updates: Record<string, boolean> = {};
@@ -88,18 +87,6 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
       if (currentStep === 'upload-id') updates.documentsUploaded = true;
       
       await updateProgress(chefProfileId, updates);
-
-      // Save TOS data if provided (from food safety step)
-      if (tosData) {
-        await supabase
-          .from('chef_profiles')
-          .update({
-            tos_signature: tosData.signature,
-            tos_accepted_at: tosData.acceptedAt,
-            tos_plan_accepted: tosData.planAccepted,
-          })
-          .eq('id', chefProfileId);
-      }
     }
 
     if (currentStepIndex < STEPS.length - 1) {
@@ -111,6 +98,14 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
       }
       onComplete();
     }
+  };
+
+  const handleDocumentStepComplete = async () => {
+    // Save progress for document upload step
+    if (chefProfileId) {
+      await updateProgress(chefProfileId, { documentsUploaded: true, verificationCompleted: true });
+    }
+    onComplete();
   };
 
   const goToPrevious = () => {
@@ -153,13 +148,12 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
       case 'food-safety':
         return (
           <FoodSafetyInfoStep
-            onComplete={goToNext}
+            onComplete={() => goToNext()}
             onPrevious={goToPrevious}
-            onSkip={(tosData) => goToNext(tosData)}
+            onSkip={() => goToNext()}
             chefProfileId={chefProfileId}
             chefEmail={profile.email}
             chefName={profile.firstName || profile.restaurantName}
-            plan={profile.plan}
           />
         );
       case 'upload-id':
@@ -167,11 +161,12 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           <DocumentUploadStep
             profile={profile}
             onUpdateProfile={onUpdateProfile}
-            onNext={goToNext}
+            onNext={handleDocumentStepComplete}
             onPrevious={goToPrevious}
-            onSkip={goToNext}
+            onSkip={handleDocumentStepComplete}
             onDocumentUpload={handleDocumentUpload}
             verificationProgress={progress}
+            chefProfileId={chefProfileId}
           />
         );
       default:

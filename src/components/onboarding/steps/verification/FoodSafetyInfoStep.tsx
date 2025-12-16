@@ -2,14 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { ShieldCheck, ArrowLeft, ExternalLink, CheckCircle, Play, Clock } from "lucide-react";
-import { TermsOfServiceModal, TosAcceptanceData } from "@/components/onboarding/TermsOfServiceModal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface FoodSafetyInfoStepProps {
-  onComplete: (tosData?: TosAcceptanceData) => void;
+  onComplete: () => void;
   onPrevious: () => void;
-  onSkip: (tosData?: TosAcceptanceData) => void;
+  onSkip: () => void;
   chefProfileId: string | null;
   chefEmail?: string;
   chefName?: string;
@@ -46,14 +45,11 @@ export function FoodSafetyInfoStep({
   chefProfileId,
   chefEmail,
   chefName,
-  plan
 }: FoodSafetyInfoStepProps) {
   const { t, i18n } = useTranslation();
   const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set());
   const [quizCompleted, setQuizCompleted] = useState(false);
-  const [showTosModal, setShowTosModal] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
-  const [pendingSkip, setPendingSkip] = useState(false);
 
   const handleWatchVideo = (videoId: string, url: string) => {
     window.open(url, "_blank");
@@ -78,13 +74,7 @@ export function FoodSafetyInfoStep({
     setQuizCompleted(true);
   };
 
-  const handleSkipClick = () => {
-    // Show TOS modal first, then skip
-    setPendingSkip(true);
-    setShowTosModal(true);
-  };
-
-  const performSkip = async (tosData: TosAcceptanceData) => {
+  const handleSkipClick = async () => {
     setIsSkipping(true);
     try {
       // Record skip timestamp in database
@@ -110,26 +100,12 @@ export function FoodSafetyInfoStep({
       }
 
       toast.info(t("verification.skippedFoodSafety", "We'll remind you to complete food safety training later."));
-      onSkip(tosData);
+      onSkip();
     } catch (error) {
       console.error('Error handling skip:', error);
-      onSkip(tosData);
+      onSkip();
     } finally {
       setIsSkipping(false);
-    }
-  };
-
-  const handleCompleteClick = () => {
-    setPendingSkip(false);
-    setShowTosModal(true);
-  };
-
-  const handleTosAccept = (tosData: TosAcceptanceData) => {
-    setShowTosModal(false);
-    if (pendingSkip) {
-      performSkip(tosData);
-    } else {
-      onComplete(tosData);
     }
   };
 
@@ -231,7 +207,7 @@ export function FoodSafetyInfoStep({
             <ArrowLeft className="w-4 h-4 mr-2" />
             {t("common.back", "Back")}
           </Button>
-          <Button onClick={handleCompleteClick} size="lg" variant="default" disabled={!canComplete}>
+          <Button onClick={onComplete} size="lg" variant="default" disabled={!canComplete}>
             {t("verification.complete", "Complete")}
           </Button>
         </div>
@@ -242,7 +218,7 @@ export function FoodSafetyInfoStep({
             variant="link" 
             className="text-muted-foreground hover:text-foreground"
             onClick={handleSkipClick}
-            disabled={isSkipping || pendingSkip}
+            disabled={isSkipping}
           >
             <Clock className="w-4 h-4 mr-2" />
             {isSkipping 
@@ -251,14 +227,6 @@ export function FoodSafetyInfoStep({
           </Button>
         </div>
       </div>
-
-      {/* TOS Modal */}
-      <TermsOfServiceModal
-        isOpen={showTosModal}
-        onClose={() => setShowTosModal(false)}
-        onAccept={handleTosAccept}
-        plan={(plan as 'basic' | 'pro' | 'advanced') || 'basic'}
-      />
     </div>
   );
 }
