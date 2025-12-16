@@ -114,6 +114,7 @@
     "verificationSent": "We found your profile! Check your email to verify and continue.",
     "verificationResent": "Verification link sent again!",
     "verificationFailed": "Failed to send verification. Please try again.",
+    "rateLimitError": "Too many requests. Please wait a minute before trying again.",
     "verificationRequired": "Please verify your email first by clicking the link we sent.",
     "verificationSuccess": "Email verified! Restoring your progress..."
   },

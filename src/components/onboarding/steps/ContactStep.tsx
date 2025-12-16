@@ -113,7 +113,7 @@ export function ContactStep({
     }
   };
 
-  const sendVerificationLink = async (emailToVerify: string) => {
+  const sendVerificationLink = async (emailToVerify: string): Promise<{ sent: boolean; rateLimited?: boolean; error?: string }> => {
     try {
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
@@ -124,13 +124,22 @@ export function ContactStep({
 
       if (error) {
         console.error('Error sending verification link:', error);
-        return false;
+        // Check if it's a rate limit error
+        if (error.message?.includes('429') || error.message?.includes('Too many')) {
+          return { sent: false, rateLimited: true, error: t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.') };
+        }
+        return { sent: false, error: error.message };
       }
 
-      return data?.sent || false;
-    } catch (err) {
+      // Check for rate limit in response data
+      if (data?.error?.includes('Too many')) {
+        return { sent: false, rateLimited: true, error: data.error };
+      }
+
+      return { sent: data?.sent || false };
+    } catch (err: any) {
       console.error('Failed to send verification link:', err);
-      return false;
+      return { sent: false, error: err?.message };
     }
   };
 
@@ -150,6 +159,18 @@ export function ContactStep({
 
       if (error) {
         console.error('Lookup error:', error);
+        // Check for rate limit
+        if (error.message?.includes('429') || error.message?.includes('Too many')) {
+          toast.error(t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.'));
+        }
+        setIsLookingUp(false);
+        setHasLookedUp(true);
+        return;
+      }
+
+      // Check for rate limit in response data
+      if (data?.error?.includes('Too many')) {
+        toast.error(data.error);
         setIsLookingUp(false);
         setHasLookedUp(true);
         return;
@@ -175,11 +196,13 @@ export function ContactStep({
 
   const handleResendVerification = async () => {
     setResending(true);
-    const sent = await sendVerificationLink(email);
+    const result = await sendVerificationLink(email);
     setResending(false);
     
-    if (sent) {
+    if (result.sent) {
       toast.success(t('contact.verificationResent', 'Verification link sent again!'));
+    } else if (result.rateLimited) {
+      toast.error(result.error || t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.'));
     } else {
       toast.error(t('contact.verificationFailed', 'Failed to send verification. Please try again.'));
     }

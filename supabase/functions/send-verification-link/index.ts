@@ -3,12 +3,44 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-forwarded-for",
 };
 
 interface SendVerificationRequest {
   email: string;
   redirectTo?: string;
+}
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const MAX_REQUESTS_PER_EMAIL = 3; // Max 3 requests per email per minute
+const MAX_REQUESTS_PER_IP = 10; // Max 10 requests per IP per minute
+
+// In-memory rate limit stores (reset on function cold start)
+const emailRateLimits = new Map<string, { count: number; resetAt: number }>();
+const ipRateLimits = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(key: string, store: Map<string, { count: number; resetAt: number }>, maxRequests: number): boolean {
+  const now = Date.now();
+  const record = store.get(key);
+  
+  if (!record || now > record.resetAt) {
+    store.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  
+  if (record.count >= maxRequests) {
+    return true;
+  }
+  
+  record.count++;
+  return false;
+}
+
+function getClientIp(req: Request): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+         req.headers.get("x-real-ip") ||
+         "unknown";
 }
 
 serve(async (req) => {
@@ -17,6 +49,17 @@ serve(async (req) => {
   }
 
   try {
+    const clientIp = getClientIp(req);
+    
+    // Check IP rate limit first
+    if (isRateLimited(clientIp, ipRateLimits, MAX_REQUESTS_PER_IP)) {
+      console.warn(`Rate limit exceeded for IP: ${clientIp}`);
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please try again later." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+      );
+    }
+
     const { email, redirectTo }: SendVerificationRequest = await req.json();
 
     if (!email) {
@@ -26,24 +69,35 @@ serve(async (req) => {
       );
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Check email-specific rate limit
+    if (isRateLimited(normalizedEmail, emailRateLimits, MAX_REQUESTS_PER_EMAIL)) {
+      console.warn(`Rate limit exceeded for email: ${normalizedEmail}`);
+      return new Response(
+        JSON.stringify({ error: "Too many verification requests for this email. Please check your inbox or try again in a minute." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+      );
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    console.log(`Checking for existing profile with email: ${email}`);
+    console.log(`Checking for existing profile with email: ${normalizedEmail}`);
 
     // Check if this email exists in pending_profiles or chef_profiles
     const { data: pendingProfile } = await supabaseAdmin
       .from("pending_profiles")
       .select("id, chef_name, business_name")
-      .eq("email", email.toLowerCase().trim())
+      .eq("email", normalizedEmail)
       .maybeSingle();
 
     const { data: chefProfile } = await supabaseAdmin
       .from("chef_profiles")
       .select("id, chef_name, business_name, user_id")
-      .eq("contact_email", email.toLowerCase().trim())
+      .eq("contact_email", normalizedEmail)
       .maybeSingle();
 
     if (!pendingProfile && !chefProfile) {
@@ -56,12 +110,12 @@ serve(async (req) => {
     const chefName = pendingProfile?.chef_name || chefProfile?.chef_name || "";
     const businessName = pendingProfile?.business_name || chefProfile?.business_name || "";
 
-    console.log(`Found existing profile for: ${email}, sending verification link`);
+    console.log(`Found existing profile for: ${normalizedEmail}, sending verification link`);
 
     // Check if user already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase().trim()
+      (u) => u.email?.toLowerCase() === normalizedEmail
     );
 
     let magicLinkUrl: string;
@@ -72,7 +126,7 @@ serve(async (req) => {
       // Generate magic link for existing user
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "magiclink",
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         options: {
           redirectTo: finalRedirectTo,
         },
@@ -98,7 +152,7 @@ serve(async (req) => {
     } else {
       // Create user and generate magic link
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         email_confirm: false,
       });
 
@@ -113,7 +167,7 @@ serve(async (req) => {
       // Generate magic link for new user
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "magiclink",
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         options: {
           redirectTo: finalRedirectTo,
         },
@@ -208,7 +262,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          personalizations: [{ to: [{ email: email.toLowerCase().trim() }] }],
+          personalizations: [{ to: [{ email: normalizedEmail }] }],
           from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
           subject: `Verify your email to continue - Homemade 🔐`,
           content: [{ type: "text/html", value: emailHtml }],
@@ -218,7 +272,7 @@ serve(async (req) => {
       if (!sendgridResponse.ok) {
         console.error("SendGrid error:", await sendgridResponse.text());
       } else {
-        console.log(`Verification email sent successfully to: ${email}`);
+        console.log(`Verification email sent successfully to: ${normalizedEmail}`);
       }
     }
 
