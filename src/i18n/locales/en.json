@@ -102,7 +102,20 @@
     "whatsapp": "WhatsApp",
     "call": "Call us",
     "whatsappMessage": "Hi! I need help with my Homemade onboarding.",
-    "profileRestored": "Welcome back! Your progress has been restored."
+    "profileRestored": "Welcome back! Your progress has been restored.",
+    "verifyEmailTitle": "Verify Your Email",
+    "verifyEmailSubtitle": "We found your existing profile",
+    "checkYourEmail": "Check Your Email",
+    "verificationInstructions": "For security, we've sent a verification link to:",
+    "clickLinkToContinue": "Click the link in your email to verify your identity and continue where you left off.",
+    "resendVerification": "Resend Verification Link",
+    "useDifferentEmail": "Use a Different Email",
+    "sending": "Sending...",
+    "verificationSent": "We found your profile! Check your email to verify and continue.",
+    "verificationResent": "Verification link sent again!",
+    "verificationFailed": "Failed to send verification. Please try again.",
+    "verificationRequired": "Please verify your email first by clicking the link we sent.",
+    "verificationSuccess": "Email verified! Restoring your progress..."
   },
   "address": {
     "title": "Where will you cook?",

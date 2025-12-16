@@ -102,7 +102,20 @@
     "whatsapp": "WhatsApp",
     "call": "Bel ons",
     "whatsappMessage": "Hallo! Ik heb hulp nodig met mijn Homemade onboarding.",
-    "profileRestored": "Welkom terug! Je voortgang is hersteld."
+    "profileRestored": "Welkom terug! Je voortgang is hersteld.",
+    "verifyEmailTitle": "Verifieer je e-mail",
+    "verifyEmailSubtitle": "We hebben je bestaande profiel gevonden",
+    "checkYourEmail": "Controleer je e-mail",
+    "verificationInstructions": "Voor de veiligheid hebben we een verificatielink gestuurd naar:",
+    "clickLinkToContinue": "Klik op de link in je e-mail om je identiteit te verifiëren en verder te gaan waar je gebleven was.",
+    "resendVerification": "Verificatielink opnieuw versturen",
+    "useDifferentEmail": "Gebruik een ander e-mailadres",
+    "sending": "Verzenden...",
+    "verificationSent": "We hebben je profiel gevonden! Controleer je e-mail om te verifiëren en door te gaan.",
+    "verificationResent": "Verificatielink opnieuw verzonden!",
+    "verificationFailed": "Verzenden mislukt. Probeer het opnieuw.",
+    "verificationRequired": "Verifieer eerst je e-mail door op de link te klikken die we hebben gestuurd.",
+    "verificationSuccess": "E-mail geverifieerd! Je voortgang wordt hersteld..."
   },
   "address": {
     "title": "Waar ga je koken?",
