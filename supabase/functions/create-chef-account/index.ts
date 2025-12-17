@@ -176,7 +176,7 @@ serve(async (req) => {
         type: "magiclink",
         email: email,
         options: {
-          redirectTo: "https://chef-craft-flow.lovable.app/summary",
+          redirectTo: "https://signup.homemadechefs.com/onboarding?verified=true",
         },
       });
 
@@ -186,7 +186,7 @@ serve(async (req) => {
       }
 
       // Replace preview URL with production URL in the redirect_to parameter
-      const productionUrl = "https://chef-craft-flow.lovable.app";
+      const productionUrl = "https://signup.homemadechefs.com";
       let magicLinkUrl = linkData.properties.action_link;
 
       // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too
@@ -279,7 +279,7 @@ serve(async (req) => {
       type: "magiclink",
       email: email,
       options: {
-        redirectTo: "https://chef-craft-flow.lovable.app/summary",
+        redirectTo: "https://signup.homemadechefs.com/onboarding?verified=true",
       },
     });
 
@@ -289,7 +289,7 @@ serve(async (req) => {
     }
 
     // Replace preview URL with production URL in the redirect_to parameter
-    const productionUrl = "https://chef-craft-flow.lovable.app";
+    const productionUrl = "https://signup.homemadechefs.com";
     let magicLinkUrl = linkData.properties.action_link;
 
     // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too
