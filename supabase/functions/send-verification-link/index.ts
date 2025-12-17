@@ -159,7 +159,7 @@ serve(async (req) => {
 
     // Always redirect to the public production onboarding flow.
     // Using preview URLs can send users through a Lovable login bridge.
-    const finalRedirectTo = `${productionUrl}/onboarding?verified=true`;
+    const finalRedirectTo = `${productionUrl}/onboarding`;
 
     if (existingUser) {
       // Generate magic link for existing user

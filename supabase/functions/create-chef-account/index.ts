@@ -102,6 +102,11 @@ async function sendMagicLinkEmail(
       from: { email: "info@homemademeals.net", name: "Homemade Chef" },
       subject: `Welcome to Homemade${businessName ? ` - ${businessName}` : ""} 🍳`,
       content: [{ type: "text/html", value: emailHtml }],
+      // Disable click tracking so auth links aren't rewritten to url*.homemademeals.net
+      tracking_settings: {
+        click_tracking: { enable: false, enable_text: false },
+        open_tracking: { enable: true },
+      },
     }),
   });
 
@@ -176,7 +181,7 @@ serve(async (req) => {
         type: "magiclink",
         email: email,
         options: {
-          redirectTo: "https://signup.homemadechefs.com/onboarding?verified=true",
+          redirectTo: "https://signup.homemadechefs.com/onboarding",
         },
       });
 
@@ -279,7 +284,7 @@ serve(async (req) => {
       type: "magiclink",
       email: email,
       options: {
-        redirectTo: "https://signup.homemadechefs.com/onboarding?verified=true",
+        redirectTo: "https://signup.homemadechefs.com/onboarding",
       },
     });
 
