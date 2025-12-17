@@ -175,15 +175,27 @@ export function ContactStep({
 
   const handleResendVerification = async () => {
     setResending(true);
-    const result = await sendVerificationLink(email);
-    setResending(false);
 
-    if (result.sent) {
-      toast.success(t('contact.verificationResent', 'Verification link sent again!'));
-    } else if (result.rateLimited) {
-      toast.error(result.error || t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.'));
-    } else {
-      toast.error(t('contact.verificationFailed', 'Failed to send verification. Please try again.'));
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: {
+          emailRedirectTo: 'https://signup.homemadechefs.com/onboarding',
+        },
+      });
+
+      if (error) {
+        console.error('Error sending magic link:', error);
+        toast.error('Failed to send magic link. Please try again.');
+      } else {
+        setVerificationSent(true);
+        toast.success('Magic link sent! Check your email.');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      toast.error('Failed to send magic link. Please try again.');
+    } finally {
+      setResending(false);
     }
   };
 
