@@ -671,9 +671,27 @@ export default function AdminDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredChefs.length === 0 ? (
+                {chefsLoading ? (
+                  // Show skeleton rows during loading to prevent flicker
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`skeleton-${i}`}>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-3/4" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/2" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-full" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/3" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-2/3" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/2" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-full" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/4" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/3" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/2" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/3" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/4" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredChefs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       No chefs found
                     </TableCell>
                   </TableRow>
