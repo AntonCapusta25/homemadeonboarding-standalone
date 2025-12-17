@@ -253,6 +253,7 @@ export function ContactStep({
         // Show verification screen and BLOCK
         setVerificationRequired(true);
         setVerificationSent(true);
+        setSaving(false); // IMPORTANT: Stop loading state so UI updates
         toast.success('Check your email! We sent you a magic link to restore your progress.');
 
         if (onVerificationRequired) {
