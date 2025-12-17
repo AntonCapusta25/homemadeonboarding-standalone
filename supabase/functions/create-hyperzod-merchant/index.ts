@@ -26,14 +26,12 @@ serve(async (req) => {
 
     console.log("Creating merchant for:", chef.business_name || chef.chef_name);
 
-    // Extract postal code
     const extractPostalCode = (address: string): string => {
       if (!address) return "";
       const match = address.match(/\d{4}\s*[A-Z]{2}/i);
       return match ? match[0].replace(/\s/g, "") : "";
     };
 
-    // Map service type
     const mapServiceType = (serviceType: string): string[] => {
       if (serviceType === "delivery") return ["delivery"];
       if (serviceType === "pickup") return ["pickup"];
@@ -43,7 +41,23 @@ serve(async (req) => {
     const acceptedOrderTypes = mapServiceType(chef.service_type || "unsure");
     const postalCode = extractPostalCode(chef.address || "");
 
-    // CORRECTED PAYLOAD based on API docs
+    // Commission structure per order type
+    const buildCommissionStructure = () => {
+      const commission: any = {};
+      const allOrderTypes = ["delivery", "pickup", "custom_1"];
+      
+      for (const orderType of allOrderTypes) {
+        commission[orderType] = {
+          type: "percentage",
+          value: 15,
+          calculate_on_status: 1,
+        };
+      }
+      
+      return commission;
+    };
+
+    // CORRECTED PAYLOAD with proper commission structure
     const merchantPayload = {
       name: chef.business_name || chef.chef_name || "Unknown Chef",
       address: chef.address || "",
@@ -60,16 +74,20 @@ serve(async (req) => {
       status: 1,
       delivery_by: "tenant",
       
-      // Commission object - value must be NUMERIC
-      commission: {
-        type: "percentage",
-        value: 15,
-        calculate_on_status: 1,
-      },
+      // Commission: structured per order type
+      commission: buildCommissionStructure(),
       
       tax_method: "inclusive",
       merchant_category_ids: [],
-      language_translation: [],
+      
+      // Language translation: must have at least one entry
+      language_translation: [
+        {
+          locale: "en",
+          key: "name",
+          value: chef.business_name || chef.chef_name || "Unknown Chef",
+        }
+      ],
       
       tenant_id: TENANT_ID,
       apikey: HYPERZOD_API_KEY,
@@ -92,7 +110,6 @@ serve(async (req) => {
     console.log("Response:", responseText);
 
     if (response.status === 422) {
-      // Validation error - parse details
       let validationErrors = {};
       try {
         const errorData = JSON.parse(responseText);
@@ -105,7 +122,6 @@ serve(async (req) => {
           success: false,
           error: "Validation failed",
           validation_errors: validationErrors,
-          hint: "Check which fields are missing or have wrong format",
           payload_sent: merchantPayload,
         }),
         {
