@@ -127,68 +127,43 @@ serve(async (req) => {
       responseData = { raw: responseText };
     }
 
-    // Check what Hyperzod returned
-    if (response.status === 404) {
-      console.error("\n❌ 404 ERROR - Merchant Not Found");
-      console.error("This means:");
-      console.error("1. The CREATE request succeeded (no validation error)");
-      console.error("2. But Hyperzod immediately returned 404");
-      console.error("3. Possible causes:");
-      console.error("   - API key doesn't have CREATE permission");
-      console.error("   - Tenant doesn't exist or isn't active");
-      console.error("   - Wrong endpoint (maybe /merchants not /merchant?)");
-      console.error("\nMessage from Hyperzod:", responseData.message);
-      console.error("Model:", responseData.data?.model);
-
+    // CRITICAL: Hyperzod returns HTTP 200 but with success:false in body
+    // Must check the body's success field, not just HTTP status
+    if (responseData.success === false) {
+      console.error("❌ Hyperzod returned success:false");
+      console.error("Message:", responseData.message);
+      console.error("Status code in body:", responseData.status_code);
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: "404: Merchant not found after creation attempt",
-          hyperzod_message: responseData.message,
-          hyperzod_status: response.status,
-          possible_causes: [
-            "API key lacks CREATE permission (only has READ)",
-            "Tenant ID 3331 is invalid or inactive",
-            "Wrong API endpoint",
-          ],
-          action_required: "Contact Hyperzod support: siddiquiazam966@gmail.com",
+          error: responseData.message || "Hyperzod API error",
+          hyperzod_status: responseData.status_code,
+          details: responseData.data,
+          action_required: responseData.status_code === 404 
+            ? "Contact Hyperzod: Tenant 3331 may not have create permissions or API key is read-only"
+            : "Check Hyperzod API configuration",
         }),
         {
-          status: 404,
+          status: responseData.status_code || 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
-    if (response.ok) {
-      console.log("✅ Status 200/201 - Success!");
-      console.log("Merchant data:", JSON.stringify(responseData, null, 2));
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          merchant: responseData,
-          message: "Merchant created successfully!",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    console.error("❌ Unexpected status:", response.status);
+    console.log("✅ Merchant created successfully!");
+    console.log("Merchant ID:", responseData?.data?._id || "unknown");
 
     return new Response(
       JSON.stringify({
-        success: false,
-        error: `HTTP ${response.status}`,
-        details: responseData,
+        success: true,
+        merchant: responseData,
+        message: "Merchant created successfully!",
       }),
       {
-        status: response.status,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      }
     );
   } catch (error: any) {
     console.error("Fatal error:", error);
@@ -200,7 +175,7 @@ serve(async (req) => {
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      }
     );
   }
 });
