@@ -258,7 +258,9 @@ export function ContactStep({
         if (onVerificationRequired) {
           onVerificationRequired(normalizedEmail);
         }
-        // Don't return here - let finally block set saving to false
+
+        // IMPORTANT: Return here to prevent executing new user code
+        return;
       } else {
         // NEW USER: Create account and CONTINUE to next step
         console.log('New user, creating account silently');
