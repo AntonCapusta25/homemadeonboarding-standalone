@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useOnboarding, clearOnboardingProgress } from '@/hooks/useOnboarding';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,6 +46,7 @@ export function OnboardingWizard() {
   const [showFastVerification, setShowFastVerification] = useState(false);
   const [verificationComplete, setVerificationComplete] = useState(false);
   const [isGeneratingMenu, setIsGeneratingMenu] = useState(false);
+  const restoredAfterLoginRef = useRef(false);
   
   const {
     currentStep,
@@ -107,6 +108,22 @@ export function OnboardingWizard() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, user, lookupByEmail, setSearchParams, t]);
+
+  // Restore pending onboarding progress after ANY successful login (even without ?verified=true)
+  // Guard: only do this when onboarding state doesn't already contain an email.
+  useEffect(() => {
+    if (authLoading || !user?.email) return;
+    if (restoredAfterLoginRef.current) return;
+    if (profile.email) return;
+
+    restoredAfterLoginRef.current = true;
+
+    lookupByEmail(user.email).then((found) => {
+      if (found) {
+        toast.success(t('contact.profileRestored', 'Welcome back! Your progress has been restored.'));
+      }
+    });
+  }, [authLoading, user?.email, lookupByEmail, profile.email, t]);
 
   // Show a friendly message if the verification link was invalid/expired
   useEffect(() => {
@@ -370,7 +387,7 @@ export function OnboardingWizard() {
     setResending(true);
     try {
       // Use production URL for magic link redirect
-      const redirectTo = 'https://signup.homemadechefs.com/onboarding?verified=true';
+      const redirectTo = 'https://signup.homemadechefs.com/onboarding';
       
       const { error } = await supabase.functions.invoke('create-chef-account', {
         body: {

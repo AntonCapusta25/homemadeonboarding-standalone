@@ -119,7 +119,7 @@ serve(async (req) => {
       
       // Generate a magic link for the user
       const productionUrl = "https://signup.homemadechefs.com";
-      const redirectTo = `${productionUrl}/onboarding?verified=true`;
+      const redirectTo = `${productionUrl}/onboarding`;
       
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
@@ -222,6 +222,11 @@ serve(async (req) => {
             from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
             subject: `Your login link - Homemade 🏠`,
             content: [{ type: "text/html", value: emailHtml }],
+            // Disable click tracking so auth links aren't rewritten to url*.homemademeals.net
+            tracking_settings: {
+              click_tracking: { enable: false, enable_text: false },
+              open_tracking: { enable: true },
+            },
           }),
         }).then(res => {
           if (!res.ok) console.error("SendGrid error sending magic link email");
@@ -318,7 +323,7 @@ serve(async (req) => {
 
     // Generate a magic link for auto-login
     const productionUrl = "https://signup.homemadechefs.com";
-    const redirectTo = `${productionUrl}/onboarding?verified=true`;
+    const redirectTo = `${productionUrl}/onboarding`;
     
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
@@ -416,12 +421,17 @@ serve(async (req) => {
           Authorization: `Bearer ${SENDGRID_API_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email }] }],
-          from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
-          subject: `Welcome to Homemade! Here's your login link 🏠`,
-          content: [{ type: "text/html", value: emailHtml }],
-        }),
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email }] }],
+            from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
+            subject: `Welcome to Homemade! Here's your login link 🏠`,
+            content: [{ type: "text/html", value: emailHtml }],
+            // Disable click tracking so auth links aren't rewritten to url*.homemademeals.net
+            tracking_settings: {
+              click_tracking: { enable: false, enable_text: false },
+              open_tracking: { enable: true },
+            },
+          }),
       }).then(res => {
         if (!res.ok) console.error("SendGrid error sending welcome email");
         else console.log(`Welcome email with magic link sent to: ${email}`);
