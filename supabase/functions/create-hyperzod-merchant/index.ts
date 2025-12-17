@@ -18,10 +18,10 @@ serve(async (req) => {
     const { chef } = await req.json();
 
     if (!chef || !HYPERZOD_API_KEY) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing chef or API key" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ success: false, error: "Missing chef or API key" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log("Creating merchant for:", chef.business_name || chef.chef_name);
@@ -52,34 +52,38 @@ serve(async (req) => {
       city: chef.city || "",
       phone: chef.contact_phone || "+31600000000",
       email: chef.contact_email || "",
-      
+
       type: "ecommerce",
       accepted_order_types: acceptedOrderTypes,
       status: 1,
       delivery_by: "tenant",
-      
-      // CRITICAL: Commission must be structured per order type
+
+      // FIXED: Commission structure with correct field names
+      // Changed: value → percent_value, added order_type field
       commission: {
         delivery: {
+          order_type: "delivery", // ADDED
           type: "percentage",
-          value: 15,
+          percent_value: 15, // CHANGED from 'value'
           calculate_on_status: 1,
         },
         pickup: {
+          order_type: "pickup", // ADDED
           type: "percentage",
-          value: 15,
+          percent_value: 15, // CHANGED from 'value'
           calculate_on_status: 1,
         },
         custom_1: {
+          order_type: "custom_1", // ADDED
           type: "percentage",
-          value: 15,
+          percent_value: 15, // CHANGED from 'value'
           calculate_on_status: 1,
         },
       },
-      
+
       tax_method: "inclusive",
       merchant_category_ids: [],
-      
+
       // Language translation: REQUIRED with at least one entry
       language_translation: [
         {
@@ -88,7 +92,7 @@ serve(async (req) => {
           value: chef.business_name || chef.chef_name || "Unknown Chef",
         },
       ],
-      
+
       tenant_id: TENANT_ID,
       apikey: HYPERZOD_API_KEY,
     };
@@ -101,7 +105,7 @@ serve(async (req) => {
     const response = await fetch(`${BASE_URL}/admin/v1/merchant/create`, {
       method: "POST",
       headers: {
-        "Accept": "application/json",
+        Accept: "application/json",
         "Content-Type": "application/json",
         "x-tenant": TENANT_ID,
       },
@@ -133,7 +137,7 @@ serve(async (req) => {
         {
           status: 422,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -153,7 +157,7 @@ serve(async (req) => {
         {
           status: response.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -177,9 +181,8 @@ serve(async (req) => {
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
-
   } catch (error: any) {
     console.error("Fatal error:", error);
     return new Response(
@@ -191,7 +194,7 @@ serve(async (req) => {
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });
