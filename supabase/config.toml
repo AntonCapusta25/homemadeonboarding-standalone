@@ -50,3 +50,9 @@ verify_jwt = false
 
 [functions.import-menu-to-hyperzod]
 verify_jwt = false
+
+[functions.detect-hyperzod-pricing-type]
+verify_jwt = false
+
+[functions.generate-menu-images]
+verify_jwt = false

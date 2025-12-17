@@ -264,6 +264,7 @@ export type Database = {
           description: string | null
           estimated_cost: number | null
           id: string
+          image_url: string | null
           is_upsell: boolean | null
           margin: number | null
           menu_id: string
@@ -278,6 +279,7 @@ export type Database = {
           description?: string | null
           estimated_cost?: number | null
           id?: string
+          image_url?: string | null
           is_upsell?: boolean | null
           margin?: number | null
           menu_id: string
@@ -292,6 +294,7 @@ export type Database = {
           description?: string | null
           estimated_cost?: number | null
           id?: string
+          image_url?: string | null
           is_upsell?: boolean | null
           margin?: number | null
           menu_id?: string
