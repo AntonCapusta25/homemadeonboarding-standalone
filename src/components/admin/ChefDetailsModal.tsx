@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
+import { MenuUploadSection } from './MenuUploadSection';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -759,24 +760,6 @@ export function ChefDetailsModal({
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           </DialogTitle>
           <div className="flex items-center gap-2 ml-auto mr-8">
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={handleTestConnection} 
-              disabled={testingConnection}
-            >
-              {testingConnection ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <Wifi className={cn("w-4 h-4 mr-2", connectionStatus === 'success' && "text-green-500", connectionStatus === 'error' && "text-red-500")} />
-                  Test Connection
-                </>
-              )}
-            </Button>
             <Popover>
               <PopoverTrigger asChild>
                 <Button 
@@ -1203,48 +1186,20 @@ export function ChefDetailsModal({
               </TabsContent>
 
               <TabsContent value="menu" className="space-y-4">
+                <MenuUploadSection 
+                  chefId={chef.id}
+                  chefName={chef.chef_name}
+                  cuisines={chef.cuisines}
+                  onMenuUpdated={() => {
+                    fetchChefData();
+                    onRefresh?.();
+                  }}
+                />
                 {!menu ? (
                   <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
                 ) : (
                   <>
-                    <div className="flex flex-wrap items-center gap-4 justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">Style:</Label>
-                          <Select value={selectedBackground} onValueChange={setSelectedBackground}>
-                            <SelectTrigger className="h-7 text-xs w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background z-50">
-                              <SelectItem value="cozy_wooden_table">Cozy Wooden</SelectItem>
-                              <SelectItem value="bright_and_airy">Bright & Airy</SelectItem>
-                              <SelectItem value="luxury_marble_surface">Luxury Marble</SelectItem>
-                              <SelectItem value="rustic_wooden_charm">Rustic Charm</SelectItem>
-                              <SelectItem value="moody_concrete_background">Moody Concrete</SelectItem>
-                              <SelectItem value="fresh_pastel_vibes">Fresh Pastel</SelectItem>
-                              <SelectItem value="earthy_slate_surface">Earthy Slate</SelectItem>
-                              <SelectItem value="bold_black_backdrop">Bold Black</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">Light:</Label>
-                          <Select value={selectedAmbience} onValueChange={setSelectedAmbience}>
-                            <SelectTrigger className="h-7 text-xs w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background z-50">
-                              <SelectItem value="soft_window_light">Soft Window</SelectItem>
-                              <SelectItem value="natural_daylight">Natural Daylight</SelectItem>
-                              <SelectItem value="natural_side_light">Side Light</SelectItem>
-                              <SelectItem value="warm_directional_light">Warm Directional</SelectItem>
-                              <SelectItem value="studio_lighting_100mm">Studio Macro</SelectItem>
-                              <SelectItem value="moody_softbox">Moody Softbox</SelectItem>
-                              <SelectItem value="dramatic_studio_light">Dramatic Studio</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+                    <div className="flex items-center justify-end">
                       <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
                         <Download className="w-4 h-4" />
                         Download ZIP
