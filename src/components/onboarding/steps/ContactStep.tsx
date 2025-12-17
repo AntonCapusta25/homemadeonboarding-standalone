@@ -233,37 +233,16 @@ export function ContactStep({
       const isExistingUser = lookupData?.found === true;
 
       if (isExistingUser) {
-        // EXISTING USER: Send magic link and block until verified
-        console.log('Existing user detected, sending magic link');
+        // EXISTING USER: Show verification screen with button to request magic link
+        console.log('Existing user detected, showing verification screen');
 
-        const { error: otpError } = await supabase.auth.signInWithOtp({
-          email: normalizedEmail,
-          options: {
-            emailRedirectTo: 'https://signup.homemadechefs.com/onboarding',
-          },
-        });
-
-        if (otpError) {
-          console.error('Error sending magic link:', otpError);
-          toast.error('Failed to send verification link. Please try again.');
-          setSaving(false);
-          return;
-        }
-
-        // Show verification screen and BLOCK
-        // Use setTimeout to ensure state updates trigger re-render
-        setTimeout(() => {
-          setVerificationRequired(true);
-          setVerificationSent(true);
-        }, 0);
-
-        toast.success('Check your email! We sent you a magic link to restore your progress.');
+        setVerificationRequired(true);
+        toast.info('We found your account! Click "Request Magic Link" to continue.');
 
         if (onVerificationRequired) {
           onVerificationRequired(normalizedEmail);
         }
 
-        // IMPORTANT: Return here to prevent executing new user code
         return;
       } else {
         // NEW USER: Create account and CONTINUE to next step
@@ -314,7 +293,77 @@ export function ContactStep({
 
   const isValid = email.trim().length > 0 && phone.trim().length > 0 && firstName.trim().length > 0 && validatePhone(phone);
 
-  // Show verification required screen
+  // Show "Request Magic Link" screen for existing users
+  if (verificationRequired && !verificationSent) {
+    return (
+      <StepLayout
+        title="Welcome Back!"
+        subtitle="We found your existing account"
+        onNext={handleNext}
+        onPrevious={onPrevious}
+        isNextDisabled={true}
+        showNext={false}
+      >
+        <div className="max-w-md mx-auto text-center space-y-6">
+          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <ShieldCheck className="w-10 h-10 text-primary" />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold text-foreground">
+              Verify It's You
+            </h3>
+            <p className="text-muted-foreground">
+              For security, we need to verify your identity before you can continue.
+            </p>
+            <p className="font-medium text-primary">{email}</p>
+          </div>
+
+          <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
+            <p>
+              Click the button below to receive a magic link via email. Use that link to verify your identity and restore your progress.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="w-full"
+            >
+              {resending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending Magic Link...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Request Magic Link
+                </>
+              )}
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setVerificationRequired(false);
+                setVerificationSent(false);
+                setIsReturningUser(false);
+                setReturningUserName('');
+                onChange('email', '');
+              }}
+              className="w-full text-muted-foreground"
+            >
+              Use a Different Email
+            </Button>
+          </div>
+        </div>
+      </StepLayout>
+    );
+  }
+
+  // Show "Check Your Email" screen after magic link is sent
   if (verificationRequired && verificationSent) {
     return (
       <StepLayout
