@@ -115,7 +115,7 @@ export function ContactStep({
 
   const sendVerificationLink = async (emailToVerify: string): Promise<{ sent: boolean; rateLimited?: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase.functions.invoke('send-verification-link', {
+      const { data, error } = await supabase.functions.invoke('send-magic-link', {
         body: {
           email: emailToVerify.trim().toLowerCase(),
           redirectTo: `${window.location.origin}/onboarding?verified=true`
@@ -150,7 +150,7 @@ export function ContactStep({
 
     try {
       // First check if this email exists without restoring data
-      const { data, error } = await supabase.functions.invoke('send-verification-link', {
+      const { data, error } = await supabase.functions.invoke('send-magic-link', {
         body: {
           email: emailValue.trim().toLowerCase(),
           redirectTo: `${window.location.origin}/onboarding?verified=true`
@@ -449,15 +449,7 @@ export function ContactStep({
                 onChange('email', newEmail);
                 if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
 
-                // Debounced lookup when email looks valid
-                if (lookupTimeoutRef.current) {
-                  clearTimeout(lookupTimeoutRef.current);
-                }
-                if (validateEmail(newEmail) && !hasLookedUp) {
-                  lookupTimeoutRef.current = setTimeout(() => {
-                    handleEmailLookup(newEmail);
-                  }, 800);
-                }
+                // Email validation only - no auto-lookup
               }}
               className="pl-10 pr-10"
             />
