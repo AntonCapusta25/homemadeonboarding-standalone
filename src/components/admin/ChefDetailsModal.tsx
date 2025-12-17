@@ -780,28 +780,77 @@ export function ChefDetailsModal({
                 </>
               )}
             </Button>
-            <Button 
-              onClick={handleFullMerchantSetup} 
-              disabled={creatingMerchant}
-              variant={storedMerchantId ? 'outline' : 'default'}
-            >
-              {creatingMerchant ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {processStep || 'Processing...'}
-                </>
-              ) : storedMerchantId ? (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                  Merchant: {storedMerchantId.slice(0, 8)}...
-                </>
-              ) : (
-                <>
-                  <Rocket className="w-4 h-4 mr-2" />
-                  Create Merchant
-                </>
-              )}
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  disabled={creatingMerchant}
+                  variant={storedMerchantId ? 'outline' : 'default'}
+                >
+                  {creatingMerchant ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {processStep || 'Processing...'}
+                    </>
+                  ) : storedMerchantId ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                      Merchant: {storedMerchantId.slice(0, 8)}...
+                    </>
+                  ) : (
+                    <>
+                      <Rocket className="w-4 h-4 mr-2" />
+                      Create Merchant
+                    </>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4" align="end">
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm">Photo Style Settings</h4>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Background</Label>
+                      <Select value={selectedBackground} onValueChange={setSelectedBackground}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cozy_wooden_table">Cozy Wooden Table</SelectItem>
+                          <SelectItem value="clean_marble">Clean Marble Surface</SelectItem>
+                          <SelectItem value="rustic_kitchen">Rustic Kitchen</SelectItem>
+                          <SelectItem value="modern_minimal">Modern Minimal</SelectItem>
+                          <SelectItem value="outdoor_garden">Outdoor Garden</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Lighting</Label>
+                      <Select value={selectedAmbience} onValueChange={setSelectedAmbience}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="soft_window_light">Soft Window Light</SelectItem>
+                          <SelectItem value="warm_golden_hour">Warm Golden Hour</SelectItem>
+                          <SelectItem value="bright_studio">Bright Studio</SelectItem>
+                          <SelectItem value="moody_dramatic">Moody Dramatic</SelectItem>
+                          <SelectItem value="natural_daylight">Natural Daylight</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={handleFullMerchantSetup} 
+                    disabled={creatingMerchant}
+                    className="w-full"
+                    size="sm"
+                  >
+                    <Rocket className="w-4 h-4 mr-2" />
+                    {storedMerchantId ? 'Re-create Merchant' : 'Start Setup'}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </DialogHeader>
 
