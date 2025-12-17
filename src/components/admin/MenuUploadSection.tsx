@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Upload, FileText, Loader2, Check, X } from 'lucide-react';
+import { Upload, FileText, Loader2, Check, X, Pencil, Trash2 } from 'lucide-react';
 
 interface ParsedDish {
   name: string;
@@ -15,6 +17,8 @@ interface ParsedDish {
   is_upsell: boolean;
   sort_order: number;
 }
+
+const CATEGORIES = ['Main Dishes', 'Starters', 'Sides', 'Drinks', 'Desserts'];
 
 interface MenuUploadSectionProps {
   chefId: string;
@@ -28,6 +32,7 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
   const [parsing, setParsing] = useState(false);
   const [parsedDishes, setParsedDishes] = useState<ParsedDish[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,16 +41,12 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
 
     const fileType = file.name.split('.').pop()?.toLowerCase() || '';
     
-    // Read file content
     try {
       let content = '';
       
-      if (fileType === 'csv' || fileType === 'txt') {
-        content = await file.text();
-      } else if (fileType === 'json') {
+      if (fileType === 'csv' || fileType === 'txt' || fileType === 'json') {
         content = await file.text();
       } else {
-        // For other files, read as text and let AI figure it out
         content = await file.text();
       }
 
@@ -55,7 +56,6 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
       toast({ title: 'Error', description: 'Could not read file', variant: 'destructive' });
     }
     
-    // Reset file input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -90,19 +90,32 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
     }
   };
 
+  const updateDish = (index: number, field: keyof ParsedDish, value: string | number | boolean) => {
+    if (!parsedDishes) return;
+    const updated = [...parsedDishes];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'category') {
+      updated[index].is_upsell = ['Drinks', 'Desserts'].includes(value as string);
+    }
+    setParsedDishes(updated);
+  };
+
+  const removeDish = (index: number) => {
+    if (!parsedDishes) return;
+    setParsedDishes(parsedDishes.filter((_, i) => i !== index));
+  };
+
   const handleSaveMenu = async () => {
     if (!parsedDishes || parsedDishes.length === 0) return;
 
     setSaving(true);
 
     try {
-      // Deactivate existing menus
       await supabase
         .from('menus')
         .update({ is_active: false })
         .eq('chef_profile_id', chefId);
 
-      // Create new menu
       const { data: newMenu, error: menuError } = await supabase
         .from('menus')
         .insert({
@@ -116,7 +129,6 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
 
       if (menuError) throw menuError;
 
-      // Insert dishes
       const dishInserts = parsedDishes.map((d, idx) => ({
         menu_id: newMenu.id,
         name: d.name,
@@ -146,6 +158,7 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
   const handleClear = () => {
     setParsedDishes(null);
     setPastedContent('');
+    setEditingIndex(null);
   };
 
   return (
@@ -194,11 +207,7 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
               disabled={!pastedContent.trim() || parsing}
               className="gap-2"
             >
-              {parsing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <FileText className="w-4 h-4" />
-              )}
+              {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               {parsing ? 'Parsing...' : 'Parse Menu'}
             </Button>
           </div>
@@ -206,36 +215,73 @@ export function MenuUploadSection({ chefId, chefName, cuisines, onMenuUpdated }:
       ) : (
         <>
           <div className="text-sm text-muted-foreground">
-            Found {parsedDishes.length} dishes. Review and save:
+            Found {parsedDishes.length} dishes. Click to edit, then save:
           </div>
-          <div className="max-h-[200px] overflow-y-auto space-y-1 border rounded p-2">
+          <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded p-2">
             {parsedDishes.map((dish, idx) => (
-              <div key={idx} className="flex justify-between text-sm py-1 border-b last:border-0">
-                <span className="truncate flex-1">{dish.name}</span>
-                <span className="text-muted-foreground ml-2">{dish.category}</span>
-                <span className="font-medium ml-2">€{dish.price.toFixed(2)}</span>
+              <div key={idx} className="border rounded p-2 bg-muted/30">
+                {editingIndex === idx ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={dish.name}
+                      onChange={(e) => updateDish(idx, 'name', e.target.value)}
+                      placeholder="Dish name"
+                      className="h-8 text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Select value={dish.category} onValueChange={(v) => updateDish(idx, 'category', v)}>
+                        <SelectTrigger className="h-8 text-xs flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((cat) => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={dish.price}
+                        onChange={(e) => updateDish(idx, 'price', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-sm w-24"
+                        placeholder="Price"
+                      />
+                    </div>
+                    <Input
+                      value={dish.description}
+                      onChange={(e) => updateDish(idx, 'description', e.target.value)}
+                      placeholder="Description (optional)"
+                      className="h-8 text-xs"
+                    />
+                    <Button size="sm" variant="outline" onClick={() => setEditingIndex(null)} className="h-7 text-xs">
+                      Done
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{dish.name}</p>
+                      <p className="text-xs text-muted-foreground">{dish.category}</p>
+                    </div>
+                    <span className="font-semibold text-sm">€{dish.price.toFixed(2)}</span>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingIndex(idx)}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeDish(idx)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setParsedDishes(null)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setParsedDishes(null)}>
               Back to Edit
             </Button>
-            <Button
-              size="sm"
-              onClick={handleSaveMenu}
-              disabled={saving}
-              className="gap-2"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Check className="w-4 h-4" />
-              )}
+            <Button size="sm" onClick={handleSaveMenu} disabled={saving || parsedDishes.length === 0} className="gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {saving ? 'Saving...' : 'Save as New Menu'}
             </Button>
           </div>
