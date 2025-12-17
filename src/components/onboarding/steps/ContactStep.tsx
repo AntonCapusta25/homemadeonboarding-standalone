@@ -225,8 +225,14 @@ export function ContactStep({
     try {
       const normalizedEmail = email.trim().toLowerCase();
 
-      // Use the state we already set from the lookup
-      if (isReturningUser) {
+      // ALWAYS check if user exists on Next click (don't rely on debounced state)
+      const { data: lookupData } = await supabase.functions.invoke('lookup-pending-profile', {
+        body: { email: normalizedEmail },
+      });
+
+      const isExistingUser = lookupData?.found === true;
+
+      if (isExistingUser) {
         // EXISTING USER: Send magic link and block until verified
         console.log('Existing user detected, sending magic link');
 
