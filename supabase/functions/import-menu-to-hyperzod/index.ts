@@ -196,9 +196,9 @@ serve(async (req) => {
         });
 
         const text = await response.text();
-        console.log(`Product ${dishName} response: ${response.status} - ${text.substring(0, 200)}`);
 
         if (response.ok) {
+          console.log(`✓ Product ${dishName} created: ${response.status}`);
           const data = JSON.parse(text);
           results.push({
             dish_name: dishName,
@@ -206,6 +206,10 @@ serve(async (req) => {
             product_id: data?.data?.product_id || data?.data?._id,
           });
         } else {
+          // Log full payload on 4xx errors for debugging
+          console.error(`✗ Product ${dishName} FAILED: ${response.status}`);
+          console.error(`  Response: ${text}`);
+          console.error(`  Request payload sent:`, JSON.stringify(productPayload, null, 2));
           results.push({
             dish_name: dishName,
             success: false,
