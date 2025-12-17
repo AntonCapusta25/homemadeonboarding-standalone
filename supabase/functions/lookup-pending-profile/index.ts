@@ -14,16 +14,16 @@ serve(async (req) => {
   try {
     const { email } = await req.json();
 
-    if (!email || typeof email !== 'string') {
-      return new Response(
-        JSON.stringify({ error: "Email is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!email || typeof email !== "string") {
+      return new Response(JSON.stringify({ error: "Email is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -46,7 +46,7 @@ serve(async (req) => {
 
     // 3. Check Supabase Auth users
     const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const authUser = authUsers?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+    const authUser = authUsers?.users?.find((u) => u.email?.toLowerCase() === normalizedEmail);
 
     // Determine if user exists in ANY source
     const foundInPending = !!pendingProfile;
@@ -55,47 +55,51 @@ serve(async (req) => {
     const found = foundInPending || foundInChef || foundInAuth;
 
     if (!found) {
-      return new Response(
-        JSON.stringify({ found: false }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ found: false }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Build profile from best available source
-    const profile = pendingProfile || (chefProfile ? {
-      email: chefProfile.contact_email,
-      phone: chefProfile.contact_phone,
-      chef_name: chefProfile.chef_name,
-      business_name: chefProfile.business_name,
-      city: chefProfile.city,
-      address: chefProfile.address,
-      cuisines: chefProfile.cuisines,
-      dish_types: chefProfile.dish_types,
-      availability: chefProfile.availability,
-      service_type: chefProfile.service_type,
-      food_safety_status: chefProfile.food_safety_status,
-      kvk_status: chefProfile.kvk_status,
-      plan: chefProfile.plan,
-      logo_url: chefProfile.logo_url,
-    } : {
-      email: normalizedEmail,
-      chef_name: authUser?.user_metadata?.chef_name || null,
-    });
+    const profile =
+      pendingProfile ||
+      (chefProfile
+        ? {
+            email: chefProfile.contact_email,
+            phone: chefProfile.contact_phone,
+            chef_name: chefProfile.chef_name,
+            business_name: chefProfile.business_name,
+            city: chefProfile.city,
+            address: chefProfile.address,
+            cuisines: chefProfile.cuisines,
+            dish_types: chefProfile.dish_types,
+            availability: chefProfile.availability,
+            service_type: chefProfile.service_type,
+            food_safety_status: chefProfile.food_safety_status,
+            kvk_status: chefProfile.kvk_status,
+            plan: chefProfile.plan,
+            logo_url: chefProfile.logo_url,
+          }
+        : {
+            email: normalizedEmail,
+            chef_name: authUser?.user_metadata?.chef_name || null,
+          });
 
     return new Response(
       JSON.stringify({
         found: true,
-        source: foundInChef ? 'chef_profiles' : (foundInPending ? 'pending_profiles' : 'auth'),
+        source: foundInChef ? "chef_profiles" : foundInPending ? "pending_profiles" : "auth",
         profile: profile,
         sessionToken: pendingProfile?.session_token,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
     console.error("Error in lookup-pending-profile:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
