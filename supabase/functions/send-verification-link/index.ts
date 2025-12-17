@@ -293,6 +293,12 @@ serve(async (req) => {
           from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
           subject: `Verify your email to continue - Homemade 🔐`,
           content: [{ type: "text/html", value: emailHtml }],
+          // Disable click-tracking so the magic link isn't rewritten to url*.homemademeals.net
+          // (those tracking redirects can break/expire flows and confuse users)
+          tracking_settings: {
+            click_tracking: { enable: false, enable_text: false },
+            open_tracking: { enable: true },
+          },
         }),
       });
 
