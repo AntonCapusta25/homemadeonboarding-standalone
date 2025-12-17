@@ -24,6 +24,7 @@ serve(async (req) => {
       });
     }
 
+    console.log("✅ NEW FUNCTION v2 - BYPASSING CACHE");
     console.log("Creating merchant for:", chef.business_name || chef.chef_name);
 
     const extractPostalCode = (address: string): string => {
@@ -41,7 +42,6 @@ serve(async (req) => {
     const acceptedOrderTypes = mapServiceType(chef.service_type || "unsure");
     const postalCode = extractPostalCode(chef.address || "");
 
-    // PAYLOAD with CORRECT commission structure
     const merchantPayload = {
       name: chef.business_name || chef.chef_name || "Unknown Chef",
       address: chef.address || "",
@@ -52,39 +52,32 @@ serve(async (req) => {
       city: chef.city || "",
       phone: chef.contact_phone || "+31600000000",
       email: chef.contact_email || "",
-
       type: "ecommerce",
       accepted_order_types: acceptedOrderTypes,
       status: 1,
       delivery_by: "tenant",
-
-      // FIXED: Commission structure with correct field names
-      // Changed: value → percent_value, added order_type field
       commission: {
         delivery: {
-          order_type: "delivery", // ADDED
+          order_type: "delivery",
           type: "percentage",
-          percent_value: 15, // CHANGED from 'value'
+          percent_value: 15,
           calculate_on_status: 1,
         },
         pickup: {
-          order_type: "pickup", // ADDED
+          order_type: "pickup",
           type: "percentage",
-          percent_value: 15, // CHANGED from 'value'
+          percent_value: 15,
           calculate_on_status: 1,
         },
         custom_1: {
-          order_type: "custom_1", // ADDED
+          order_type: "custom_1",
           type: "percentage",
-          percent_value: 15, // CHANGED from 'value'
+          percent_value: 15,
           calculate_on_status: 1,
         },
       },
-
       tax_method: "inclusive",
       merchant_category_ids: [],
-
-      // Language translation: REQUIRED with at least one entry
       language_translation: [
         {
           locale: "en",
@@ -92,15 +85,15 @@ serve(async (req) => {
           value: chef.business_name || chef.chef_name || "Unknown Chef",
         },
       ],
-
       tenant_id: TENANT_ID,
       apikey: HYPERZOD_API_KEY,
     };
 
-    console.log("=".repeat(60));
-    console.log("PAYLOAD BEING SENT:");
-    console.log(JSON.stringify(merchantPayload, null, 2));
-    console.log("=".repeat(60));
+    console.log("Commission check:", {
+      has_order_type: "order_type" in merchantPayload.commission.delivery,
+      has_percent_value: "percent_value" in merchantPayload.commission.delivery,
+      delivery_structure: merchantPayload.commission.delivery,
+    });
 
     const response = await fetch(`${BASE_URL}/admin/v1/merchant/create`, {
       method: "POST",
@@ -114,45 +107,15 @@ serve(async (req) => {
 
     const responseText = await response.text();
     console.log("Status:", response.status);
-    console.log("Response:", responseText);
-
-    if (response.status === 422) {
-      let validationErrors = {};
-      try {
-        const errorData = JSON.parse(responseText);
-        validationErrors = errorData.data || errorData.errors || errorData;
-        console.error("Validation errors:", JSON.stringify(validationErrors, null, 2));
-      } catch {}
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Validation failed",
-          validation_errors: validationErrors,
-          payload_structure: {
-            commission_keys: Object.keys(merchantPayload.commission),
-            language_translation_count: merchantPayload.language_translation.length,
-          },
-        }),
-        {
-          status: 422,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
+    console.log("Response:", responseText.substring(0, 500));
 
     if (!response.ok) {
-      let errorMessage = responseText;
-      try {
-        const errorData = JSON.parse(responseText);
-        errorMessage = errorData.message || errorData.error || JSON.stringify(errorData);
-      } catch {}
-
       return new Response(
         JSON.stringify({
           success: false,
           error: `Failed (${response.status})`,
-          details: errorMessage,
+          details: responseText,
+          sent_commission: merchantPayload.commission.delivery,
         }),
         {
           status: response.status,
@@ -161,7 +124,6 @@ serve(async (req) => {
       );
     }
 
-    // Success!
     let merchantData;
     try {
       merchantData = JSON.parse(responseText);
@@ -170,13 +132,12 @@ serve(async (req) => {
     }
 
     console.log("✅ SUCCESS! Merchant created");
-    console.log("Merchant ID:", merchantData?.data?._id || merchantData?._id || "unknown");
 
     return new Response(
       JSON.stringify({
         success: true,
         merchant: merchantData,
-        message: "Merchant created successfully in Hyperzod!",
+        message: "Merchant created successfully!",
       }),
       {
         status: 200,
@@ -189,7 +150,6 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error?.message || String(error),
-        stack: error?.stack,
       }),
       {
         status: 500,
