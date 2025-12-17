@@ -13,12 +13,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, Wifi, AlertTriangle, Upload, Search, ImagePlus
+  Download, Store, Wifi, AlertTriangle, Rocket, Search
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -108,9 +109,11 @@ export function ChefDetailsModal({
   const [saving, setSaving] = useState(false);
   const [creatingMerchant, setCreatingMerchant] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
-  const [importingMenu, setImportingMenu] = useState(false);
   const [detectingPricingType, setDetectingPricingType] = useState(false);
-  const [generatingImages, setGeneratingImages] = useState(false);
+  const [processingMenu, setProcessingMenu] = useState(false);
+  const [processStep, setProcessStep] = useState<string>('');
+  const [selectedBackground, setSelectedBackground] = useState('cozy_wooden_table');
+  const [selectedAmbience, setSelectedAmbience] = useState('soft_window_light');
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
@@ -347,60 +350,6 @@ export function ChefDetailsModal({
     }
   };
 
-  const handleImportMenuToHyperzod = async () => {
-    if (!merchantId.trim()) {
-      toast({ title: 'Error', description: 'Please enter a Merchant ID', variant: 'destructive' });
-      return;
-    }
-    if (!menu || menu.dishes.length === 0) {
-      toast({ title: 'Error', description: 'No menu dishes to import', variant: 'destructive' });
-      return;
-    }
-
-    setImportingMenu(true);
-    setHyperzodError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('import-menu-to-hyperzod', {
-        body: { 
-          merchant_id: merchantId.trim(),
-          dishes: menu.dishes
-        }
-      });
-
-      if (error) {
-        setHyperzodError({ error: error.message });
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        return;
-      }
-
-      if (data?.success) {
-        toast({ 
-          title: 'Menu Imported', 
-          description: data.message || `Successfully imported ${menu.dishes.length} dishes`
-        });
-      } else {
-        const failedItems = data?.results?.filter((r: any) => !r.success) || [];
-        setHyperzodError({ 
-          error: data?.error || 'Some dishes failed to import',
-          details: failedItems.length > 0 ? { 
-            field: 'dishes', 
-            message: failedItems.map((r: any) => `${r.dish_name}: ${r.error}`).join(', ') 
-          } : null
-        });
-        toast({ 
-          title: data?.successful_count > 0 ? 'Partial Import' : 'Import Failed', 
-          description: data?.message || 'Failed to import menu',
-          variant: data?.successful_count > 0 ? 'default' : 'destructive'
-        });
-      }
-    } catch (err: any) {
-      setHyperzodError({ error: err?.message || 'Network error' });
-      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
-    } finally {
-      setImportingMenu(false);
-    }
-  };
-
   const handleDetectPricingType = async () => {
     if (!merchantId.trim()) {
       toast({ title: 'Error', description: 'Please enter a Merchant ID first', variant: 'destructive' });
@@ -448,45 +397,88 @@ export function ChefDetailsModal({
     }
   };
 
-  const handleGenerateImages = async () => {
-    if (!menu) {
-      toast({ title: 'Error', description: 'No menu found', variant: 'destructive' });
+  const handleGenerateAndImport = async () => {
+    if (!merchantId.trim()) {
+      toast({ title: 'Error', description: 'Please enter a Merchant ID first', variant: 'destructive' });
+      return;
+    }
+    if (!menu || menu.dishes.length === 0) {
+      toast({ title: 'Error', description: 'No menu dishes found', variant: 'destructive' });
       return;
     }
 
-    setGeneratingImages(true);
+    setProcessingMenu(true);
+    setHyperzodError(null);
+
     try {
-      const { data, error } = await supabase.functions.invoke('generate-menu-images', {
+      // Step 1: Generate images
+      setProcessStep('Generating images...');
+      const { data: imgData, error: imgError } = await supabase.functions.invoke('generate-menu-images', {
         body: { 
           menu_id: menu.id,
-          ambience: 'soft_window_light',
-          background: 'cozy_wooden_table'
+          ambience: selectedAmbience,
+          background: selectedBackground
         }
       });
 
-      if (error) {
-        toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        return;
+      if (imgError) {
+        throw new Error(`Image generation failed: ${imgError.message}`);
       }
 
-      if (data?.success) {
+      toast({ 
+        title: 'Images Generated', 
+        description: `${imgData?.success_count || 0} images created`
+      });
+
+      // Refresh dish data to get image URLs
+      setProcessStep('Loading updated menu...');
+      const { data: updatedDishes } = await supabase
+        .from('dishes')
+        .select('id, name, description, price, category, is_upsell, image_url')
+        .eq('menu_id', menu.id)
+        .order('sort_order', { ascending: true });
+
+      // Step 2: Import to Hyperzod with images
+      setProcessStep('Importing to Hyperzod...');
+      const { data: importData, error: importError } = await supabase.functions.invoke('import-menu-to-hyperzod', {
+        body: { 
+          merchant_id: merchantId.trim(),
+          dishes: updatedDishes || menu.dishes
+        }
+      });
+
+      if (importError) {
+        throw new Error(`Hyperzod import failed: ${importError.message}`);
+      }
+
+      if (importData?.success) {
         toast({ 
-          title: 'Images Generated!', 
-          description: `Generated ${data.success_count} images for dishes`
+          title: '✓ Complete!', 
+          description: `Generated images and imported ${importData.successful_count} dishes to Hyperzod`
         });
-        // Refresh to load new images
-        fetchChefData();
       } else {
+        const failedItems = importData?.results?.filter((r: any) => !r.success) || [];
+        if (failedItems.length > 0) {
+          setHyperzodError({ 
+            error: 'Some dishes failed to import',
+            details: { field: 'dishes', message: failedItems.map((r: any) => `${r.dish_name}: ${r.error}`).join(', ') }
+          });
+        }
         toast({ 
-          title: data?.success_count > 0 ? 'Partial Success' : 'Failed', 
-          description: `${data?.success_count || 0} images generated, ${data?.error_count || 0} failed`,
-          variant: data?.success_count > 0 ? 'default' : 'destructive'
+          title: importData?.successful_count > 0 ? 'Partial Success' : 'Import Failed', 
+          description: importData?.message || 'Check error details',
+          variant: importData?.successful_count > 0 ? 'default' : 'destructive'
         });
       }
+
+      // Refresh UI
+      fetchChefData();
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message || 'Failed to generate images', variant: 'destructive' });
+      setHyperzodError({ error: err?.message || 'Process failed' });
+      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
     } finally {
-      setGeneratingImages(false);
+      setProcessingMenu(false);
+      setProcessStep('');
     }
   };
 
@@ -1249,50 +1241,86 @@ export function ChefDetailsModal({
                             placeholder="Merchant ID"
                             value={merchantId}
                             onChange={(e) => setMerchantId(e.target.value)}
-                            className={cn("w-56 h-8 text-sm pr-8", storedMerchantId && "border-green-300")}
+                            className={cn("w-48 h-8 text-sm pr-8", storedMerchantId && "border-green-300")}
                           />
                           {storedMerchantId && merchantId === storedMerchantId && (
                             <CheckCircle className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
                           )}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={handleGenerateImages}
-                          disabled={generatingImages || !menu}
-                          className="gap-2"
-                        >
-                          {generatingImages ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <ImagePlus className="w-4 h-4" />
-                              Generate Images
-                            </>
-                          )}
-                        </Button>
-                        <Button 
-                          variant="default" 
-                          size="sm" 
-                          onClick={handleImportMenuToHyperzod}
-                          disabled={importingMenu || !merchantId.trim()}
-                          className="gap-2"
-                        >
-                          {importingMenu ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Importing...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4" />
-                              Import to Hyperzod
-                            </>
-                          )}
-                        </Button>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button 
+                              variant="default" 
+                              size="sm" 
+                              disabled={processingMenu || !merchantId.trim() || !menu}
+                              className="gap-2"
+                            >
+                              {processingMenu ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  {processStep || 'Processing...'}
+                                </>
+                              ) : (
+                                <>
+                                  <Rocket className="w-4 h-4" />
+                                  Generate & Import
+                                </>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 bg-background border shadow-lg z-50" align="start">
+                            <div className="space-y-4">
+                              <h4 className="font-medium text-sm">Photo Style Settings</h4>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Background</Label>
+                                <Select value={selectedBackground} onValueChange={setSelectedBackground}>
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-background z-50">
+                                    <SelectItem value="cozy_wooden_table">Cozy Wooden Table</SelectItem>
+                                    <SelectItem value="bright_and_airy">Bright & Airy</SelectItem>
+                                    <SelectItem value="luxury_marble_surface">Luxury Marble</SelectItem>
+                                    <SelectItem value="rustic_wooden_charm">Rustic Charm</SelectItem>
+                                    <SelectItem value="moody_concrete_background">Moody Concrete</SelectItem>
+                                    <SelectItem value="fresh_pastel_vibes">Fresh Pastel</SelectItem>
+                                    <SelectItem value="earthy_slate_surface">Earthy Slate</SelectItem>
+                                    <SelectItem value="bold_black_backdrop">Bold Black</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Lighting</Label>
+                                <Select value={selectedAmbience} onValueChange={setSelectedAmbience}>
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-background z-50">
+                                    <SelectItem value="soft_window_light">Soft Window Light</SelectItem>
+                                    <SelectItem value="natural_daylight">Natural Daylight</SelectItem>
+                                    <SelectItem value="natural_side_light">Natural Side Light</SelectItem>
+                                    <SelectItem value="warm_directional_light">Warm Directional</SelectItem>
+                                    <SelectItem value="studio_lighting_100mm">Studio Macro</SelectItem>
+                                    <SelectItem value="moody_softbox">Moody Softbox</SelectItem>
+                                    <SelectItem value="dramatic_studio_light">Dramatic Studio</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <Button 
+                                className="w-full gap-2" 
+                                size="sm"
+                                onClick={handleGenerateAndImport}
+                                disabled={processingMenu}
+                              >
+                                <Rocket className="w-4 h-4" />
+                                Start Process
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                This will generate AI photos for all {menu?.dishes.length || 0} dishes and import them to Hyperzod.
+                              </p>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
                         <Download className="w-4 h-4" />
