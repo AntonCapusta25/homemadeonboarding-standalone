@@ -41,23 +41,7 @@ serve(async (req) => {
     const acceptedOrderTypes = mapServiceType(chef.service_type || "unsure");
     const postalCode = extractPostalCode(chef.address || "");
 
-    // Commission structure per order type
-    const buildCommissionStructure = () => {
-      const commission: any = {};
-      const allOrderTypes = ["delivery", "pickup", "custom_1"];
-      
-      for (const orderType of allOrderTypes) {
-        commission[orderType] = {
-          type: "percentage",
-          value: 15,
-          calculate_on_status: 1,
-        };
-      }
-      
-      return commission;
-    };
-
-    // CORRECTED PAYLOAD with proper commission structure
+    // PAYLOAD with CORRECT commission structure
     const merchantPayload = {
       name: chef.business_name || chef.chef_name || "Unknown Chef",
       address: chef.address || "",
@@ -74,26 +58,45 @@ serve(async (req) => {
       status: 1,
       delivery_by: "tenant",
       
-      // Commission: structured per order type
-      commission: buildCommissionStructure(),
+      // CRITICAL: Commission must be structured per order type
+      commission: {
+        delivery: {
+          type: "percentage",
+          value: 15,
+          calculate_on_status: 1,
+        },
+        pickup: {
+          type: "percentage",
+          value: 15,
+          calculate_on_status: 1,
+        },
+        custom_1: {
+          type: "percentage",
+          value: 15,
+          calculate_on_status: 1,
+        },
+      },
       
       tax_method: "inclusive",
       merchant_category_ids: [],
       
-      // Language translation: must have at least one entry
+      // Language translation: REQUIRED with at least one entry
       language_translation: [
         {
           locale: "en",
           key: "name",
           value: chef.business_name || chef.chef_name || "Unknown Chef",
-        }
+        },
       ],
       
       tenant_id: TENANT_ID,
       apikey: HYPERZOD_API_KEY,
     };
 
-    console.log("Payload:", JSON.stringify(merchantPayload, null, 2));
+    console.log("=".repeat(60));
+    console.log("PAYLOAD BEING SENT:");
+    console.log(JSON.stringify(merchantPayload, null, 2));
+    console.log("=".repeat(60));
 
     const response = await fetch(`${BASE_URL}/admin/v1/merchant/create`, {
       method: "POST",
@@ -122,7 +125,10 @@ serve(async (req) => {
           success: false,
           error: "Validation failed",
           validation_errors: validationErrors,
-          payload_sent: merchantPayload,
+          payload_structure: {
+            commission_keys: Object.keys(merchantPayload.commission),
+            language_translation_count: merchantPayload.language_translation.length,
+          },
         }),
         {
           status: 422,
@@ -160,13 +166,13 @@ serve(async (req) => {
     }
 
     console.log("✅ SUCCESS! Merchant created");
-    console.log("Merchant ID:", merchantData?.data?._id || "unknown");
+    console.log("Merchant ID:", merchantData?.data?._id || merchantData?._id || "unknown");
 
     return new Response(
       JSON.stringify({
         success: true,
         merchant: merchantData,
-        message: "Merchant created successfully!",
+        message: "Merchant created successfully in Hyperzod!",
       }),
       {
         status: 200,
@@ -180,6 +186,7 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error?.message || String(error),
+        stack: error?.stack,
       }),
       {
         status: 500,
