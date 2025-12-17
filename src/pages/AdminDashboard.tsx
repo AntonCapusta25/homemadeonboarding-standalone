@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useChefProfiles, ChefWithStats } from '@/hooks/useChefProfiles';
@@ -92,7 +92,17 @@ export default function AdminDashboard() {
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
-  
+
+  // Memoize the options to prevent unnecessary re-fetches
+  const chefProfilesOptions = useMemo(() => ({
+    page,
+    pageSize: 10,
+    statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
+    adminId: user?.id,
+    includePending: true,
+    searchQuery: searchQuery.trim() || undefined,
+    sortByAdmin: adminFilter !== 'all' ? adminFilter : undefined,
+  }), [page, statusFilter, user?.id, searchQuery, adminFilter]);
 
   const {
     chefs,
@@ -109,15 +119,7 @@ export default function AdminDashboard() {
     assignAdmin,
     incrementCallAttempts,
     updateFollowUpDate,
-  } = useChefProfiles({
-    page,
-    pageSize: 10,
-    statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
-    adminId: user?.id,
-    includePending: true,
-    searchQuery: searchQuery.trim() || undefined,
-    sortByAdmin: adminFilter !== 'all' ? adminFilter : undefined,
-  });
+  } = useChefProfiles(chefProfilesOptions);
 
   const { stats: adminStats, loading: statsLoading, error: statsError } = useAdminStatistics();
 
@@ -135,7 +137,7 @@ export default function AdminDashboard() {
     const syncQuizzes = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('sync-typeform-quizzes');
-        
+
         if (error) {
           console.error('Quiz sync error:', error);
           return;
@@ -491,12 +493,11 @@ export default function AdminDashboard() {
                 <Badge
                   key={plan}
                   variant="outline"
-                  className={`text-sm py-1 px-3 ${
-                    plan === 'advanced' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                  className={`text-sm py-1 px-3 ${plan === 'advanced' ? 'bg-purple-100 text-purple-800 border-purple-200' :
                     plan === 'pro' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                    plan === 'starter' ? 'bg-green-100 text-green-800 border-green-200' :
-                    'bg-gray-100 text-gray-800 border-gray-200'
-                  }`}
+                      plan === 'starter' ? 'bg-green-100 text-green-800 border-green-200' :
+                        'bg-gray-100 text-gray-800 border-gray-200'
+                    }`}
                 >
                   {plan.charAt(0).toUpperCase() + plan.slice(1)}: {count}
                 </Badge>
@@ -551,7 +552,7 @@ export default function AdminDashboard() {
                         Step: {pending.current_step || 'contact'}
                       </Badge>
                       {pending.phone && (
-                        <a 
+                        <a
                           href={`tel:${pending.phone}`}
                           className="text-xs text-primary hover:underline flex items-center gap-1"
                         >
@@ -678,7 +679,7 @@ export default function AdminDashboard() {
                   </TableRow>
                 ) : (
                   filteredChefs.map((chef) => (
-                    <TableRow 
+                    <TableRow
                       key={chef.id}
                       className={cn(
                         "cursor-pointer transition-colors",
@@ -830,7 +831,7 @@ export default function AdminDashboard() {
                             <SelectValue>
                               <span className="flex items-center gap-1 text-sm">
                                 <UserPlus className="w-3 h-3" />
-                                {chef.assigned_admin_id 
+                                {chef.assigned_admin_id
                                   ? admins.find(a => a.id === chef.assigned_admin_id)?.name || 'Assigned'
                                   : 'Unassigned'}
                               </span>
@@ -928,8 +929,8 @@ export default function AdminDashboard() {
                                 : 'Set'}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent 
-                            className="w-auto p-0 z-50 bg-card border shadow-lg" 
+                          <PopoverContent
+                            className="w-auto p-0 z-50 bg-card border shadow-lg"
                             align="start"
                           >
                             <Calendar
