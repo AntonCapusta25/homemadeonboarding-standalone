@@ -120,7 +120,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: emailToVerify.trim().toLowerCase(),
-          redirectTo: `${window.location.origin}/onboarding?verified=true`
+          redirectTo: `https://chef-craft-flow.lovable.app/onboarding?verified=true`
         },
       });
 
@@ -155,7 +155,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: emailValue.trim().toLowerCase(),
-          redirectTo: `${window.location.origin}/onboarding?verified=true`
+          redirectTo: `https://chef-craft-flow.lovable.app/onboarding?verified=true`
         },
       });
 
@@ -224,7 +224,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: email.trim().toLowerCase(),
-          redirectTo: `${window.location.origin}/onboarding?verified=true`
+          redirectTo: `https://chef-craft-flow.lovable.app/onboarding?verified=true`
         },
       });
 
@@ -290,31 +290,34 @@ export function ContactStep({
     
     if (!validate()) return;
     
-    // Silently create account in background for new users
-    supabase.functions.invoke('auto-create-account', {
-      body: {
-        email: email.trim(),
-        chefName: `${firstName} ${lastName}`.trim(),
-      },
-    }).then(({ data, error }) => {
-      if (error) {
-        console.error('Auto-create account error (background):', error);
-        return;
-      }
+    // Silently create account in background for new users only
+    // (Returning users are already authenticated via magic link)
+    if (!user) {
+      supabase.functions.invoke('auto-create-account', {
+        body: {
+          email: email.trim(),
+          chefName: `${firstName} ${lastName}`.trim(),
+        },
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('Auto-create account error (background):', error);
+          return;
+        }
 
-      if (data?.verifyToken) {
-        supabase.auth.verifyOtp({
-          token_hash: data.verifyToken,
-          type: data.tokenType || 'magiclink',
-        }).catch(err => console.error('OTP verification error (background):', err));
-      }
+        if (data?.verifyToken) {
+          supabase.auth.verifyOtp({
+            token_hash: data.verifyToken,
+            type: data.tokenType || 'magiclink',
+          }).catch(err => console.error('OTP verification error (background):', err));
+        }
 
-      if (onAccountCreated && data?.userId) {
-        onAccountCreated(data.userId);
-      }
-    }).catch(err => {
-      console.error('Error in background account creation:', err);
-    });
+        if (onAccountCreated && data?.userId) {
+          onAccountCreated(data.userId);
+        }
+      }).catch(err => {
+        console.error('Error in background account creation:', err);
+      });
+    }
 
     onNext();
   };
