@@ -1,8 +1,5 @@
 project_id = "mnhtpdsgxlyqppzyevvl"
 
-[edge_runtime]
-policy = "per_worker"
-
 [functions.send-verification-link]
 verify_jwt = false
 
@@ -61,7 +58,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-menu-images]
-verify_jwt = false
-
-[functions.orchestrate-merchant-setup]
 verify_jwt = false
