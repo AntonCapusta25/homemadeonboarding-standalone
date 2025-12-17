@@ -67,21 +67,19 @@ serve(async (req) => {
       try {
         const dishName = safeString(dish?.name, 120);
         const description = safeString(dish?.description ?? "", 2000);
-        const priceSell = Number(dish?.price);
+        const priceSell = Number(dish?.price) || 0;
 
-        if (!dishName || !Number.isFinite(priceSell)) {
+        if (!dishName) {
           results.push({
-            dish_name: dishName || "(invalid dish)",
+            dish_name: "(invalid dish)",
             success: false,
-            error: "Invalid dish payload (name/price)",
+            error: "Invalid dish payload (missing name)",
           });
           continue;
         }
 
-        // Hyperzod requires product_category and a valid product_pricing.type.
-        // Based on observed validation behavior, product_pricing.type expects an order type (e.g. delivery/pickup).
-        const pricingType = "delivery";
-
+        // Based on docs: existing products have product_pricing without "type" field
+        // but validation requires profit and margin fields
         const productPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
@@ -90,17 +88,16 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
-            type: pricingType,
             price_sell: priceSell,
-            // Use same as sell price to satisfy any min/compare validation rules.
-            price_sell_compare: priceSell,
+            price_sell_compare: 0,
             is_tax_chargaeble: false,
             tax: 0,
+            profit: 0,
+            margin: 0,
           },
           has_product_options: false,
           product_options: [],
-          // We only have a string category from our menu, so send it as a label-like category value.
-          product_category: [safeString(dish?.category ?? (dish?.is_upsell ? "upsell" : "main"), 40)],
+          product_category: [],
           product_tags: dish?.is_upsell ? ["upsell", "extra"] : ["main"],
           product_labels: [],
           status: true,
@@ -114,6 +111,7 @@ serve(async (req) => {
         };
 
         console.log(`Creating product: ${dishName}`);
+        console.log(`Payload: ${JSON.stringify(productPayload)}`);
 
         const response = await fetch(`${BASE_URL}/merchant/v1/catalog/product/create`, {
           method: "POST",
@@ -127,9 +125,7 @@ serve(async (req) => {
         });
 
         const responseText = await response.text();
-        console.log(
-          `Product ${dishName} response: ${response.status} - ${responseText.substring(0, 800)}`,
-        );
+        console.log(`Product ${dishName} response: ${response.status} - ${responseText}`);
 
         if (response.ok) {
           let data: any;
@@ -148,7 +144,7 @@ serve(async (req) => {
           results.push({
             dish_name: dishName,
             success: false,
-            error: `${response.status}: ${responseText.substring(0, 300)}`,
+            error: `${response.status}: ${responseText}`,
           });
         }
       } catch (dishError: any) {
