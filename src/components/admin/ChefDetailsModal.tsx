@@ -19,7 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, Wifi, AlertTriangle, Rocket, Search
+  Download, Store, AlertTriangle, Rocket, Upload, Pencil, Trash2, Save
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -116,6 +116,19 @@ export function ChefDetailsModal({
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
   const [storedMerchantId, setStoredMerchantId] = useState<string | null>(null);
+  
+  // Menu upload states
+  interface ParsedDish {
+    name: string;
+    description: string | null;
+    price: number;
+    category: string;
+    is_upsell: boolean;
+  }
+  const [parsedDishes, setParsedDishes] = useState<ParsedDish[]>([]);
+  const [parsingMenu, setParsingMenu] = useState(false);
+  const [savingMenu, setSavingMenu] = useState(false);
+  const [editingDishIndex, setEditingDishIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen && chef.id) {
@@ -246,37 +259,147 @@ export function ChefDetailsModal({
     }
   };
 
-  const handleTestConnection = async () => {
-    setTestingConnection(true);
-    setHyperzodError(null);
-    setConnectionStatus('idle');
+  // Handle file upload for menu parsing
+  const handleMenuFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setParsingMenu(true);
+    setParsedDishes([]);
+
     try {
-      const { data, error } = await supabase.functions.invoke('test-hyperzod-connection');
+      // Read file content
+      const content = await file.text();
+      
+      const { data, error } = await supabase.functions.invoke('parse-menu-file', {
+        body: { content, filename: file.name }
+      });
 
       if (error) {
-        setConnectionStatus('error');
-        setHyperzodError({ error: error.message, details: { field: 'network', message: 'Failed to reach edge function' } });
-        toast({ title: 'Connection Test Failed', description: error.message, variant: 'destructive' });
-        return;
+        throw new Error(error.message);
       }
 
-      if (data?.success) {
-        setConnectionStatus('success');
-        toast({ 
-          title: 'Connection Successful', 
-          description: `Tenant: ${data.details?.tenant_id}, API Key Valid: ✓` 
-        });
-      } else {
-        setConnectionStatus('error');
-        setHyperzodError({ error: data?.error || 'Unknown error', details: data?.details });
-        toast({ title: 'Connection Failed', description: data?.error, variant: 'destructive' });
+      if (!data?.success || !data?.dishes) {
+        throw new Error(data?.error || 'Failed to parse menu');
       }
+
+      setParsedDishes(data.dishes);
+      toast({ 
+        title: 'Menu Parsed', 
+        description: `Found ${data.dishes.length} dishes. Review and edit before saving.` 
+      });
     } catch (err: any) {
-      setConnectionStatus('error');
-      setHyperzodError({ error: err?.message || 'Network error', details: { field: 'network', message: 'Could not reach API' } });
-      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+      console.error('Menu parse error:', err);
+      toast({ 
+        title: 'Parse Failed', 
+        description: err?.message || 'Could not parse the menu file', 
+        variant: 'destructive' 
+      });
     } finally {
-      setTestingConnection(false);
+      setParsingMenu(false);
+      // Reset file input
+      event.target.value = '';
+    }
+  };
+
+  // Update a parsed dish
+  const updateParsedDish = (index: number, field: keyof ParsedDish, value: any) => {
+    setParsedDishes(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      // Auto-set is_upsell based on category
+      if (field === 'category') {
+        const upsellCategories = ['Drinks', 'Desserts', 'Extras', 'Sides'];
+        updated[index].is_upsell = upsellCategories.includes(value);
+      }
+      return updated;
+    });
+  };
+
+  // Delete a parsed dish
+  const deleteParsedDish = (index: number) => {
+    setParsedDishes(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Save parsed dishes to database
+  const handleSaveParsedMenu = async () => {
+    if (parsedDishes.length === 0) return;
+
+    setSavingMenu(true);
+    try {
+      // If there's an existing menu, delete old dishes and add new ones
+      // If no menu exists, create a new one
+      let menuId = menu?.id;
+
+      if (!menuId) {
+        // Create new menu
+        const { data: newMenu, error: menuError } = await supabase
+          .from('menus')
+          .insert({
+            chef_profile_id: chef.id,
+            is_active: true,
+            summary: `Uploaded menu with ${parsedDishes.length} dishes`,
+          })
+          .select()
+          .single();
+
+        if (menuError) throw menuError;
+        menuId = newMenu.id;
+      } else {
+        // Deactivate old menu and create new one
+        await supabase
+          .from('menus')
+          .update({ is_active: false })
+          .eq('id', menuId);
+
+        const { data: newMenu, error: menuError } = await supabase
+          .from('menus')
+          .insert({
+            chef_profile_id: chef.id,
+            is_active: true,
+            summary: `Uploaded menu with ${parsedDishes.length} dishes`,
+          })
+          .select()
+          .single();
+
+        if (menuError) throw menuError;
+        menuId = newMenu.id;
+      }
+
+      // Insert new dishes
+      const dishesToInsert = parsedDishes.map((dish, index) => ({
+        menu_id: menuId,
+        name: dish.name,
+        description: dish.description,
+        price: dish.price,
+        category: dish.category,
+        is_upsell: dish.is_upsell,
+        sort_order: index,
+      }));
+
+      const { error: dishError } = await supabase
+        .from('dishes')
+        .insert(dishesToInsert);
+
+      if (dishError) throw dishError;
+
+      toast({ 
+        title: 'Menu Saved', 
+        description: `${parsedDishes.length} dishes saved successfully` 
+      });
+
+      // Clear parsed dishes and refresh menu data
+      setParsedDishes([]);
+      fetchChefData();
+    } catch (err: any) {
+      console.error('Save menu error:', err);
+      toast({ 
+        title: 'Save Failed', 
+        description: err?.message || 'Could not save the menu', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setSavingMenu(false);
     }
   };
 
@@ -763,24 +886,6 @@ export function ChefDetailsModal({
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           </DialogTitle>
           <div className="flex items-center gap-2 ml-auto mr-8">
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={handleTestConnection} 
-              disabled={testingConnection}
-            >
-              {testingConnection ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <Wifi className={cn("w-4 h-4 mr-2", connectionStatus === 'success' && "text-green-500", connectionStatus === 'error' && "text-red-500")} />
-                  Test Connection
-                </>
-              )}
-            </Button>
             <Popover>
               <PopoverTrigger asChild>
                 <Button 
@@ -1188,48 +1293,149 @@ export function ChefDetailsModal({
               </TabsContent>
 
               <TabsContent value="menu" className="space-y-4">
+                {/* Upload Section */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-medium">Upload New Menu</h4>
+                      <p className="text-xs text-muted-foreground">Upload CSV, TXT, DOCX, or JSON file to replace the current menu</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept=".csv,.txt,.json,.doc,.docx"
+                        onChange={handleMenuFileUpload}
+                        disabled={parsingMenu}
+                        className="max-w-[200px] text-xs"
+                      />
+                      {parsingMenu && <Loader2 className="w-4 h-4 animate-spin" />}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Parsed Dishes Preview */}
+                {parsedDishes.length > 0 && (
+                  <Card className="p-4 border-primary/50">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="font-medium text-primary">Parsed Menu Preview</h4>
+                        <p className="text-xs text-muted-foreground">{parsedDishes.length} dishes found. Click pencil to edit before saving.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setParsedDishes([])}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={handleSaveParsedMenu}
+                          disabled={savingMenu}
+                          className="gap-2"
+                        >
+                          {savingMenu ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          Save Menu
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                      {parsedDishes.map((dish, index) => (
+                        <div key={index} className="flex gap-3 p-3 border rounded-lg bg-muted/20">
+                          {editingDishIndex === index ? (
+                            // Edit mode
+                            <div className="flex-1 space-y-2">
+                              <Input
+                                value={dish.name}
+                                onChange={(e) => updateParsedDish(index, 'name', e.target.value)}
+                                placeholder="Dish name"
+                                className="h-8"
+                              />
+                              <div className="flex gap-2">
+                                <Select 
+                                  value={dish.category} 
+                                  onValueChange={(val) => updateParsedDish(index, 'category', val)}
+                                >
+                                  <SelectTrigger className="h-8 w-40">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Main Dishes">Main Dishes</SelectItem>
+                                    <SelectItem value="Appetizers">Appetizers</SelectItem>
+                                    <SelectItem value="Soups">Soups</SelectItem>
+                                    <SelectItem value="Salads">Salads</SelectItem>
+                                    <SelectItem value="Sides">Sides</SelectItem>
+                                    <SelectItem value="Drinks">Drinks</SelectItem>
+                                    <SelectItem value="Desserts">Desserts</SelectItem>
+                                    <SelectItem value="Extras">Extras</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={dish.price}
+                                  onChange={(e) => updateParsedDish(index, 'price', parseFloat(e.target.value) || 0)}
+                                  placeholder="Price"
+                                  className="h-8 w-24"
+                                />
+                              </div>
+                              <Textarea
+                                value={dish.description || ''}
+                                onChange={(e) => updateParsedDish(index, 'description', e.target.value || null)}
+                                placeholder="Description (optional)"
+                                className="min-h-[60px] text-sm"
+                              />
+                              <div className="flex justify-end">
+                                <Button size="sm" variant="outline" onClick={() => setEditingDishIndex(null)}>
+                                  Done
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            // View mode
+                            <>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium">{dish.name}</p>
+                                {dish.description && (
+                                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{dish.description}</p>
+                                )}
+                                <Badge variant="outline" className="mt-1 text-xs">{dish.category}</Badge>
+                                {dish.is_upsell && <Badge className="ml-1 text-xs bg-blue-100 text-blue-800">Upsell</Badge>}
+                              </div>
+                              <p className="font-semibold flex-shrink-0">€{Number(dish.price).toFixed(2)}</p>
+                              <div className="flex flex-col gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7"
+                                  onClick={() => setEditingDishIndex(index)}
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 text-destructive"
+                                  onClick={() => deleteParsedDish(index)}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Existing Menu Display */}
                 {!menu ? (
-                  <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
+                  parsedDishes.length === 0 && <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
                 ) : (
                   <>
-                    <div className="flex flex-wrap items-center gap-4 justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">Style:</Label>
-                          <Select value={selectedBackground} onValueChange={setSelectedBackground}>
-                            <SelectTrigger className="h-7 text-xs w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background z-50">
-                              <SelectItem value="cozy_wooden_table">Cozy Wooden</SelectItem>
-                              <SelectItem value="bright_and_airy">Bright & Airy</SelectItem>
-                              <SelectItem value="luxury_marble_surface">Luxury Marble</SelectItem>
-                              <SelectItem value="rustic_wooden_charm">Rustic Charm</SelectItem>
-                              <SelectItem value="moody_concrete_background">Moody Concrete</SelectItem>
-                              <SelectItem value="fresh_pastel_vibes">Fresh Pastel</SelectItem>
-                              <SelectItem value="earthy_slate_surface">Earthy Slate</SelectItem>
-                              <SelectItem value="bold_black_backdrop">Bold Black</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">Light:</Label>
-                          <Select value={selectedAmbience} onValueChange={setSelectedAmbience}>
-                            <SelectTrigger className="h-7 text-xs w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background z-50">
-                              <SelectItem value="soft_window_light">Soft Window</SelectItem>
-                              <SelectItem value="natural_daylight">Natural Daylight</SelectItem>
-                              <SelectItem value="natural_side_light">Side Light</SelectItem>
-                              <SelectItem value="warm_directional_light">Warm Directional</SelectItem>
-                              <SelectItem value="studio_lighting_100mm">Studio Macro</SelectItem>
-                              <SelectItem value="moody_softbox">Moody Softbox</SelectItem>
-                              <SelectItem value="dramatic_studio_light">Dramatic Studio</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
                       <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
                         <Download className="w-4 h-4" />
                         Download ZIP
