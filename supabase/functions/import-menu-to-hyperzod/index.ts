@@ -60,6 +60,7 @@ serve(async (req) => {
             { key: "description", locale: "en", value: dish.description || "" },
           ],
           product_pricing: {
+            type: "fixed",
             price_sell: Number(dish.price),
             price_sell_compare: 0,
             is_tax_chargaeble: false,
@@ -67,7 +68,7 @@ serve(async (req) => {
           },
           has_product_options: false,
           product_options: [],
-          product_category: [],
+          product_category: ["uncategorized"],
           product_tags: dish.is_upsell ? ["upsell", "extra"] : ["main"],
           product_labels: [],
           status: true,
