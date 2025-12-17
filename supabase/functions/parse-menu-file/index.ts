@@ -19,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    const { content, filename } = await req.json();
+    const { content, filename, isBase64 } = await req.json();
 
     if (!content) {
       return new Response(
@@ -36,7 +36,7 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `You are a menu parser. Extract dishes from the provided menu content and return them as a JSON array.
+    const systemPrompt = `You are a menu parser. Extract dishes from the provided menu and return them as a JSON array.
 
 Each dish should have:
 - name: The dish name (string)
@@ -47,20 +47,53 @@ Each dish should have:
 
 Important rules:
 - Always return a valid JSON array
-- Extract prices as numbers (strip currency symbols)
-- If price is missing, estimate a reasonable price
+- Extract prices as numbers (strip currency symbols like €, $, etc.)
+- If price is missing, estimate a reasonable price based on the dish type
 - Categorize dishes appropriately based on their names/descriptions
 - Set is_upsell=true for drinks, desserts, sides, extras
 - Clean up formatting and remove any artifacts from the source format
 
 Return ONLY the JSON array, no other text.`;
 
-    const userPrompt = `Parse this menu content and extract all dishes as JSON:
+    let userPrompt: string;
+    let messages: any[];
+
+    if (isBase64) {
+      // Handle image input with vision API
+      const base64Data = content.split(',')[1]; // Remove data:image/...;base64, prefix
+      const mimeType = content.match(/data:(image\/[^;]+);/)?.[1] || 'image/jpeg';
+
+      userPrompt = `Parse this menu image and extract all dishes as JSON. The image shows a restaurant menu.`;
+
+      messages = [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: userPrompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`
+              }
+            }
+          ]
+        },
+      ];
+    } else {
+      // Handle text input
+      userPrompt = `Parse this menu content and extract all dishes as JSON:
 
 Filename: ${filename || 'menu'}
 
 Content:
 ${content}`;
+
+      messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ];
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -69,11 +102,8 @@ ${content}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
+        model: 'google/gemini-2.0-flash-exp',
+        messages,
         temperature: 0.3,
       }),
     });
@@ -82,7 +112,7 @@ ${content}`;
       const errorText = await response.text();
       console.error('AI gateway error:', response.status, errorText);
       return new Response(
-        JSON.stringify({ success: false, error: 'AI service error' }),
+        JSON.stringify({ success: false, error: 'AI service error', details: errorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -268,11 +268,27 @@ export function ChefDetailsModal({
     setParsedDishes([]);
 
     try {
-      // Read file content
-      const content = await file.text();
+      // Check if file is an image
+      const isImage = file.type.startsWith('image/');
+      let content: string;
+      let isBase64 = false;
+
+      if (isImage) {
+        // Read image as base64
+        content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        isBase64 = true;
+      } else {
+        // Read text files normally
+        content = await file.text();
+      }
 
       const { data, error } = await supabase.functions.invoke('parse-menu-file', {
-        body: { content, filename: file.name }
+        body: { content, filename: file.name, isBase64 }
       });
 
       if (error) {
