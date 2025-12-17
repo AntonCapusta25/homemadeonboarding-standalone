@@ -150,7 +150,7 @@ serve(async (req) => {
         // Use appropriate category based on dish type
         const categoryId = isUpsell && extrasCategoryId ? extrasCategoryId : mainCategoryId;
 
-        // FIXED: Added required 'type' field to product_pricing
+        // NOTE: Hyperzod docs for Merchant API/Product "Create a product" do not require product_pricing.type
         const productPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
@@ -159,7 +159,6 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
-            type: "fixed", // REQUIRED: "fixed" or "variable"
             price_buy: 0,
             price_sell: priceSell,
             price_sell_compare: null,
