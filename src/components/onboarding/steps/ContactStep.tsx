@@ -210,11 +210,10 @@ export function ContactStep({
         // EXISTING USER: Send magic link and block until verified
         console.log('Existing user found, sending magic link for verification');
 
-        const { data: magicLinkData, error: magicLinkError } = await supabase.functions.invoke('send-magic-link', {
+        const { data: magicLinkData, error: magicLinkError } = await supabase.functions.invoke('send-verification-link', {
           body: {
             email: normalizedEmail,
-            chefName: lookupData.profile?.chef_name?.split(' ')[0] || firstName,
-            businessName: lookupData.profile?.business_name || '',
+            redirectTo: 'https://signup.homemadechefs.com/onboarding',
           },
         });
 
