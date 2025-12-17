@@ -23,7 +23,8 @@ serve(async (req) => {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "x-tenant": TENANT_ID,
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY || "",
       },
     });
 
@@ -146,8 +147,8 @@ serve(async (req) => {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "x-tenant": TENANT_ID,
-        "x-api-key": HYPERZOD_API_KEY || "",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY || "",
       },
       body: JSON.stringify(merchantPayload),
     });
