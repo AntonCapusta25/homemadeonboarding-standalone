@@ -93,8 +93,12 @@ function tryParseJson(text: string): any | null {
 }
 
 function hasTypeInvalidError(parsed: any): boolean {
-  const errs = parsed?.data?.["product_pricing.type"];
-  return Array.isArray(errs) && errs.some((m: string) => m.toLowerCase().includes("invalid"));
+  const errs =
+    parsed?.data?.["product_pricing.type"] ??
+    parsed?.data?.data?.["product_pricing.type"] ??
+    parsed?.error?.data?.["product_pricing.type"]; 
+
+  return Array.isArray(errs) && errs.some((m: string) => String(m).toLowerCase().includes("invalid"));
 }
 
 async function detectExistingProductPricingType(
@@ -115,7 +119,7 @@ async function detectExistingProductPricingType(
 
     const text = await resp.text();
     if (!resp.ok) {
-      console.log(`Product list not available (${resp.status})`);
+      console.log(`Product list not available (${resp.status}): ${text.slice(0, 500)}`);
       return null;
     }
 
@@ -127,11 +131,16 @@ async function detectExistingProductPricingType(
       [];
 
     const first = Array.isArray(products) ? products[0] : null;
+    const pricing = first?.product_pricing ?? null;
     const type =
-      first?.product_pricing?.type ??
-      first?.product_pricing?.pricing_type ??
-      first?.product_pricing?.[0]?.type ??
+      pricing?.type ??
+      pricing?.pricing_type ??
+      pricing?.[0]?.type ??
       null;
+
+    console.log(
+      `Product list ok; sample product_pricing: ${JSON.stringify(pricing)?.slice(0, 800)}`,
+    );
 
     if (type !== null && type !== undefined && type !== "") {
       console.log(`Detected product_pricing.type from existing products: ${type}`);
@@ -151,23 +160,26 @@ async function createProductWithPricingTypeFallback(
   productPayload: any,
   pricingTypeHint: string | number | null,
 ): Promise<{ ok: boolean; status: number; text: string; data: any | null }> {
+  const numericCandidates = Array.from({ length: 11 }, (_, i) => i); // 0..10
+
   const rawCandidates: Array<string | number | null | undefined> = [
     pricingTypeHint,
+    // common string candidates (unknown enum)
     "simple",
     "single",
     "fixed",
     "standard",
     "default",
-    0,
-    1,
-    2,
-    3,
+    "regular",
+    "price",
+    ...numericCandidates,
   ];
 
   const typeCandidates = Array.from(
     new Set(rawCandidates.filter((v) => v !== null && v !== undefined && v !== "")),
   ) as Array<string | number>;
 
+  console.log(`Trying product_pricing.type candidates: ${typeCandidates.join(", ")}`);
   for (const candidate of typeCandidates) {
     const payload = {
       ...productPayload,
