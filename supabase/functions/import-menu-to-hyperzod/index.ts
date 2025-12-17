@@ -28,6 +28,57 @@ function safeString(input: unknown, maxLen: number) {
   return input.trim().slice(0, maxLen);
 }
 
+// Create or get default category for merchant
+async function getOrCreateCategory(merchantId: string, categoryName: string): Promise<string | null> {
+  // First try to list existing categories
+  const listResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/category/list?merchant_id=${merchantId}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "X-TENANT": TENANT_ID,
+      "X-API-KEY": HYPERZOD_API_KEY!,
+    },
+  });
+
+  if (listResponse.ok) {
+    const listData = await listResponse.json();
+    const categories = listData?.data?.data || listData?.data || [];
+    const existing = categories.find((c: any) => 
+      c.name === categoryName || 
+      c.language_translation?.some((t: any) => t.value === categoryName)
+    );
+    if (existing) {
+      console.log(`Found existing category: ${existing._id || existing.category_id}`);
+      return existing._id || existing.category_id;
+    }
+  }
+
+  // Create new category
+  const createResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/category/create`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-TENANT": TENANT_ID,
+      "X-API-KEY": HYPERZOD_API_KEY!,
+    },
+    body: JSON.stringify({
+      merchant_id: merchantId,
+      language_translation: [{ key: "name", locale: "en", value: categoryName }],
+      status: true,
+      sort_order: 0,
+    }),
+  });
+
+  const createData = await createResponse.json();
+  console.log(`Create category response:`, JSON.stringify(createData));
+  
+  if (createResponse.ok && createData?.data) {
+    return createData.data._id || createData.data.category_id;
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -61,6 +112,19 @@ serve(async (req) => {
 
     console.log(`Importing ${dishes.length} dishes to merchant ${merchant_id}`);
 
+    // Create default categories
+    const mainCategoryId = await getOrCreateCategory(merchant_id, "Main Dishes");
+    const extrasCategoryId = await getOrCreateCategory(merchant_id, "Extras");
+    
+    if (!mainCategoryId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to create product categories" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    console.log(`Using categories - Main: ${mainCategoryId}, Extras: ${extrasCategoryId}`);
+
     const results: { dish_name: string; success: boolean; error?: string; product_id?: string }[] = [];
 
     for (const dish of dishes) {
@@ -68,6 +132,7 @@ serve(async (req) => {
         const dishName = safeString(dish?.name, 120);
         const description = safeString(dish?.description ?? "", 2000);
         const priceSell = Number(dish?.price) || 0;
+        const isUpsell = dish?.is_upsell || false;
 
         if (!dishName) {
           results.push({
@@ -78,8 +143,9 @@ serve(async (req) => {
           continue;
         }
 
-        // Based on docs: existing products have product_pricing without "type" field
-        // but validation requires profit and margin fields
+        // Use appropriate category based on dish type
+        const categoryId = isUpsell && extrasCategoryId ? extrasCategoryId : mainCategoryId;
+
         const productPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
@@ -88,16 +154,15 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
+            type: "simple",
             price_sell: priceSell,
-            price_sell_compare: 0,
+            price_sell_compare: priceSell, // Must be >= price_sell
             is_tax_chargaeble: false,
             tax: 0,
-            profit: 0,
-            margin: 0,
           },
           has_product_options: false,
           product_options: [],
-          product_category: [],
+          product_category: [categoryId],
           product_tags: dish?.is_upsell ? ["upsell", "extra"] : ["main"],
           product_labels: [],
           status: true,
