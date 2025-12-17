@@ -318,7 +318,8 @@ export function ChefDetailsModal({
           body: { 
             menu_id: menu.id,
             ambience: selectedAmbience,
-            background: selectedBackground
+            background: selectedBackground,
+            cuisines: chef.cuisines || []
           }
         });
 
@@ -820,6 +821,9 @@ export function ChefDetailsModal({
                           <SelectItem value="rustic_kitchen">Rustic Kitchen</SelectItem>
                           <SelectItem value="modern_minimal">Modern Minimal</SelectItem>
                           <SelectItem value="outdoor_garden">Outdoor Garden</SelectItem>
+                          <SelectItem value="neutral_studio">Neutral Studio</SelectItem>
+                          <SelectItem value="dark_moody">Dark & Moody</SelectItem>
+                          <SelectItem value="light_airy">Light & Airy</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -835,6 +839,9 @@ export function ChefDetailsModal({
                           <SelectItem value="bright_studio">Bright Studio</SelectItem>
                           <SelectItem value="moody_dramatic">Moody Dramatic</SelectItem>
                           <SelectItem value="natural_daylight">Natural Daylight</SelectItem>
+                          <SelectItem value="overhead_soft">Overhead Soft</SelectItem>
+                          <SelectItem value="side_rim">Side Rim Light</SelectItem>
+                          <SelectItem value="backlit_glow">Backlit Glow</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

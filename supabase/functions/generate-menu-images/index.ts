@@ -7,52 +7,74 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Background prompt mappings
+// Clean background prompt mappings - focused on surface and setting only
 const BACKGROUND_PROMPTS: Record<string, string> = {
   cozy_wooden_table:
-    "A rustic wooden table with warm tones and a minimalist food setup. The soft window light highlights the food, creating a cozy, inviting feel perfect for homey and comforting meals.",
-  high_contrast_studio:
-    "A dramatic studio setting with high-contrast lighting and a dark background. The softbox creates deep shadows, emphasizing intricate details and textures in the food, giving it an editorial, modern look.",
-  bright_and_airy:
-    "A fresh and open setup with soft natural daylight coming from a north-facing window. The neutral textured surface and minimal props give it a clean, light, and refreshing vibe, ideal for showcasing simple, fresh dishes.",
-  neutral_modern_look:
-    "A sleek, neutral grey backdrop with clean studio lighting, creating a polished and modern atmosphere. The food takes center stage in an editorial style, with minimal distractions and a sharp focus on details.",
-  luxury_marble_surface:
-    "A chic white marble surface with subtle grey veins, accented by soft side light from natural sources. The clean, bright setup exudes luxury and elegance, perfect for high-end or refined dishes.",
-  rustic_wooden_charm:
-    "A warm, earthy background featuring a dark wooden table with visible grain. Directional lighting enhances the natural beauty of the wood and fresh herbs, giving the scene a rustic, homey charm with a touch of sophistication.",
-  moody_concrete_background:
-    "A moody, urban look with a rough concrete surface and deep shadows created by softbox lighting. This setup highlights the food's textures and creates a contemporary, edgy atmosphere.",
-  fresh_pastel_vibes:
-    "A light, soft pastel-painted background that evokes freshness and springtime vibes. The soft natural light and minimal props create a relaxed, approachable, and inviting feel—perfect for colorful and vibrant dishes.",
-  earthy_slate_surface:
-    "A natural, earthy slate stone slab serves as the backdrop, with directional lighting from the side to highlight the textures of the dish. The dark, grounded tone enhances the food's colors and creates an elegant, sophisticated look.",
-  bold_black_backdrop:
-    "A dramatic matte black acrylic background, with sharp, high-contrast studio lighting to accentuate the food's shape and texture. This setup gives a modern, minimalist look with bold emphasis on the dish, ideal for high-contrast, edgy food presentations.",
+    "Dark oak wooden table surface with visible natural grain. Simple, clean composition with the dish as the sole focus.",
+  clean_marble:
+    "White Carrara marble surface with subtle grey veining. Bright, clean, and luxurious setting.",
+  rustic_kitchen:
+    "Weathered farmhouse wooden surface with a neutral linen napkin. Warm, homey atmosphere.",
+  modern_minimal:
+    "Sleek matte grey concrete surface. Contemporary, clean lines with minimal styling.",
+  outdoor_garden:
+    "Natural stone surface with soft outdoor daylight. Fresh, organic garden atmosphere.",
+  neutral_studio:
+    "Neutral grey seamless backdrop. Professional studio setting with clean edges.",
+  dark_moody:
+    "Dark slate surface with dramatic shadows. Rich, sophisticated mood.",
+  light_airy:
+    "White painted wood surface with bright, diffused lighting. Fresh and inviting.",
 };
 
-// Ambience prompt mappings
+// Clean ambience/lighting prompt mappings - technical photography focus
 const AMBIENCE_PROMPTS: Record<string, string> = {
   soft_window_light:
-    "Lighting: Soft window light from the left side with white reflector bounce on the right. Lens: 85mm f/1.4. Shot Details: 45-degree angle, shallow depth of field (f/1.4), sharp focus on dish and garnish. Style: Minimalist food styling",
-  studio_lighting_100mm:
-    "Lighting: Studio lighting with large softbox at 45 degrees. Lens: 100mm f/2.8 (macro). Shot Details: Extreme close-up, focused on texture and surface details",
+    "Soft diffused natural window light from the left. Gentle shadows, warm tones. 85mm lens, f/2.8, shallow depth of field.",
+  warm_golden_hour:
+    "Warm golden hour lighting with soft orange tones. Cozy, inviting atmosphere. 50mm lens, f/1.8.",
+  bright_studio:
+    "Bright, even studio lighting with softbox from above. Clean, commercial look. 100mm macro lens, f/4.",
+  moody_dramatic:
+    "Single directional light source creating deep shadows. High contrast, dramatic mood. 85mm lens, f/2.",
   natural_daylight:
-    "Lighting: Soft diffused natural daylight from a north-facing window. Lens: 50mm f/2.2. Shot Details: Top-down view, neutral textured surface",
-  studio_light_100mm:
-    "Lighting: Clean studio light setup using Aputure 600D with dome softbox. Lens: 100mm f/2.8. Shot Details: Key light from top left, fill light on the right",
-  natural_side_light:
-    "Lighting: Soft natural side light through sheer curtains. Lens: 50mm f/1.8. Shot Details: Elegant plating with minimal props",
-  warm_directional_light:
-    "Lighting: Warm directional lighting from the left. Lens: 85mm f/1.4",
-  moody_softbox:
-    "Lighting: Softbox lighting with deep shadows. Lens: 100mm f/2.8 (macro). Shot Details: High detail on surface reflections and textures",
-  natural_light:
-    "Lighting: Soft natural light with minimal shadows. Lens: 50mm f/2.0. Shot Details: Styled with garnishes and accompaniments",
-  directional_light:
-    "Lighting: Directional light from the right, slight vignette effect. Lens: 100mm f/2.8 (macro)",
-  dramatic_studio_light:
-    "Lighting: Dramatic studio lighting with edge highlights. Lens: 85mm f/1.4. Shot Details: High-contrast lighting",
+    "Soft overcast natural daylight. Even, flattering light with minimal shadows. 50mm lens, f/2.2.",
+  overhead_soft:
+    "Soft overhead lighting with white bounce cards. Flat lay style, even illumination. Top-down shot.",
+  side_rim:
+    "Side lighting with rim highlights. Emphasizes texture and steam. 100mm lens, f/2.8.",
+  backlit_glow:
+    "Backlit setup with soft fill from front. Creates a glowing, ethereal quality. 85mm lens, f/1.4.",
+};
+
+// Cuisine-specific styling prompts
+const CUISINE_PROMPTS: Record<string, string> = {
+  italian: "Mediterranean styling with olive oil drizzle, fresh basil, rustic ceramic plate.",
+  indian: "Vibrant colors, brass or copper serving bowl, aromatic spices visible, naan or rice accompaniment.",
+  pakistani: "Rich earthy tones, traditional serving style, aromatic presentation with fresh herbs.",
+  chinese: "Elegant plating on white porcelain, chopsticks nearby, precise garnish arrangement.",
+  japanese: "Minimalist presentation, clean lines, zen aesthetic, beautiful negative space.",
+  thai: "Fresh herbs garnish, vibrant colors, traditional bowl or banana leaf element.",
+  mexican: "Bold colors, lime wedge, fresh cilantro, rustic earthenware.",
+  french: "Elegant plating, refined sauce work, delicate garnish, fine dining presentation.",
+  american: "Generous portions, comfort food styling, casual elegant presentation.",
+  mediterranean: "Fresh vegetables, olive oil sheen, herbs, bright and healthy aesthetic.",
+  dutch: "Simple, hearty presentation, traditional comfort food styling.",
+  turkish: "Warm spices visible, copper or brass elements, generous herbs.",
+  greek: "Fresh, bright colors, feta crumbles, olive oil, Mediterranean herbs.",
+  spanish: "Tapas-style presentation, saffron tones, rustic ceramic.",
+  vietnamese: "Fresh herbs, light and fresh presentation, subtle elegance.",
+  korean: "Banchan-style arrangement, fermented elements, vibrant colors.",
+  ethiopian: "Injera presentation, communal style, rich spice colors.",
+  moroccan: "Tagine presentation, warm spices, dried fruits, ornate serving.",
+  caribbean: "Tropical colors, vibrant presentation, fresh fruit garnish.",
+  lebanese: "Mezze-style, fresh parsley, hummus swirl, pita elements.",
+  persian: "Saffron rice, jeweled presentation, elegant garnishes.",
+  indonesian: "Banana leaf elements, sambal on side, tropical presentation.",
+  african: "Earthy tones, traditional serving style, rich colors.",
+  fusion: "Modern creative plating, artistic presentation, contemporary style.",
+  homemade: "Comforting home-style presentation, generous portions, inviting warmth.",
+  default: "Professional restaurant plating, appetizing presentation, balanced composition.",
 };
 
 serve(async (req) => {
@@ -72,7 +94,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { chef_profile_id, menu_id, ambience, background } = await req.json();
+    const { chef_profile_id, menu_id, ambience, background, cuisines } = await req.json();
 
     if (!chef_profile_id && !menu_id) {
       throw new Error("Either chef_profile_id or menu_id is required");
@@ -81,8 +103,9 @@ serve(async (req) => {
     // Default settings
     const selectedAmbience = ambience || "soft_window_light";
     const selectedBackground = background || "cozy_wooden_table";
+    const cuisineList: string[] = cuisines || [];
 
-    console.log(`Starting image generation with ambience: ${selectedAmbience}, background: ${selectedBackground}`);
+    console.log(`Starting image generation with ambience: ${selectedAmbience}, background: ${selectedBackground}, cuisines: ${cuisineList.join(", ")}`);
 
     // Fetch dishes from database
     let dishes: any[] = [];
@@ -131,12 +154,13 @@ serve(async (req) => {
           { name: dish.name, description: dish.description || "" },
           selectedAmbience,
           selectedBackground,
+          cuisineList,
           openaiApiKey
         );
         console.log(`Generated prompt for ${dish.name}`);
 
         // Generate image with Recraft
-        const imageUrl = await generateImageWithRecraft(optimizedPrompt, dish.name, recraftApiKey);
+        const imageUrl = await generateImageWithRecraft(optimizedPrompt, recraftApiKey);
         console.log(`✅ Recraft image generated for ${dish.name}`);
 
         // Download and upload to Supabase storage
@@ -196,39 +220,58 @@ serve(async (req) => {
   }
 });
 
+function getCuisinePrompt(cuisines: string[]): string {
+  if (!cuisines || cuisines.length === 0) {
+    return CUISINE_PROMPTS.default;
+  }
+  
+  // Get prompts for all matching cuisines
+  const prompts: string[] = [];
+  for (const cuisine of cuisines) {
+    const key = cuisine.toLowerCase().replace(/\s+/g, "");
+    if (CUISINE_PROMPTS[key]) {
+      prompts.push(CUISINE_PROMPTS[key]);
+    }
+  }
+  
+  // Return first matching or default
+  return prompts.length > 0 ? prompts[0] : CUISINE_PROMPTS.default;
+}
+
 async function generateOptimizedPrompt(
   dish: { name: string; description: string },
   ambienceKey: string,
   backgroundKey: string,
+  cuisines: string[],
   openaiApiKey?: string
 ): Promise<string> {
   const backgroundPrompt = BACKGROUND_PROMPTS[backgroundKey] || BACKGROUND_PROMPTS.cozy_wooden_table;
   const ambiencePrompt = AMBIENCE_PROMPTS[ambienceKey] || AMBIENCE_PROMPTS.soft_window_light;
+  const cuisinePrompt = getCuisinePrompt(cuisines);
 
-  // If no OpenAI key, use a good fallback prompt
+  const basePrompt = `Professional food photography of "${dish.name}". ${dish.description ? dish.description + "." : ""} ${backgroundPrompt} ${ambiencePrompt} ${cuisinePrompt} High resolution, appetizing, sharp focus on food. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO LABELS, NO WATERMARKS.`;
+
+  // If no OpenAI key, use the base prompt
   if (!openaiApiKey) {
-    return `Professional food photography of ${dish.name}. ${dish.description}. ${backgroundPrompt} ${ambiencePrompt}. Restaurant quality, high resolution, appetizing presentation, detailed textures, vibrant colors. No text, no labels, no writing.`;
+    return basePrompt;
   }
 
-  const systemMessage = `You are an expert food photography prompt engineer. Create a detailed, optimized prompt for an AI image generation model to create a professional restaurant-quality photo of a dish. The prompt should be professional, specific, and focused on achieving stunning food photography.
+  const systemMessage = `You are an expert food photography prompt engineer. Create a concise, optimized prompt for AI image generation of a professional restaurant-quality food photo.
 
-Guidelines:
-- Combine the provided background and ambience settings seamlessly
-- Include specific technical photography details
-- Emphasize food styling and presentation quality
-- Make the prompt concise but comprehensive (under 800 characters)
-- Focus on professional food photography aesthetics
-- DO NOT include any text, labels, or writing in the image`;
+CRITICAL RULES:
+- Output ONLY the prompt, no explanations
+- Keep under 600 characters
+- Focus on: dish appearance, plating, lighting, composition
+- NEVER include any request for text, words, labels, or writing
+- End with: "No text, no words, no labels, no watermarks."
+- Do not add random objects or decorations not related to the dish
+- Keep the composition simple and focused on the food`;
 
-  const userMessage = `Create an optimized prompt for generating a professional food photograph of "${dish.name}".
-
-Dish Description: ${dish.description}
-
-Background Setting: ${backgroundPrompt}
-
-Ambience/Technical Settings: ${ambiencePrompt}
-
-Create a single, cohesive prompt that will produce a stunning, professional food photograph. Keep it under 800 characters and ensure no text appears in the image.`;
+  const userMessage = `Create a food photography prompt for: "${dish.name}"
+Description: ${dish.description || "A delicious dish"}
+Background: ${backgroundPrompt}
+Lighting: ${ambiencePrompt}
+Cuisine style: ${cuisinePrompt}`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -243,8 +286,8 @@ Create a single, cohesive prompt that will produce a stunning, professional food
           { role: "system", content: systemMessage },
           { role: "user", content: userMessage },
         ],
-        max_tokens: 300,
-        temperature: 0.7,
+        max_tokens: 250,
+        temperature: 0.6,
       }),
     });
 
@@ -256,24 +299,28 @@ Create a single, cohesive prompt that will produce a stunning, professional food
 
     const result = await response.json();
     if (result.choices?.[0]?.message?.content) {
-      return result.choices[0].message.content.trim();
+      let prompt = result.choices[0].message.content.trim();
+      // Ensure no-text instruction is always present
+      if (!prompt.toLowerCase().includes("no text")) {
+        prompt += " No text, no words, no labels, no watermarks.";
+      }
+      return prompt;
     }
     throw new Error("Invalid OpenAI response structure");
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("OpenAI API error, using fallback:", errMsg);
-    return `Professional food photography of ${dish.name}. ${dish.description}. ${backgroundPrompt} ${ambiencePrompt}. Restaurant quality, high resolution, appetizing presentation, detailed textures, vibrant colors. No text, no labels, no writing.`;
+    return basePrompt;
   }
 }
 
 async function generateImageWithRecraft(
   prompt: string,
-  dishName: string,
   apiKey: string
 ): Promise<string> {
   let cleanPrompt = prompt.trim();
   if (!cleanPrompt || cleanPrompt.length === 0) {
-    cleanPrompt = "Professional food photography, restaurant quality, high resolution, well lit, appetizing presentation";
+    cleanPrompt = "Professional food photography, restaurant quality, high resolution, well lit, appetizing presentation. No text, no labels.";
   }
   if (cleanPrompt.length > 1000) {
     cleanPrompt = cleanPrompt.substring(0, 997) + "...";
@@ -282,8 +329,11 @@ async function generateImageWithRecraft(
   const MAX_RETRIES = 3;
   let lastError = "";
 
+  // Strong negative prompt to prevent text and random objects
+  const negativePrompt = "text, words, letters, writing, labels, menu, price, watermark, logo, signature, caption, title, numbers, typography, font, handwriting, stamp, badge, sticker, banner, random objects, clutter, mess, unrelated items, decorations, toys, figurines, people, hands, faces";
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    console.log(`Recraft API attempt ${attempt} of ${MAX_RETRIES} for ${dishName}`);
+    console.log(`Recraft API attempt ${attempt} of ${MAX_RETRIES}`);
 
     try {
       const requestBody = {
@@ -293,7 +343,7 @@ async function generateImageWithRecraft(
         response_format: "url",
         size: "1024x1024",
         n: 1,
-        negative_prompt: `${dishName}, text, writing, labels, words, letters, menu text, price tags`,
+        negative_prompt: negativePrompt,
       };
 
       const response = await fetch("https://external.api.recraft.ai/v1/images/generations", {
@@ -310,7 +360,7 @@ async function generateImageWithRecraft(
       if (response.ok) {
         const result = await response.json();
         if (result.data?.[0]?.url) {
-          console.log(`✅ Recraft API success for ${dishName}`);
+          console.log(`✅ Recraft API success`);
           return result.data[0].url;
         } else {
           lastError = `Unexpected Recraft API response structure: ${JSON.stringify(result)}`;
