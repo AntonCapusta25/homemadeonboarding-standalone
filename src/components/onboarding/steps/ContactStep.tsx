@@ -262,7 +262,7 @@ export function ContactStep({
       toast.success(t('contact.magicLinkSent', 'Magic link sent! Check your email to continue.'));
 
       if (onVerificationRequired) {
-        onVerificationRequired(profileData.email);
+        onVerificationRequired(email.trim().toLowerCase());
       }
     } catch (err: any) {
       console.error('Error in contact step:', err);
