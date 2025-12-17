@@ -202,10 +202,15 @@ serve(async (req) => {
 
     console.log("✅ SUCCESS! Merchant created!");
 
+    // Extract merchant_id from response
+    const merchantId = createData?.data?.merchant_id || createData?.data?._id || null;
+    console.log("Merchant ID:", merchantId);
+
     return new Response(
       JSON.stringify({
         success: true,
         merchant: createData,
+        merchant_id: merchantId,
         message: "Merchant created successfully!",
       }),
       {
