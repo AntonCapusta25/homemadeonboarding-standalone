@@ -37,7 +37,8 @@ export function ContactStep({
   const { user } = useAuth();
   const [errors, setErrors] = useState<{ email?: string; phone?: string; firstName?: string }>({});
   const [isLookingUp, setIsLookingUp] = useState(false);
-  const [hasLookedUp, setHasLookedUp] = useState(false);
+  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [returningUserName, setReturningUserName] = useState('');
   const [verificationRequired, setVerificationRequired] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [resending, setResending] = useState(false);
@@ -144,7 +145,32 @@ export function ContactStep({
   };
 
   const handleEmailLookup = async (emailValue: string) => {
-    // No-op: Email lookup removed in favor of explicit magic link on Next click
+    if (!validateEmail(emailValue)) {
+      setIsReturningUser(false);
+      setReturningUserName('');
+      return;
+    }
+
+    setIsLookingUp(true);
+
+    try {
+      const { data: lookupData } = await supabase.functions.invoke('lookup-pending-profile', {
+        body: { email: emailValue.trim().toLowerCase() },
+      });
+
+      if (lookupData?.found) {
+        setIsReturningUser(true);
+        const name = lookupData.profile?.chef_name?.split(' ')[0] || '';
+        setReturningUserName(name);
+      } else {
+        setIsReturningUser(false);
+        setReturningUserName('');
+      }
+    } catch (err) {
+      console.error('Email lookup error:', err);
+    } finally {
+      setIsLookingUp(false);
+    }
   };
 
   const handleResendVerification = async () => {
@@ -408,7 +434,25 @@ export function ContactStep({
                 onChange('email', newEmail);
                 if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
 
-                // Email validation only - no auto-lookup
+                // Clear returning user state when email changes
+                setIsReturningUser(false);
+                setReturningUserName('');
+
+                // Debounced lookup
+                if (lookupTimeoutRef.current) {
+                  clearTimeout(lookupTimeoutRef.current);
+                }
+                if (validateEmail(newEmail)) {
+                  lookupTimeoutRef.current = setTimeout(() => {
+                    handleEmailLookup(newEmail);
+                  }, 800);
+                }
+              }}
+              onBlur={(e) => {
+                const emailValue = e.target.value;
+                if (validateEmail(emailValue)) {
+                  handleEmailLookup(emailValue);
+                }
               }}
               className="pl-10 pr-10"
             />
@@ -418,6 +462,18 @@ export function ContactStep({
           </div>
           {errors.email && (
             <p className="text-sm text-destructive mt-1">{errors.email}</p>
+          )}
+          {isReturningUser && !errors.email && (
+            <div className="flex items-center gap-2 mt-2 text-sm text-primary animate-in fade-in slide-in-from-top-1 duration-300">
+              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="font-medium">
+                Welcome back{returningUserName ? `, ${returningUserName}` : ''}! We found your account.
+              </span>
+            </div>
           )}
         </div>
 
