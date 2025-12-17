@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, Wifi, AlertTriangle, Upload, Search
+  Download, Store, Wifi, AlertTriangle, Upload, Search, ImagePlus
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -85,6 +85,7 @@ interface MenuData {
     price: number;
     category: string | null;
     is_upsell: boolean;
+    image_url: string | null;
   }[];
 }
 
@@ -109,6 +110,7 @@ export function ChefDetailsModal({
   const [testingConnection, setTestingConnection] = useState(false);
   const [importingMenu, setImportingMenu] = useState(false);
   const [detectingPricingType, setDetectingPricingType] = useState(false);
+  const [generatingImages, setGeneratingImages] = useState(false);
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
@@ -201,7 +203,7 @@ export function ChefDetailsModal({
       if (menuData) {
         const { data: dishesData } = await supabase
           .from('dishes')
-          .select('id, name, description, price, category, is_upsell')
+          .select('id, name, description, price, category, is_upsell, image_url')
           .eq('menu_id', menuData.id)
           .order('sort_order', { ascending: true });
 
@@ -443,6 +445,48 @@ export function ChefDetailsModal({
       toast({ title: 'Error', description: err?.message, variant: 'destructive' });
     } finally {
       setDetectingPricingType(false);
+    }
+  };
+
+  const handleGenerateImages = async () => {
+    if (!menu) {
+      toast({ title: 'Error', description: 'No menu found', variant: 'destructive' });
+      return;
+    }
+
+    setGeneratingImages(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-menu-images', {
+        body: { 
+          menu_id: menu.id,
+          ambience: 'soft_window_light',
+          background: 'cozy_wooden_table'
+        }
+      });
+
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success) {
+        toast({ 
+          title: 'Images Generated!', 
+          description: `Generated ${data.success_count} images for dishes`
+        });
+        // Refresh to load new images
+        fetchChefData();
+      } else {
+        toast({ 
+          title: data?.success_count > 0 ? 'Partial Success' : 'Failed', 
+          description: `${data?.success_count || 0} images generated, ${data?.error_count || 0} failed`,
+          variant: data?.success_count > 0 ? 'default' : 'destructive'
+        });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to generate images', variant: 'destructive' });
+    } finally {
+      setGeneratingImages(false);
     }
   };
 
@@ -1212,6 +1256,25 @@ export function ChefDetailsModal({
                           )}
                         </div>
                         <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={handleGenerateImages}
+                          disabled={generatingImages || !menu}
+                          className="gap-2"
+                        >
+                          {generatingImages ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <ImagePlus className="w-4 h-4" />
+                              Generate Images
+                            </>
+                          )}
+                        </Button>
+                        <Button 
                           variant="default" 
                           size="sm" 
                           onClick={handleImportMenuToHyperzod}
@@ -1257,17 +1320,28 @@ export function ChefDetailsModal({
                     <div className="space-y-2">
                       <h4 className="font-medium">Dishes ({menu.dishes.filter(d => !d.is_upsell).length})</h4>
                       {menu.dishes.filter(d => !d.is_upsell).map((dish) => (
-                        <div key={dish.id} className="flex justify-between items-start p-3 border rounded-lg">
-                          <div>
+                        <div key={dish.id} className="flex gap-3 p-3 border rounded-lg">
+                          {dish.image_url ? (
+                            <img 
+                              src={dish.image_url} 
+                              alt={dish.name} 
+                              className="w-16 h-16 object-cover rounded-md flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                              <Utensils className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
                             <p className="font-medium">{dish.name}</p>
                             {dish.description && (
-                              <p className="text-xs text-muted-foreground mt-1">{dish.description}</p>
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{dish.description}</p>
                             )}
                             {dish.category && (
                               <Badge variant="outline" className="mt-1 text-xs">{dish.category}</Badge>
                             )}
                           </div>
-                          <p className="font-semibold">€{Number(dish.price).toFixed(2)}</p>
+                          <p className="font-semibold flex-shrink-0">€{Number(dish.price).toFixed(2)}</p>
                         </div>
                       ))}
                     </div>
@@ -1275,8 +1349,19 @@ export function ChefDetailsModal({
                       <div className="space-y-2">
                         <h4 className="font-medium">Upsells ({menu.dishes.filter(d => d.is_upsell).length})</h4>
                         {menu.dishes.filter(d => d.is_upsell).map((dish) => (
-                          <div key={dish.id} className="flex justify-between items-center p-3 border rounded-lg bg-muted/30">
-                            <p className="font-medium">{dish.name}</p>
+                          <div key={dish.id} className="flex gap-3 items-center p-3 border rounded-lg bg-muted/30">
+                            {dish.image_url ? (
+                              <img 
+                                src={dish.image_url} 
+                                alt={dish.name} 
+                                className="w-12 h-12 object-cover rounded-md flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                                <Utensils className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <p className="font-medium flex-1">{dish.name}</p>
                             <p className="font-semibold">€{Number(dish.price).toFixed(2)}</p>
                           </div>
                         ))}

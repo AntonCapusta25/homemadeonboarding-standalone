@@ -16,6 +16,7 @@ interface Dish {
   price: number;
   category: string | null;
   is_upsell: boolean;
+  image_url?: string | null;
 }
 
 interface ImportRequest {
@@ -151,6 +152,12 @@ serve(async (req) => {
         const categoryId = isUpsell && extrasCategoryId ? extrasCategoryId : mainCategoryId;
 
         // Hyperzod requires product_pricing.type - detected valid value is "flat"
+        // Include product_images if dish has an image_url
+        const productImages: string[] = [];
+        if (dish.image_url) {
+          productImages.push(dish.image_url);
+        }
+
         const productPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
@@ -180,7 +187,7 @@ serve(async (req) => {
           is_featured: false,
           sort_order: 0,
           product_quantity: { min_quantity: 0, max_quantity: 0 },
-          product_images: [],
+          product_images: productImages,
         };
 
         console.log(`Creating product: ${dishName}`);
