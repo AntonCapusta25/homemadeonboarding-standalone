@@ -116,16 +116,86 @@ export function ChefDetailsModal({
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
   const [storedMerchantId, setStoredMerchantId] = useState<string | null>(null);
+  
+  // Background job state
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<{
+    status: string;
+    current_step: string | null;
+    merchant_id: string | null;
+    images_generated: number;
+    dishes_imported: number;
+    error_message: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen && chef.id) {
       fetchChefData();
       setAdminStatus(chef.admin_status || 'new');
       setAdminNotes(chef.admin_notes || '');
-      // Load stored hyperzod_merchant_id
       loadHyperzodMerchantId();
+      checkExistingJob();
     }
   }, [isOpen, chef.id, chef.admin_status, chef.admin_notes]);
+
+  // Poll for job status updates
+  useEffect(() => {
+    if (!currentJobId || !isOpen) return;
+    
+    const pollInterval = setInterval(async () => {
+      const { data: job } = await supabase
+        .from('merchant_setup_jobs')
+        .select('status, current_step, merchant_id, images_generated, dishes_imported, error_message')
+        .eq('id', currentJobId)
+        .single();
+      
+      if (job) {
+        setJobStatus(job);
+        setProcessStep(job.current_step || '');
+        
+        if (job.status === 'completed') {
+          setCreatingMerchant(false);
+          setCurrentJobId(null);
+          if (job.merchant_id) {
+            setStoredMerchantId(job.merchant_id);
+            setMerchantId(job.merchant_id);
+          }
+          toast({ 
+            title: '✓ Setup Complete!', 
+            description: `Merchant created, ${job.images_generated} images, ${job.dishes_imported} dishes imported`
+          });
+          fetchChefData();
+          onRefresh?.();
+        } else if (job.status === 'failed') {
+          setCreatingMerchant(false);
+          setCurrentJobId(null);
+          setHyperzodError({ error: job.error_message || 'Setup failed', details: null });
+          toast({ title: 'Setup Failed', description: job.error_message, variant: 'destructive' });
+        }
+      }
+    }, 2000);
+    
+    return () => clearInterval(pollInterval);
+  }, [currentJobId, isOpen]);
+
+  const checkExistingJob = async () => {
+    // Check for any in-progress jobs for this chef
+    const { data: existingJob } = await supabase
+      .from('merchant_setup_jobs')
+      .select('id, status, current_step, merchant_id, images_generated, dishes_imported, error_message')
+      .eq('chef_profile_id', chef.id)
+      .eq('status', 'processing')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (existingJob) {
+      setCurrentJobId(existingJob.id);
+      setJobStatus(existingJob);
+      setProcessStep(existingJob.current_step || '');
+      setCreatingMerchant(true);
+    }
+  };
 
   const loadHyperzodMerchantId = async () => {
     try {
@@ -280,126 +350,52 @@ export function ChefDetailsModal({
     }
   };
 
-  // Unified handler: Create Merchant → Generate Images → Import Menu
+  // Unified handler: Create Merchant → Generate Images → Import Menu (runs in background)
   const handleFullMerchantSetup = async () => {
     setCreatingMerchant(true);
     setHyperzodError(null);
-    setProcessStep('Creating merchant...');
+    setProcessStep('Starting background job...');
+    setJobStatus(null);
 
     try {
-      // Step 1: Create merchant in Hyperzod
-      const { data: merchantData, error: merchantError } = await supabase.functions.invoke('create-hyperzod-merchant', {
-        body: { chef }
+      const { data, error } = await supabase.functions.invoke('process-merchant-setup', {
+        body: {
+          chef_profile_id: chef.id,
+          chef: chef,
+          menu_id: menu?.id,
+          ambience: selectedAmbience,
+          background: selectedBackground,
+          cuisines: chef.cuisines || [],
+        },
       });
 
-      if (merchantError) {
-        throw new Error(`Merchant creation failed: ${merchantError.message}`);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      if (!merchantData?.success || !merchantData?.merchant_id) {
-        const errorMsg = merchantData?.error || 'Failed to create merchant';
-        throw new Error(errorMsg);
+      if (!data?.success || !data?.job_id) {
+        throw new Error(data?.error || 'Failed to start background job');
       }
 
-      const newMerchantId = merchantData.merchant_id;
-      setMerchantId(newMerchantId);
-      await saveHyperzodMerchantId(newMerchantId);
+      setCurrentJobId(data.job_id);
+      setProcessStep('Processing in background...');
       
-      toast({ 
-        title: '✓ Merchant Created', 
-        description: `ID: ${newMerchantId.slice(0, 12)}...`
+      toast({
+        title: 'Setup Started',
+        description: 'Processing in background. You can close this modal and refresh the page - it will continue!',
       });
-
-      // Step 2: Generate images (if menu exists)
-      if (menu && menu.dishes.length > 0) {
-        setProcessStep('Generating images...');
-        
-        const { data: imgData, error: imgError } = await supabase.functions.invoke('generate-menu-images', {
-          body: { 
-            menu_id: menu.id,
-            ambience: selectedAmbience,
-            background: selectedBackground,
-            cuisines: chef.cuisines || []
-          }
-        });
-
-        if (imgError) {
-          console.error('Image generation error:', imgError);
-          toast({ 
-            title: 'Warning', 
-            description: `Image generation issue: ${imgError.message}. Continuing with import...`,
-            variant: 'default'
-          });
-        } else {
-          toast({ 
-            title: '✓ Images Generated', 
-            description: `${imgData?.success_count || 0} images created`
-          });
-        }
-
-        // Refresh dish data to get image URLs
-        setProcessStep('Loading updated menu...');
-        const { data: updatedDishes } = await supabase
-          .from('dishes')
-          .select('id, name, description, price, category, is_upsell, image_url')
-          .eq('menu_id', menu.id)
-          .order('sort_order', { ascending: true });
-
-        // Step 3: Import to Hyperzod
-        setProcessStep('Importing to Hyperzod...');
-        const { data: importData, error: importError } = await supabase.functions.invoke('import-menu-to-hyperzod', {
-          body: { 
-            merchant_id: newMerchantId,
-            dishes: updatedDishes || menu.dishes
-          }
-        });
-
-        if (importError) {
-          throw new Error(`Hyperzod import failed: ${importError.message}`);
-        }
-
-        if (importData?.success) {
-          toast({ 
-            title: '✓ Complete!', 
-            description: `Merchant created, ${imgData?.success_count || 0} images generated, ${importData.successful_count} dishes imported`
-          });
-        } else {
-          const failedItems = importData?.results?.filter((r: any) => !r.success) || [];
-          if (failedItems.length > 0) {
-            setHyperzodError({ 
-              error: 'Some dishes failed to import',
-              details: { field: 'dishes', message: failedItems.map((r: any) => `${r.dish_name}: ${r.error}`).join(', ') }
-            });
-          }
-          toast({ 
-            title: importData?.successful_count > 0 ? '⚠ Partial Success' : 'Import Issues', 
-            description: importData?.message || 'Check error details',
-            variant: importData?.successful_count > 0 ? 'default' : 'destructive'
-          });
-        }
-
-        // Refresh UI
-        fetchChefData();
-      } else {
-        toast({ 
-          title: '✓ Merchant Created', 
-          description: 'No menu found - skipped image generation and import'
-        });
-      }
     } catch (err: any) {
-      console.error('Full merchant setup error:', err);
+      console.error('Failed to start merchant setup:', err);
+      setCreatingMerchant(false);
       setHyperzodError({ 
-        error: err?.message || 'Setup failed', 
-        details: { field: 'process', message: processStep || 'Unknown step' } 
+        error: err?.message || 'Failed to start setup', 
+        details: null 
       });
       toast({ 
         title: 'Error', 
-        description: err?.message || 'Failed to complete merchant setup', 
+        description: err?.message || 'Failed to start merchant setup', 
         variant: 'destructive' 
       });
-    } finally {
-      setCreatingMerchant(false);
-      setProcessStep('');
     }
   };
 
@@ -846,15 +842,34 @@ export function ChefDetailsModal({
                       </Select>
                     </div>
                   </div>
-                  <Button 
-                    onClick={handleFullMerchantSetup} 
-                    disabled={creatingMerchant}
-                    className="w-full"
-                    size="sm"
-                  >
-                    <Rocket className="w-4 h-4 mr-2" />
-                    {storedMerchantId ? 'Re-create Merchant' : 'Start Setup'}
-                  </Button>
+                  {creatingMerchant && jobStatus ? (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="font-medium">{jobStatus.current_step || 'Processing...'}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {jobStatus.merchant_id && <p>✓ Merchant: {jobStatus.merchant_id.slice(0, 12)}...</p>}
+                        {jobStatus.images_generated > 0 && <p>✓ {jobStatus.images_generated} images generated</p>}
+                        {jobStatus.dishes_imported > 0 && <p>✓ {jobStatus.dishes_imported} dishes imported</p>}
+                      </div>
+                      <p className="text-xs text-green-600">Safe to close - runs in background!</p>
+                    </div>
+                  ) : (
+                    <Button 
+                      onClick={handleFullMerchantSetup} 
+                      disabled={creatingMerchant}
+                      className="w-full"
+                      size="sm"
+                    >
+                      {creatingMerchant ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Rocket className="w-4 h-4 mr-2" />
+                      )}
+                      {creatingMerchant ? 'Starting...' : storedMerchantId ? 'Re-create Merchant' : 'Start Setup'}
+                    </Button>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
