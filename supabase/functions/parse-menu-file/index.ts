@@ -120,6 +120,21 @@ ${content}`;
     const aiResponse = await response.json();
     const messageContent = aiResponse.choices?.[0]?.message?.content || "";
 
+    console.log('AI Response:', JSON.stringify(aiResponse, null, 2));
+    console.log('Message content:', messageContent);
+
+    if (!messageContent || messageContent.trim() === '') {
+      console.error('Empty AI response received');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'AI returned empty response. The menu might be too complex or unclear.',
+          details: 'Try uploading a clearer image or a different format.'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Extract JSON from the response
     let dishes: ParsedDish[] = [];
     try {
@@ -131,11 +146,16 @@ ${content}`;
         dishes = JSON.parse(messageContent);
       }
     } catch (parseError) {
-      console.error("Failed to parse AI response:", messageContent);
-      return new Response(JSON.stringify({ success: false, error: "Failed to parse menu data", raw: messageContent }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error('Failed to parse AI response:', messageContent);
+      console.error('Parse error:', parseError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to parse menu data. AI response was not valid JSON.',
+          raw: messageContent.substring(0, 500) // Limit to first 500 chars
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Validate and clean dishes
