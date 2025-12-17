@@ -128,10 +128,47 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     setError(null);
 
     try {
+      // If filtering by admin, first get chef IDs assigned to that admin
+      let adminFilteredChefIds: string[] | null = null;
+      if (sortByAdmin) {
+        if (sortByAdmin === 'unassigned') {
+          // Get all chef_profile_ids that have admin data
+          const { data: assignedData } = await supabase
+            .from('chef_admin_data')
+            .select('chef_profile_id')
+            .not('assigned_admin_id', 'is', null);
+          
+          const assignedIds = new Set((assignedData || []).map(d => d.chef_profile_id));
+          
+          // We'll need to filter out assigned ones after fetching
+          adminFilteredChefIds = []; // Empty means we need inverse filter
+        } else {
+          const { data: adminData } = await supabase
+            .from('chef_admin_data')
+            .select('chef_profile_id')
+            .eq('assigned_admin_id', sortByAdmin);
+          
+          adminFilteredChefIds = (adminData || []).map(d => d.chef_profile_id);
+          
+          // If no chefs assigned to this admin, return empty
+          if (adminFilteredChefIds.length === 0) {
+            setChefs([]);
+            setTotalCount(0);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       // First fetch chef profiles - for universal search, fetch ALL matching records then paginate
       let query = supabase
         .from('chef_profiles')
         .select('*', { count: 'exact' });
+
+      // Apply admin filter at database level if we have specific IDs
+      if (adminFilteredChefIds && adminFilteredChefIds.length > 0) {
+        query = query.in('id', adminFilteredChefIds);
+      }
 
       if (cityFilter && cityFilter !== 'all') {
         query = query.eq('city', cityFilter);
@@ -149,8 +186,8 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         .not('contact_phone', 'is', null)
         .order('created_at', { ascending: false });
 
-      // Only paginate when not searching (search returns all results then paginates client-side)
-      if (!searchQuery?.trim()) {
+      // Only paginate when not searching or admin filtering (these return all results then paginate client-side)
+      if (!searchQuery?.trim() && !sortByAdmin) {
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
         query = query.range(from, to);
@@ -228,14 +265,11 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         mergedData = mergedData.filter(chef => chef.assigned_admin_id === adminId);
       }
 
-      // Apply sortByAdmin filter (filter by assigned admin)
-      if (sortByAdmin) {
-        if (sortByAdmin === 'unassigned') {
-          mergedData = mergedData.filter(chef => !chef.assigned_admin_id);
-        } else {
-          mergedData = mergedData.filter(chef => chef.assigned_admin_id === sortByAdmin);
-        }
+      // Apply sortByAdmin filter for "unassigned" case (filter out those with assignments)
+      if (sortByAdmin === 'unassigned') {
+        mergedData = mergedData.filter(chef => !chef.assigned_admin_id);
       }
+      // Note: For specific admin filter, we already filtered at DB level via adminFilteredChefIds
 
       // Deduplicate by contact_email
       const deduplicatedChefs = mergedData.reduce((acc: ChefWithStats[], chef) => {
