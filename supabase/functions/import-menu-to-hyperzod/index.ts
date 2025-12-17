@@ -31,7 +31,7 @@ function safeString(input: unknown, maxLen: number) {
 // Create or get default category for merchant
 async function getOrCreateCategory(merchantId: string, categoryName: string): Promise<string | null> {
   // First try to list existing categories
-  const listResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/category/list?merchant_id=${merchantId}`, {
+  const listResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/list?merchant_id=${merchantId}`, {
     method: "GET",
     headers: {
       Accept: "application/json",
@@ -53,8 +53,8 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
     }
   }
 
-  // Create new category
-  const createResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/category/create`, {
+  // Create new category using correct endpoint: /merchant/v1/catalog/product-category/create
+  const createResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/create`, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -64,9 +64,11 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
     },
     body: JSON.stringify({
       merchant_id: merchantId,
-      language_translation: [{ key: "name", locale: "en", value: categoryName }],
-      status: true,
+      description: "",
+      view_type: "card",
+      image: "",
       sort_order: 0,
+      language_translation: [{ key: "name", locale: "en", value: categoryName }],
     }),
   });
 
