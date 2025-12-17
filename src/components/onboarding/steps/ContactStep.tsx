@@ -144,54 +144,7 @@ export function ContactStep({
   };
 
   const handleEmailLookup = async (emailValue: string) => {
-    if (!validateEmail(emailValue) || hasLookedUp) return;
-
-    setIsLookingUp(true);
-
-    try {
-      // First check if this email exists without restoring data
-      const { data, error } = await supabase.functions.invoke('send-magic-link', {
-        body: {
-          email: emailValue.trim().toLowerCase(),
-          redirectTo: `${window.location.origin}/onboarding?verified=true`
-        },
-      });
-
-      if (error) {
-        console.error('Lookup error:', error);
-        // Check for rate limit
-        if (error.message?.includes('429') || error.message?.includes('Too many')) {
-          toast.error(t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.'));
-        }
-        setIsLookingUp(false);
-        setHasLookedUp(true);
-        return;
-      }
-
-      // Check for rate limit in response data
-      if (data?.error?.includes('Too many')) {
-        toast.error(data.error);
-        setIsLookingUp(false);
-        setHasLookedUp(true);
-        return;
-      }
-
-      if (data?.found) {
-        // Existing profile found - require verification
-        setVerificationRequired(true);
-        setVerificationSent(true);
-        toast.info(t('contact.verificationSent', 'We found your profile! Check your email to verify and continue.'));
-
-        if (onVerificationRequired) {
-          onVerificationRequired(emailValue);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to check email:', err);
-    } finally {
-      setIsLookingUp(false);
-      setHasLookedUp(true);
-    }
+    // No-op: Email lookup removed in favor of explicit magic link on Next click
   };
 
   const handleResendVerification = async () => {
