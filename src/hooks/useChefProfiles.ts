@@ -66,6 +66,7 @@ interface UseChefProfilesOptions {
   adminId?: string;
   includePending?: boolean;
   searchQuery?: string;
+  sortByAdmin?: string; // Sort by assigned_admin_id
 }
 
 interface Analytics {
@@ -80,7 +81,7 @@ interface Analytics {
 }
 
 export function useChefProfiles(options: UseChefProfilesOptions = {}) {
-  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId, includePending = true, searchQuery } = options;
+  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId, includePending = true, searchQuery, sortByAdmin } = options;
 
   const [chefs, setChefs] = useState<ChefWithStats[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
@@ -227,6 +228,15 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         mergedData = mergedData.filter(chef => chef.assigned_admin_id === adminId);
       }
 
+      // Apply sortByAdmin filter (filter by assigned admin)
+      if (sortByAdmin) {
+        if (sortByAdmin === 'unassigned') {
+          mergedData = mergedData.filter(chef => !chef.assigned_admin_id);
+        } else {
+          mergedData = mergedData.filter(chef => chef.assigned_admin_id === sortByAdmin);
+        }
+      }
+
       // Deduplicate by contact_email
       const deduplicatedChefs = mergedData.reduce((acc: ChefWithStats[], chef) => {
         if (!chef.contact_email) {
@@ -364,7 +374,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId, includePending, searchQuery]);
+  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId, includePending, searchQuery, sortByAdmin]);
 
   useEffect(() => {
     fetchChefs();
@@ -411,6 +421,24 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           admin_user_id: currentAdminId,
           admin_name: adminName,
         });
+
+        // Send notification when status is "called_no_answer"
+        if (status === 'called_no_answer' && previousChef) {
+          try {
+            await supabase.functions.invoke('send-notification-email', {
+              body: {
+                type: 'called_no_answer',
+                chefName: previousChef.chef_name || previousChef.business_name || 'Chef',
+                email: previousChef.contact_email,
+                phone: previousChef.contact_phone,
+                businessName: previousChef.business_name,
+              },
+            });
+            console.log('Called no answer notification sent to chef');
+          } catch (notifyErr) {
+            console.error('Failed to send called_no_answer notification:', notifyErr);
+          }
+        }
       } catch (err) {
         console.error('Failed to update status:', err);
         if (previousChef) {
@@ -487,10 +515,11 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     const newCount = (chef?.call_attempts || 0) + 1;
     const now = new Date().toISOString();
     
-    // Optimistic update - happens immediately
+    // Optimistic update - happens immediately (also auto-assign to calling admin)
     optimisticUpdate(chefId, { 
       call_attempts: newCount,
-      crm_last_contact_date: now
+      crm_last_contact_date: now,
+      assigned_admin_id: currentAdminId, // Auto-assign to the admin who logged the call
     });
 
     // Fire-and-forget DB operations
@@ -503,6 +532,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             call_attempts: newCount,
             crm_last_contact_date: now,
             crm_updated_by: currentAdminId,
+            assigned_admin_id: currentAdminId, // Auto-assign to the admin who logged the call
           }, { onConflict: 'chef_profile_id' });
 
         if (error) throw error;
@@ -518,7 +548,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       } catch (err) {
         console.error('Failed to log call:', err);
         if (chef) {
-          optimisticUpdate(chefId, { call_attempts: chef.call_attempts });
+          optimisticUpdate(chefId, { call_attempts: chef.call_attempts, assigned_admin_id: chef.assigned_admin_id });
         }
       }
     })();

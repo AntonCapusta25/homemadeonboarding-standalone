@@ -76,6 +76,7 @@ export default function AdminDashboard() {
 
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [adminFilter, setAdminFilter] = useState<string>('all');
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
@@ -115,6 +116,7 @@ export default function AdminDashboard() {
     adminId: user?.id,
     includePending: true,
     searchQuery: searchQuery.trim() || undefined,
+    sortByAdmin: adminFilter !== 'all' ? adminFilter : undefined,
   });
 
   const { stats: adminStats, loading: statsLoading, error: statsError } = useAdminStatistics();
@@ -657,6 +659,21 @@ export default function AdminDashboard() {
                   {Object.entries(CRM_STATUS_CONFIG).map(([key, { label }]) => (
                     <SelectItem key={key} value={key}>
                       {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={adminFilter} onValueChange={setAdminFilter}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="Filter by admin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Admins</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {admins.map((admin) => (
+                    <SelectItem key={admin.id} value={admin.id}>
+                      {admin.name || admin.email}
                     </SelectItem>
                   ))}
                 </SelectContent>
