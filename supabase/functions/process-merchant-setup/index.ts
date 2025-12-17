@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Declare EdgeRuntime for background tasks
-declare const EdgeRuntime: {
-  waitUntil(promise: Promise<any>): void;
-};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,16 +64,30 @@ serve(async (req) => {
 
     console.log(`Job ${job.id} created for chef ${chef_profile_id}`);
 
-    // Return immediately with job ID
-    const response = new Response(
-      JSON.stringify({ success: true, job_id: job.id, message: "Processing started" }),
+    // Process synchronously (no background work)
+    await processJob(supabase, job.id, chef, menu_id, ambience, background, cuisines);
+
+    const { data: finalJob } = await supabase
+      .from('merchant_setup_jobs')
+      .select('status, current_step, merchant_id, images_generated, dishes_imported, error_message')
+      .eq('id', job.id)
+      .single();
+
+    const ok = finalJob?.status === 'completed';
+
+    return new Response(
+      JSON.stringify({
+        success: ok,
+        job_id: job.id,
+        status: finalJob?.status || null,
+        current_step: finalJob?.current_step || null,
+        merchant_id: finalJob?.merchant_id || null,
+        images_generated: finalJob?.images_generated || 0,
+        dishes_imported: finalJob?.dishes_imported || 0,
+        error: ok ? null : (finalJob?.error_message || 'Setup failed'),
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
-    // Process in background
-    EdgeRuntime.waitUntil(processJob(supabase, job.id, chef, menu_id, ambience, background, cuisines));
-
-    return response;
   } catch (err: any) {
     console.error("Error starting job:", err);
     return new Response(
@@ -226,14 +236,27 @@ async function createHyperzodMerchant(chef: any) {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-  console.log('Hyperzod merchant response:', JSON.stringify(data));
+  const rawText = await response.text();
+  console.log('Hyperzod merchant status:', response.status);
+  console.log('Hyperzod merchant response:', rawText.substring(0, 1000));
 
-  if (!response.ok || !data.success) {
-    return { success: false, error: data.message || data.error || `HTTP ${response.status}` };
+  let data: any = null;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    data = { raw: rawText };
   }
 
-  return { success: true, merchant_id: data.data?._id || data.data?.merchant_id };
+  if (!response.ok) {
+    return { success: false, error: data?.message || data?.error || `HTTP ${response.status}` };
+  }
+
+  const merchantId = data?.data?._id || data?.data?.merchant_id;
+  if (!merchantId) {
+    return { success: false, error: data?.message || 'Merchant created but no merchant_id returned' };
+  }
+
+  return { success: true, merchant_id: merchantId };
 }
 
 async function generateDishImage(

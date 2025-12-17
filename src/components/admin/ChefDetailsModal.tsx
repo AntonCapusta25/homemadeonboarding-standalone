@@ -351,11 +351,11 @@ export function ChefDetailsModal({
     }
   };
 
-  // Unified handler: Create Merchant → Generate Images → Import Menu (runs in background)
+  // Unified handler: Create Merchant → Generate Images → Import Menu (runs synchronously)
   const handleFullMerchantSetup = async () => {
     setCreatingMerchant(true);
     setHyperzodError(null);
-    setProcessStep('Starting background job...');
+    setProcessStep('Starting setup...');
     setJobStatus(null);
 
     try {
@@ -370,33 +370,31 @@ export function ChefDetailsModal({
         },
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (error) throw new Error(error.message);
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Setup failed');
       }
 
-      if (!data?.success || !data?.job_id) {
-        throw new Error(data?.error || 'Failed to start background job');
-      }
-
-      setCurrentJobId(data.job_id);
-      setProcessStep('Processing in background...');
-      
       toast({
-        title: 'Setup Started',
-        description: 'Processing in background. You can close this modal and refresh the page - it will continue!',
+        title: '✓ Setup Complete!',
+        description: `Merchant created, ${data.images_generated || 0} images, ${data.dishes_imported || 0} dishes imported`,
       });
-    } catch (err: any) {
-      console.error('Failed to start merchant setup:', err);
+
+      if (data.merchant_id) {
+        setStoredMerchantId(data.merchant_id);
+        setMerchantId(data.merchant_id);
+      }
+
+      setProcessStep('Complete!');
       setCreatingMerchant(false);
-      setHyperzodError({ 
-        error: err?.message || 'Failed to start setup', 
-        details: null 
-      });
-      toast({ 
-        title: 'Error', 
-        description: err?.message || 'Failed to start merchant setup', 
-        variant: 'destructive' 
-      });
+      fetchChefData();
+      onRefresh?.();
+    } catch (err: any) {
+      console.error('Merchant setup failed:', err);
+      setCreatingMerchant(false);
+      setHyperzodError({ error: err?.message || 'Setup failed', details: null });
+      toast({ title: 'Hyperzod Error', description: err?.message || 'Setup failed', variant: 'destructive' });
     }
   };
 
