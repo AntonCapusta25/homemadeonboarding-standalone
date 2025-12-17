@@ -97,11 +97,76 @@ function hasTypeInvalidError(parsed: any): boolean {
   return Array.isArray(errs) && errs.some((m: string) => m.toLowerCase().includes("invalid"));
 }
 
+async function detectExistingProductPricingType(
+  merchantId: string,
+): Promise<string | number | null> {
+  const url = `${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`;
+  console.log(`Detecting product_pricing.type via: ${url}`);
+
+  try {
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY!,
+      },
+    });
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      console.log(`Product list not available (${resp.status})`);
+      return null;
+    }
+
+    const parsed = tryParseJson(text);
+    const products =
+      parsed?.data?.data ||
+      parsed?.data?.products ||
+      parsed?.data ||
+      [];
+
+    const first = Array.isArray(products) ? products[0] : null;
+    const type =
+      first?.product_pricing?.type ??
+      first?.product_pricing?.pricing_type ??
+      first?.product_pricing?.[0]?.type ??
+      null;
+
+    if (type !== null && type !== undefined && type !== "") {
+      console.log(`Detected product_pricing.type from existing products: ${type}`);
+      return type;
+    }
+
+    console.log("No existing product_pricing.type detected (no products or field missing)");
+    return null;
+  } catch (e) {
+    console.log("Failed to detect existing product pricing type:", e);
+    return null;
+  }
+}
+
 async function createProductWithPricingTypeFallback(
   dishName: string,
   productPayload: any,
+  pricingTypeHint: string | number | null,
 ): Promise<{ ok: boolean; status: number; text: string; data: any | null }> {
-  const typeCandidates: Array<string | number> = ["simple", "single", "fixed", 1];
+  const rawCandidates: Array<string | number | null | undefined> = [
+    pricingTypeHint,
+    "simple",
+    "single",
+    "fixed",
+    "standard",
+    "default",
+    0,
+    1,
+    2,
+    3,
+  ];
+
+  const typeCandidates = Array.from(
+    new Set(rawCandidates.filter((v) => v !== null && v !== undefined && v !== "")),
+  ) as Array<string | number>;
 
   for (const candidate of typeCandidates) {
     const payload = {
@@ -149,6 +214,7 @@ async function createProductWithPricingTypeFallback(
   };
 }
 
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -195,6 +261,9 @@ serve(async (req) => {
 
     console.log(`Using categories - Main: ${mainCategoryId}, Extras: ${extrasCategoryId}`);
 
+    const pricingTypeHint = await detectExistingProductPricingType(merchant_id);
+    console.log(`Pricing type hint: ${pricingTypeHint}`);
+
     const results: { dish_name: string; success: boolean; error?: string; product_id?: string }[] = [];
 
     for (const dish of dishes) {
@@ -225,7 +294,7 @@ serve(async (req) => {
           ],
           product_pricing: {
             // Hyperzod validates allowed values server-side; we may retry with alternatives.
-            type: "simple",
+            type: pricingTypeHint ?? "simple",
             price_sell: priceSell,
             price_sell_compare: priceSell, // Must be >= price_sell
             profit: 0,
@@ -254,6 +323,7 @@ serve(async (req) => {
         const { ok, status, text, data } = await createProductWithPricingTypeFallback(
           dishName,
           productPayload,
+          pricingTypeHint,
         );
 
         if (ok) {
