@@ -68,6 +68,7 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
       view_type: "card",
       image: "",
       sort_order: 0,
+      status: 1,
       language_translation: [{ key: "name", locale: "en", value: categoryName }],
     }),
   });
