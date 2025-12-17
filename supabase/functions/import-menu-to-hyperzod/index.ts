@@ -153,9 +153,10 @@ serve(async (req) => {
 
         // Hyperzod requires product_pricing.type - detected valid value is "flat"
         // Include product_images if dish has an image_url
-        const productImages: string[] = [];
+        // Hyperzod expects array of objects with file_url and is_cover fields
+        const productImages: { file_url: string; is_cover: boolean }[] = [];
         if (dish.image_url) {
-          productImages.push(dish.image_url);
+          productImages.push({ file_url: dish.image_url, is_cover: true });
         }
 
         const productPayload = {
