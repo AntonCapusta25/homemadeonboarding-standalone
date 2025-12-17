@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
+  CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin,
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
   Download, Store, AlertTriangle, Rocket, Upload, Pencil, Trash2, Save
 } from 'lucide-react';
@@ -30,6 +30,7 @@ import { ChefWithStats } from '@/hooks/useChefProfiles';
 import { calculateOnboardingProgress } from '@/lib/chefProgress';
 import { cn } from '@/lib/utils';
 import JSZip from 'jszip';
+import { useMerchantSetupJob } from '@/hooks/useMerchantSetupJob';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -90,13 +91,13 @@ interface MenuData {
   }[];
 }
 
-export function ChefDetailsModal({ 
-  chef, 
-  isOpen, 
-  onClose, 
+export function ChefDetailsModal({
+  chef,
+  isOpen,
+  onClose,
   onRefresh,
   onStatusChange,
-  onNotesChange 
+  onNotesChange
 }: ChefDetailsModalProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -115,8 +116,9 @@ export function ChefDetailsModal({
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [storedMerchantId, setStoredMerchantId] = useState<string | null>(null);
-  
+
   // Menu upload states
   interface ParsedDish {
     name: string;
@@ -129,6 +131,68 @@ export function ChefDetailsModal({
   const [parsingMenu, setParsingMenu] = useState(false);
   const [savingMenu, setSavingMenu] = useState(false);
   const [editingDishIndex, setEditingDishIndex] = useState<number | null>(null);
+
+  // Setup job polling with real-time status updates
+  const { job: setupJob } = useMerchantSetupJob({
+    jobId: activeJobId,
+    onStatusUpdate: (job) => {
+      // Update UI with progress
+      if (job.progress_message) {
+        setProcessStep(job.progress_message);
+      }
+
+      // Show toast for each step completion
+      if (job.current_step === 'create_merchant' && job.merchant_id && !merchantId) {
+        setMerchantId(job.merchant_id);
+        toast({
+          title: '✓ Merchant Created',
+          description: `ID: ${job.merchant_id.slice(0, 12)}...`,
+        });
+      } else if (job.current_step === 'generate_images' && job.progress_message?.includes('images generated')) {
+        toast({
+          title: '✓ Images Generated',
+          description: job.progress_message,
+        });
+      } else if (job.current_step === 'import_menu' && job.progress_message?.includes('Importing')) {
+        toast({
+          title: 'Importing Menu',
+          description: 'Adding dishes to Hyperzod...',
+        });
+      }
+    },
+    onComplete: (job) => {
+      setCreatingMerchant(false);
+      setProcessStep('');
+      setActiveJobId(null);
+
+      toast({
+        title: '🎉 Setup Complete!',
+        description: job.progress_message || 'Merchant setup finished successfully',
+      });
+
+      // Refresh chef data
+      fetchChefData();
+      if (onRefresh) onRefresh();
+    },
+    onError: (job) => {
+      setCreatingMerchant(false);
+      setProcessStep('');
+      setActiveJobId(null);
+
+      console.error('Merchant setup failed:', job.error_message, job.error_details);
+
+      setHyperzodError({
+        error: job.error_message || 'Setup failed',
+        details: job.error_details,
+      });
+
+      toast({
+        title: '❌ Setup Failed',
+        description: job.error_message || 'An error occurred during setup',
+        variant: 'destructive',
+      });
+    },
+  });
 
   useEffect(() => {
     if (isOpen && chef.id) {
@@ -147,7 +211,7 @@ export function ChefDetailsModal({
         .select('hyperzod_merchant_id')
         .eq('id', chef.id)
         .maybeSingle();
-      
+
       if (data?.hyperzod_merchant_id) {
         setStoredMerchantId(data.hyperzod_merchant_id);
         setMerchantId(data.hyperzod_merchant_id);
@@ -166,7 +230,7 @@ export function ChefDetailsModal({
         .from('chef_profiles')
         .update({ hyperzod_merchant_id: newMerchantId })
         .eq('id', chef.id);
-      
+
       if (error) {
         console.error('Error saving hyperzod merchant id:', error);
         toast({ title: 'Warning', description: 'Merchant created but ID could not be saved to database', variant: 'destructive' });
@@ -270,7 +334,7 @@ export function ChefDetailsModal({
     try {
       // Read file content
       const content = await file.text();
-      
+
       const { data, error } = await supabase.functions.invoke('parse-menu-file', {
         body: { content, filename: file.name }
       });
@@ -284,16 +348,16 @@ export function ChefDetailsModal({
       }
 
       setParsedDishes(data.dishes);
-      toast({ 
-        title: 'Menu Parsed', 
-        description: `Found ${data.dishes.length} dishes. Review and edit before saving.` 
+      toast({
+        title: 'Menu Parsed',
+        description: `Found ${data.dishes.length} dishes. Review and edit before saving.`
       });
     } catch (err: any) {
       console.error('Menu parse error:', err);
-      toast({ 
-        title: 'Parse Failed', 
-        description: err?.message || 'Could not parse the menu file', 
-        variant: 'destructive' 
+      toast({
+        title: 'Parse Failed',
+        description: err?.message || 'Could not parse the menu file',
+        variant: 'destructive'
       });
     } finally {
       setParsingMenu(false);
@@ -383,9 +447,9 @@ export function ChefDetailsModal({
 
       if (dishError) throw dishError;
 
-      toast({ 
-        title: 'Menu Saved', 
-        description: `${parsedDishes.length} dishes saved successfully` 
+      toast({
+        title: 'Menu Saved',
+        description: `${parsedDishes.length} dishes saved successfully`
       });
 
       // Clear parsed dishes and refresh menu data
@@ -393,136 +457,66 @@ export function ChefDetailsModal({
       fetchChefData();
     } catch (err: any) {
       console.error('Save menu error:', err);
-      toast({ 
-        title: 'Save Failed', 
-        description: err?.message || 'Could not save the menu', 
-        variant: 'destructive' 
+      toast({
+        title: 'Save Failed',
+        description: err?.message || 'Could not save the menu',
+        variant: 'destructive'
       });
     } finally {
       setSavingMenu(false);
     }
   };
 
-  // Unified handler: Create Merchant → Generate Images → Import Menu
+  // Unified handler: Start background merchant setup
   const handleFullMerchantSetup = async () => {
     setCreatingMerchant(true);
     setHyperzodError(null);
-    setProcessStep('Creating merchant...');
+    setProcessStep('Starting setup...');
 
     try {
-      // Step 1: Create merchant in Hyperzod
-      const { data: merchantData, error: merchantError } = await supabase.functions.invoke('create-hyperzod-merchant', {
-        body: { chef }
+      const { data, error } = await supabase.functions.invoke('orchestrate-merchant-setup', {
+        body: {
+          chef_profile_id: chef.id,
+          chef,
+          menu_id: menu?.id,
+          ambience: selectedAmbience,
+          background: selectedBackground,
+        }
       });
 
-      if (merchantError) {
-        throw new Error(`Merchant creation failed: ${merchantError.message}`);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      if (!merchantData?.success || !merchantData?.merchant_id) {
-        const errorMsg = merchantData?.error || 'Failed to create merchant';
-        throw new Error(errorMsg);
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to start merchant setup');
       }
 
-      const newMerchantId = merchantData.merchant_id;
-      setMerchantId(newMerchantId);
-      await saveHyperzodMerchantId(newMerchantId);
-      
-      toast({ 
-        title: '✓ Merchant Created', 
-        description: `ID: ${newMerchantId.slice(0, 12)}...`
+      // Set the job ID to start polling
+      setActiveJobId(data.job_id);
+
+      toast({
+        title: '🚀 Setup Started',
+        description: 'Merchant setup is running in the background. You can close this modal.',
       });
 
-      // Step 2: Generate images (if menu exists)
-      if (menu && menu.dishes.length > 0) {
-        setProcessStep('Generating images...');
-        
-        const { data: imgData, error: imgError } = await supabase.functions.invoke('generate-menu-images', {
-          body: { 
-            menu_id: menu.id,
-            ambience: selectedAmbience,
-            background: selectedBackground,
-            cuisines: chef.cuisines || []
-          }
-        });
-
-        if (imgError) {
-          console.error('Image generation error:', imgError);
-          toast({ 
-            title: 'Warning', 
-            description: `Image generation issue: ${imgError.message}. Continuing with import...`,
-            variant: 'default'
-          });
-        } else {
-          toast({ 
-            title: '✓ Images Generated', 
-            description: `${imgData?.success_count || 0} images created`
-          });
-        }
-
-        // Refresh dish data to get image URLs
-        setProcessStep('Loading updated menu...');
-        const { data: updatedDishes } = await supabase
-          .from('dishes')
-          .select('id, name, description, price, category, is_upsell, image_url')
-          .eq('menu_id', menu.id)
-          .order('sort_order', { ascending: true });
-
-        // Step 3: Import to Hyperzod
-        setProcessStep('Importing to Hyperzod...');
-        const { data: importData, error: importError } = await supabase.functions.invoke('import-menu-to-hyperzod', {
-          body: { 
-            merchant_id: newMerchantId,
-            dishes: updatedDishes || menu.dishes
-          }
-        });
-
-        if (importError) {
-          throw new Error(`Hyperzod import failed: ${importError.message}`);
-        }
-
-        if (importData?.success) {
-          toast({ 
-            title: '✓ Complete!', 
-            description: `Merchant created, ${imgData?.success_count || 0} images generated, ${importData.successful_count} dishes imported`
-          });
-        } else {
-          const failedItems = importData?.results?.filter((r: any) => !r.success) || [];
-          if (failedItems.length > 0) {
-            setHyperzodError({ 
-              error: 'Some dishes failed to import',
-              details: { field: 'dishes', message: failedItems.map((r: any) => `${r.dish_name}: ${r.error}`).join(', ') }
-            });
-          }
-          toast({ 
-            title: importData?.successful_count > 0 ? '⚠ Partial Success' : 'Import Issues', 
-            description: importData?.message || 'Check error details',
-            variant: importData?.successful_count > 0 ? 'default' : 'destructive'
-          });
-        }
-
-        // Refresh UI
-        fetchChefData();
-      } else {
-        toast({ 
-          title: '✓ Merchant Created', 
-          description: 'No menu found - skipped image generation and import'
-        });
-      }
+      // Note: We keep creatingMerchant true until the job completes
+      // The modal can be closed, but the button will show as loading
     } catch (err: any) {
-      console.error('Full merchant setup error:', err);
-      setHyperzodError({ 
-        error: err?.message || 'Setup failed', 
-        details: { field: 'process', message: processStep || 'Unknown step' } 
-      });
-      toast({ 
-        title: 'Error', 
-        description: err?.message || 'Failed to complete merchant setup', 
-        variant: 'destructive' 
-      });
-    } finally {
+      console.error('Failed to start merchant setup:', err);
       setCreatingMerchant(false);
       setProcessStep('');
+
+      setHyperzodError({
+        error: err?.message || 'Failed to start setup',
+        details: { field: 'orchestrator', message: err?.message }
+      });
+
+      toast({
+        title: 'Error',
+        description: err?.message || 'Failed to start merchant setup',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -755,109 +749,109 @@ export function ChefDetailsModal({
 
   // Build task list based on onboarding steps
   const onboardingTasks: TaskData[] = [
-    { 
-      id: 'city', 
-      name: 'City Selection', 
-      completed: !!chef.city, 
+    {
+      id: 'city',
+      name: 'City Selection',
+      completed: !!chef.city,
       data: chef.city,
       icon: <MapPin className="w-4 h-4" />
     },
-    { 
-      id: 'cuisines', 
-      name: 'Cuisine Types', 
-      completed: (chef.cuisines?.length || 0) > 0, 
+    {
+      id: 'cuisines',
+      name: 'Cuisine Types',
+      completed: (chef.cuisines?.length || 0) > 0,
       data: chef.cuisines,
       icon: <Utensils className="w-4 h-4" />
     },
-    { 
-      id: 'contact', 
-      name: 'Contact Information', 
-      completed: !!chef.contact_email && !!chef.contact_phone, 
+    {
+      id: 'contact',
+      name: 'Contact Information',
+      completed: !!chef.contact_email && !!chef.contact_phone,
       data: { email: chef.contact_email, phone: chef.contact_phone },
       icon: <Mail className="w-4 h-4" />
     },
-    { 
-      id: 'address', 
-      name: 'Address', 
-      completed: !!chef.address, 
+    {
+      id: 'address',
+      name: 'Address',
+      completed: !!chef.address,
       data: chef.address,
       icon: <MapPin className="w-4 h-4" />
     },
-    { 
-      id: 'business_name', 
-      name: 'Business Name', 
-      completed: !!chef.business_name, 
+    {
+      id: 'business_name',
+      name: 'Business Name',
+      completed: !!chef.business_name,
       data: chef.business_name,
       icon: <ChefHat className="w-4 h-4" />
     },
-    { 
-      id: 'logo', 
-      name: 'Logo', 
-      completed: !!chef.logo_url, 
+    {
+      id: 'logo',
+      name: 'Logo',
+      completed: !!chef.logo_url,
       data: chef.logo_url,
       icon: <User className="w-4 h-4" />
     },
-    { 
-      id: 'service_type', 
-      name: 'Service Type', 
-      completed: !!chef.service_type && chef.service_type !== 'unsure', 
+    {
+      id: 'service_type',
+      name: 'Service Type',
+      completed: !!chef.service_type && chef.service_type !== 'unsure',
       data: chef.service_type,
       icon: <Clock className="w-4 h-4" />
     },
-    { 
-      id: 'availability', 
-      name: 'Availability', 
-      completed: (chef.availability?.length || 0) > 0, 
+    {
+      id: 'availability',
+      name: 'Availability',
+      completed: (chef.availability?.length || 0) > 0,
       data: chef.availability,
       icon: <Calendar className="w-4 h-4" />
     },
-    { 
-      id: 'dish_types', 
-      name: 'Dish Types', 
-      completed: (chef.dish_types?.length || 0) > 0, 
+    {
+      id: 'dish_types',
+      name: 'Dish Types',
+      completed: (chef.dish_types?.length || 0) > 0,
       data: chef.dish_types,
       icon: <Utensils className="w-4 h-4" />
     },
-    { 
-      id: 'food_safety', 
-      name: 'Food Safety Status', 
-      completed: !!chef.food_safety_status, 
+    {
+      id: 'food_safety',
+      name: 'Food Safety Status',
+      completed: !!chef.food_safety_status,
       data: chef.food_safety_status,
       icon: <Shield className="w-4 h-4" />
     },
-    { 
-      id: 'kvk_status', 
-      name: 'KVK/NVWA Status', 
-      completed: !!chef.kvk_status, 
+    {
+      id: 'kvk_status',
+      name: 'KVK/NVWA Status',
+      completed: !!chef.kvk_status,
       data: chef.kvk_status,
       icon: <FileCheck className="w-4 h-4" />
     },
-    { 
-      id: 'plan', 
-      name: 'Plan Selection', 
-      completed: !!chef.plan, 
+    {
+      id: 'plan',
+      name: 'Plan Selection',
+      completed: !!chef.plan,
       data: chef.plan,
       icon: <CheckCircle className="w-4 h-4" />
     },
   ];
 
   const verificationTasks: TaskData[] = [
-    { 
-      id: 'menu_reviewed', 
-      name: 'Menu Review', 
+    {
+      id: 'menu_reviewed',
+      name: 'Menu Review',
       completed: verification?.menu_reviewed || false,
       data: menu,
       icon: <Utensils className="w-4 h-4" />
     },
-    { 
-      id: 'food_safety_viewed', 
-      name: 'Food Safety Training', 
+    {
+      id: 'food_safety_viewed',
+      name: 'Food Safety Training',
       completed: verification?.food_safety_viewed || false,
       icon: <Shield className="w-4 h-4" />
     },
-    { 
-      id: 'documents_uploaded', 
-      name: 'Documents Uploaded', 
+    {
+      id: 'documents_uploaded',
+      name: 'Documents Uploaded',
       completed: verification?.documents_uploaded || false,
       data: {
         kvk: verification?.kvk_document_url,
@@ -870,7 +864,7 @@ export function ChefDetailsModal({
 
   const completedOnboarding = onboardingTasks.filter(t => t.completed).length;
   const completedVerification = verificationTasks.filter(t => t.completed).length;
-  
+
   // Use same calculation as table view for consistency
   const progressPercent = calculateOnboardingProgress(chef);
 
@@ -888,7 +882,7 @@ export function ChefDetailsModal({
           <div className="flex items-center gap-2 ml-auto mr-8">
             <Popover>
               <PopoverTrigger asChild>
-                <Button 
+                <Button
                   disabled={creatingMerchant}
                   variant={storedMerchantId ? 'outline' : 'default'}
                 >
@@ -951,8 +945,8 @@ export function ChefDetailsModal({
                       </Select>
                     </div>
                   </div>
-                  <Button 
-                    onClick={handleFullMerchantSetup} 
+                  <Button
+                    onClick={handleFullMerchantSetup}
                     disabled={creatingMerchant}
                     className="w-full"
                     size="sm"
@@ -1096,7 +1090,7 @@ export function ChefDetailsModal({
                 {/* Progress Card */}
                 <Card className="p-4">
                   <h3 className="font-semibold mb-4">Progress Overview</h3>
-                  
+
                   {/* Onboarding Progress */}
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-1">
@@ -1118,7 +1112,7 @@ export function ChefDetailsModal({
                       {completedOnboarding} of {onboardingTasks.length} tasks
                     </p>
                   </div>
-                  
+
                   {/* Verification Progress */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -1170,8 +1164,8 @@ export function ChefDetailsModal({
                     <div>
                       <p className="text-xs text-muted-foreground">Quiz Completed At</p>
                       <p className="font-medium">
-                        {verification?.food_safety_quiz_completed_at 
-                          ? format(new Date(verification.food_safety_quiz_completed_at), 'MMM d, yyyy HH:mm') 
+                        {verification?.food_safety_quiz_completed_at
+                          ? format(new Date(verification.food_safety_quiz_completed_at), 'MMM d, yyyy HH:mm')
                           : 'N/A'}
                       </p>
                     </div>
@@ -1322,15 +1316,15 @@ export function ChefDetailsModal({
                         <p className="text-xs text-muted-foreground">{parsedDishes.length} dishes found. Click pencil to edit before saving.</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setParsedDishes([])}
                         >
                           Cancel
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={handleSaveParsedMenu}
                           disabled={savingMenu}
                           className="gap-2"
@@ -1353,8 +1347,8 @@ export function ChefDetailsModal({
                                 className="h-8"
                               />
                               <div className="flex gap-2">
-                                <Select 
-                                  value={dish.category} 
+                                <Select
+                                  value={dish.category}
                                   onValueChange={(val) => updateParsedDish(index, 'category', val)}
                                 >
                                   <SelectTrigger className="h-8 w-40">
@@ -1405,17 +1399,17 @@ export function ChefDetailsModal({
                               </div>
                               <p className="font-semibold flex-shrink-0">€{Number(dish.price).toFixed(2)}</p>
                               <div className="flex flex-col gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-7 w-7"
                                   onClick={() => setEditingDishIndex(index)}
                                 >
                                   <Pencil className="w-3 h-3" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-7 w-7 text-destructive"
                                   onClick={() => deleteParsedDish(index)}
                                 >
@@ -1458,9 +1452,9 @@ export function ChefDetailsModal({
                       {menu.dishes.filter(d => !d.is_upsell).map((dish) => (
                         <div key={dish.id} className="flex gap-3 p-3 border rounded-lg">
                           {dish.image_url ? (
-                            <img 
-                              src={dish.image_url} 
-                              alt={dish.name} 
+                            <img
+                              src={dish.image_url}
+                              alt={dish.name}
                               className="w-16 h-16 object-cover rounded-md flex-shrink-0"
                             />
                           ) : (
@@ -1487,9 +1481,9 @@ export function ChefDetailsModal({
                         {menu.dishes.filter(d => d.is_upsell).map((dish) => (
                           <div key={dish.id} className="flex gap-3 items-center p-3 border rounded-lg bg-muted/30">
                             {dish.image_url ? (
-                              <img 
-                                src={dish.image_url} 
-                                alt={dish.name} 
+                              <img
+                                src={dish.image_url}
+                                alt={dish.name}
                                 className="w-12 h-12 object-cover rounded-md flex-shrink-0"
                               />
                             ) : (
