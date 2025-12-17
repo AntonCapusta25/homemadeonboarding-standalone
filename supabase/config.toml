@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.test-hyperzod-connection]
 verify_jwt = false
+
+[functions.import-menu-to-hyperzod]
+verify_jwt = false

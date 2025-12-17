@@ -15,10 +15,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { 
+import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, Wifi, AlertTriangle
+  Download, Store, Wifi, AlertTriangle, Upload
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -107,8 +107,10 @@ export function ChefDetailsModal({
   const [saving, setSaving] = useState(false);
   const [creatingMerchant, setCreatingMerchant] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [importingMenu, setImportingMenu] = useState(false);
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [merchantId, setMerchantId] = useState('');
 
   useEffect(() => {
     if (isOpen && chef.id) {
@@ -291,6 +293,60 @@ export function ChefDetailsModal({
       });
     } finally {
       setCreatingMerchant(false);
+    }
+  };
+
+  const handleImportMenuToHyperzod = async () => {
+    if (!merchantId.trim()) {
+      toast({ title: 'Error', description: 'Please enter a Merchant ID', variant: 'destructive' });
+      return;
+    }
+    if (!menu || menu.dishes.length === 0) {
+      toast({ title: 'Error', description: 'No menu dishes to import', variant: 'destructive' });
+      return;
+    }
+
+    setImportingMenu(true);
+    setHyperzodError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('import-menu-to-hyperzod', {
+        body: { 
+          merchant_id: merchantId.trim(),
+          dishes: menu.dishes
+        }
+      });
+
+      if (error) {
+        setHyperzodError({ error: error.message });
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success) {
+        toast({ 
+          title: 'Menu Imported', 
+          description: data.message || `Successfully imported ${menu.dishes.length} dishes`
+        });
+      } else {
+        const failedItems = data?.results?.filter((r: any) => !r.success) || [];
+        setHyperzodError({ 
+          error: data?.error || 'Some dishes failed to import',
+          details: failedItems.length > 0 ? { 
+            field: 'dishes', 
+            message: failedItems.map((r: any) => `${r.dish_name}: ${r.error}`).join(', ') 
+          } : null
+        });
+        toast({ 
+          title: data?.successful_count > 0 ? 'Partial Import' : 'Import Failed', 
+          description: data?.message || 'Failed to import menu',
+          variant: data?.successful_count > 0 ? 'default' : 'destructive'
+        });
+      }
+    } catch (err: any) {
+      setHyperzodError({ error: err?.message || 'Network error' });
+      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+    } finally {
+      setImportingMenu(false);
     }
   };
 
@@ -1021,10 +1077,37 @@ export function ChefDetailsModal({
                   <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
                 ) : (
                   <>
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap items-center gap-2 justify-between">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Merchant ID"
+                          value={merchantId}
+                          onChange={(e) => setMerchantId(e.target.value)}
+                          className="w-48 h-8 text-sm"
+                        />
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          onClick={handleImportMenuToHyperzod}
+                          disabled={importingMenu || !merchantId.trim()}
+                          className="gap-2"
+                        >
+                          {importingMenu ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Importing...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              Import to Hyperzod
+                            </>
+                          )}
+                        </Button>
+                      </div>
                       <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
                         <Download className="w-4 h-4" />
-                        Download Menu (ZIP)
+                        Download ZIP
                       </Button>
                     </div>
                     {menu.summary && (
