@@ -131,9 +131,12 @@ serve(async (req) => {
       if (imageUrl) productImages.push({ file_url: imageUrl, is_cover: true });
     }
 
+    // Add timestamp to SKU to make it unique for each test run
+    const uniqueSku = `${dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 40)}-${Date.now()}`;
+    
     const productPayload = {
       merchant_id,
-      sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "TEST-SKU",
+      sku: uniqueSku,
       language_translation: [
         { key: "name", locale: "en", value: dishName },
         { key: "description", locale: "en", value: description },
