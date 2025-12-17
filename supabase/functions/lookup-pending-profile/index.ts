@@ -26,51 +26,68 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Look up pending profile by email
-    const { data: pendingProfile, error } = await supabaseAdmin
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check ALL sources for existing user
+
+    // 1. Check pending_profiles
+    const { data: pendingProfile } = await supabaseAdmin
       .from("pending_profiles")
       .select("*")
-      .eq("email", email.toLowerCase().trim())
+      .eq("email", normalizedEmail)
       .maybeSingle();
 
-    if (error) {
-      console.error("Error looking up pending profile:", error);
-      return new Response(
-        JSON.stringify({ error: "Failed to lookup profile" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // 2. Check chef_profiles
+    const { data: chefProfile } = await supabaseAdmin
+      .from("chef_profiles")
+      .select("*")
+      .eq("contact_email", normalizedEmail)
+      .maybeSingle();
 
-    if (!pendingProfile) {
+    // 3. Check Supabase Auth users
+    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const authUser = authUsers?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+
+    // Determine if user exists in ANY source
+    const foundInPending = !!pendingProfile;
+    const foundInChef = !!chefProfile;
+    const foundInAuth = !!authUser;
+    const found = foundInPending || foundInChef || foundInAuth;
+
+    if (!found) {
       return new Response(
         JSON.stringify({ found: false }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Return the profile data including session_token for continued editing
+    // Build profile from best available source
+    const profile = pendingProfile || (chefProfile ? {
+      email: chefProfile.contact_email,
+      phone: chefProfile.contact_phone,
+      chef_name: chefProfile.chef_name,
+      business_name: chefProfile.business_name,
+      city: chefProfile.city,
+      address: chefProfile.address,
+      cuisines: chefProfile.cuisines,
+      dish_types: chefProfile.dish_types,
+      availability: chefProfile.availability,
+      service_type: chefProfile.service_type,
+      food_safety_status: chefProfile.food_safety_status,
+      kvk_status: chefProfile.kvk_status,
+      plan: chefProfile.plan,
+      logo_url: chefProfile.logo_url,
+    } : {
+      email: normalizedEmail,
+      chef_name: authUser?.user_metadata?.chef_name || null,
+    });
+
     return new Response(
       JSON.stringify({
         found: true,
-        profile: {
-          id: pendingProfile.id,
-          email: pendingProfile.email,
-          phone: pendingProfile.phone,
-          chef_name: pendingProfile.chef_name,
-          business_name: pendingProfile.business_name,
-          city: pendingProfile.city,
-          address: pendingProfile.address,
-          cuisines: pendingProfile.cuisines,
-          dish_types: pendingProfile.dish_types,
-          availability: pendingProfile.availability,
-          service_type: pendingProfile.service_type,
-          food_safety_status: pendingProfile.food_safety_status,
-          kvk_status: pendingProfile.kvk_status,
-          plan: pendingProfile.plan,
-          logo_url: pendingProfile.logo_url,
-          current_step: pendingProfile.current_step,
-        },
-        sessionToken: pendingProfile.session_token,
+        source: foundInChef ? 'chef_profiles' : (foundInPending ? 'pending_profiles' : 'auth'),
+        profile: profile,
+        sessionToken: pendingProfile?.session_token,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
