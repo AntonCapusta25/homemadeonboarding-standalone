@@ -287,12 +287,15 @@ export function ContactStep({
 
         // Notify about account creation (optional)
         if (onAccountCreated && accountData.userId) {
+          console.log('Calling onAccountCreated with userId:', accountData.userId);
           onAccountCreated(accountData.userId);
         }
 
         // CONTINUE to next step - don't show verification screen!
+        console.log('New user flow complete, calling onNext()');
         toast.success(`Welcome, ${firstName}! Let's continue.`);
         onNext();
+        console.log('onNext() called successfully');
       }
     } catch (err: any) {
       console.error('Error in contact step:', err);
