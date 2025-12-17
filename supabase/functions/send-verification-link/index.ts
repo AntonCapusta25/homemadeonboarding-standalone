@@ -156,7 +156,28 @@ serve(async (req) => {
 
     let magicLinkUrl: string;
     const productionUrl = "https://chef-craft-flow.lovable.app";
-    const finalRedirectTo = redirectTo || `${productionUrl}/onboarding?verified=true`;
+    const defaultRedirectTo = `${productionUrl}/onboarding?verified=true`;
+
+    const resolveRedirectTo = (candidate?: string) => {
+      if (!candidate) return defaultRedirectTo;
+      try {
+        const url = new URL(candidate);
+        if (!['http:', 'https:'].includes(url.protocol)) return defaultRedirectTo;
+
+        const requestOrigin = req.headers.get('origin') ?? '';
+        const allowedOrigins = new Set([productionUrl, requestOrigin].filter(Boolean));
+        if (!allowedOrigins.has(url.origin)) return defaultRedirectTo;
+
+        // Ensure we always return to onboarding and include verified=true
+        if (!url.pathname.startsWith('/onboarding')) url.pathname = '/onboarding';
+        url.searchParams.set('verified', 'true');
+        return url.toString();
+      } catch {
+        return defaultRedirectTo;
+      }
+    };
+
+    const finalRedirectTo = resolveRedirectTo(redirectTo);
 
     if (existingUser) {
       // Generate magic link for existing user
@@ -176,25 +197,36 @@ serve(async (req) => {
         );
       }
 
-      // Build the magic link URL with production domain
-      const tokenHash = linkData.properties?.hashed_token;
-      magicLinkUrl = `${productionUrl}/auth/v1/verify?token=${tokenHash}&type=magiclink&redirect_to=${encodeURIComponent(finalRedirectTo)}`;
-      
-      // Actually use the action_link but replace domain
-      magicLinkUrl = linkData.properties?.action_link?.replace(
-        /https:\/\/[^\/]+/,
-        Deno.env.get("SUPABASE_URL") ?? ""
-      ) || magicLinkUrl;
+      const actionLink = linkData?.properties?.action_link;
+      if (!actionLink) {
+        console.error("Magic link generation did not return an action_link");
+        return new Response(
+          JSON.stringify({ error: "Failed to generate verification link" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Log a redacted URL for debugging (never log tokens)
+      try {
+        const u = new URL(actionLink);
+        if (u.searchParams.has('token')) u.searchParams.set('token', '[redacted]');
+        if (u.searchParams.has('token_hash')) u.searchParams.set('token_hash', '[redacted]');
+        console.log('Generated verification link (redacted):', u.toString());
+      } catch {
+        // ignore
+      }
+
+      magicLinkUrl = actionLink;
     } else {
       // No auth user exists - just return found status without creating account
       // The account will be created when they complete onboarding via auto-create-account
       console.log(`Profile found but no auth user for: ${normalizedEmail}`);
       return new Response(
-        JSON.stringify({ 
-          found: true, 
-          sent: false, 
+        JSON.stringify({
+          found: true,
+          sent: false,
           noAuthUser: true,
-          message: "Profile found but no account yet. Continue onboarding to create your account." 
+          message: "Profile found but no account yet. Continue onboarding to create your account.",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
