@@ -16,7 +16,6 @@ interface Dish {
   price: number;
   category: string | null;
   is_upsell: boolean;
-  image_url?: string | null;
 }
 
 interface ImportRequest {
@@ -27,11 +26,6 @@ interface ImportRequest {
 function safeString(input: unknown, maxLen: number) {
   if (typeof input !== "string") return "";
   return input.trim().slice(0, maxLen);
-}
-
-// Remove emojis from string
-function removeEmojis(str: string): string {
-  return str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{231A}-\u{231B}]|[\u{23E9}-\u{23F3}]|[\u{23F8}-\u{23FA}]|[\u{25AA}-\u{25AB}]|[\u{25B6}]|[\u{25C0}]|[\u{25FB}-\u{25FE}]|[\u{2614}-\u{2615}]|[\u{2648}-\u{2653}]|[\u{267F}]|[\u{2693}]|[\u{26A1}]|[\u{26AA}-\u{26AB}]|[\u{26BD}-\u{26BE}]|[\u{26C4}-\u{26C5}]|[\u{26CE}]|[\u{26D4}]|[\u{26EA}]|[\u{26F2}-\u{26F3}]|[\u{26F5}]|[\u{26FA}]|[\u{26FD}]|[\u{2702}]|[\u{2705}]|[\u{2708}-\u{270D}]|[\u{270F}]|[\u{2712}]|[\u{2714}]|[\u{2716}]|[\u{271D}]|[\u{2721}]|[\u{2728}]|[\u{2733}-\u{2734}]|[\u{2744}]|[\u{2747}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2763}-\u{2764}]|[\u{2795}-\u{2797}]|[\u{27A1}]|[\u{27B0}]|[\u{27BF}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{2B50}]|[\u{2B55}]|[\u{3030}]|[\u{303D}]|[\u{3297}]|[\u{3299}]/gu, '').trim();
 }
 
 // Create or get default category for merchant
@@ -139,9 +133,9 @@ serve(async (req) => {
 
     for (const dish of dishes) {
       try {
-        const dishName = removeEmojis(safeString(dish?.name, 120));
+        const dishName = safeString(dish?.name, 120);
         const description = safeString(dish?.description ?? "", 2000);
-        const priceSell = Number(dish?.price) || 0; // Keep as decimal (e.g., 16.95)
+        const priceSell = Math.round((Number(dish?.price) || 0) * 100); // Convert to cents (integer)
         const isUpsell = dish?.is_upsell || false;
 
         if (!dishName) {
@@ -157,13 +151,6 @@ serve(async (req) => {
         const categoryId = isUpsell && extrasCategoryId ? extrasCategoryId : mainCategoryId;
 
         // Hyperzod requires product_pricing.type - detected valid value is "flat"
-        // Include product_images if dish has an image_url
-        // Hyperzod expects array of objects with file_url and is_cover fields
-        const productImages: { file_url: string; is_cover: boolean }[] = [];
-        if (dish.image_url) {
-          productImages.push({ file_url: dish.image_url, is_cover: true });
-        }
-
         const productPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
@@ -193,7 +180,7 @@ serve(async (req) => {
           is_featured: false,
           sort_order: 0,
           product_quantity: { min_quantity: 0, max_quantity: 0 },
-          product_images: productImages,
+          product_images: [],
         };
 
         console.log(`Creating product: ${dishName}`);
