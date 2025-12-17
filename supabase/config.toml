@@ -59,9 +59,3 @@ verify_jwt = false
 
 [functions.generate-menu-images]
 verify_jwt = false
-
-[functions.process-merchant-setup]
-verify_jwt = false
-
-[functions.parse-menu-upload]
-verify_jwt = false

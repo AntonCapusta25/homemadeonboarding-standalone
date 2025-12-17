@@ -351,62 +351,6 @@ export type Database = {
           },
         ]
       }
-      merchant_setup_jobs: {
-        Row: {
-          ambience: string | null
-          background_style: string | null
-          chef_profile_id: string
-          completed_at: string | null
-          created_at: string | null
-          current_step: string | null
-          dishes_imported: number | null
-          error_message: string | null
-          id: string
-          images_generated: number | null
-          merchant_id: string | null
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          ambience?: string | null
-          background_style?: string | null
-          chef_profile_id: string
-          completed_at?: string | null
-          created_at?: string | null
-          current_step?: string | null
-          dishes_imported?: number | null
-          error_message?: string | null
-          id?: string
-          images_generated?: number | null
-          merchant_id?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          ambience?: string | null
-          background_style?: string | null
-          chef_profile_id?: string
-          completed_at?: string | null
-          created_at?: string | null
-          current_step?: string | null
-          dishes_imported?: number | null
-          error_message?: string | null
-          id?: string
-          images_generated?: number | null
-          merchant_id?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "merchant_setup_jobs_chef_profile_id_fkey"
-            columns: ["chef_profile_id"]
-            isOneToOne: false
-            referencedRelation: "chef_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pending_profiles: {
         Row: {
           address: string | null
