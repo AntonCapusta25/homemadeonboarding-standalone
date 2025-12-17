@@ -120,6 +120,7 @@ export type Database = {
           food_safety_status:
             | Database["public"]["Enums"]["food_safety_status"]
             | null
+          hyperzod_merchant_id: string | null
           id: string
           kvk_status: Database["public"]["Enums"]["kvk_status"] | null
           logo_url: string | null
@@ -146,6 +147,7 @@ export type Database = {
           food_safety_status?:
             | Database["public"]["Enums"]["food_safety_status"]
             | null
+          hyperzod_merchant_id?: string | null
           id?: string
           kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
           logo_url?: string | null
@@ -172,6 +174,7 @@ export type Database = {
           food_safety_status?:
             | Database["public"]["Enums"]["food_safety_status"]
             | null
+          hyperzod_merchant_id?: string | null
           id?: string
           kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
           logo_url?: string | null
