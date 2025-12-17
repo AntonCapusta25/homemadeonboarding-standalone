@@ -234,22 +234,24 @@ export function ContactStep({
       }
 
       // Send magic link
-      const { data, error } = await supabase.functions.invoke('send-magic-link', {
+      const { data: magicLinkData, error: magicLinkError } = await supabase.functions.invoke('send-magic-link', {
         body: {
           email: profileData.email,
           chefName: firstName,
         },
       });
 
-      if (error) {
-        console.error('Error sending magic link:', error);
-        toast.error(t('contact.magicLinkFailed', 'Failed to send magic link. Please try again.'));
+      if (magicLinkError) {
+        console.error('Error sending magic link:', magicLinkError);
+        toast.error(`Failed to send magic link: ${magicLinkError.message || 'Unknown error'}`);
         setSaving(false);
         return;
       }
 
-      if (!data?.success) {
-        toast.error(t('contact.magicLinkFailed', 'Failed to send magic link. Please try again.'));
+      if (!magicLinkData?.success) {
+        const errorMsg = magicLinkData?.error || 'Failed to send magic link';
+        console.error('Magic link failed:', errorMsg);
+        toast.error(errorMsg);
         setSaving(false);
         return;
       }
@@ -264,7 +266,7 @@ export function ContactStep({
       }
     } catch (err: any) {
       console.error('Error in contact step:', err);
-      toast.error(t('contact.errorOccurred', 'An error occurred. Please try again.'));
+      toast.error(err?.message || t('contact.errorOccurred', 'An error occurred. Please try again.'));
     } finally {
       setSaving(false);
     }
