@@ -218,18 +218,19 @@ async function createHyperzodMerchant(chef: any) {
   const response = await fetch(`${HYPERZOD_BASE_URL}/admin/v1/merchant/create`, {
     method: 'POST',
     headers: {
-      Accept: 'application/json',
+      'Accept': 'application/json',
       'Content-Type': 'application/json',
-      'X-TENANT': TENANT_ID,
-      'X-API-KEY': HYPERZOD_API_KEY || '',
+      'x-tenant': TENANT_ID,
+      'x-api-key': HYPERZOD_API_KEY || '',
     },
     body: JSON.stringify(payload),
   });
 
   const data = await response.json();
+  console.log('Hyperzod merchant response:', JSON.stringify(data));
 
   if (!response.ok || !data.success) {
-    return { success: false, error: data.message || 'Failed to create merchant' };
+    return { success: false, error: data.message || data.error || `HTTP ${response.status}` };
   }
 
   return { success: true, merchant_id: data.data?._id || data.data?.merchant_id };
@@ -326,11 +327,11 @@ async function importMenuToHyperzod(merchantId: string, dishes: any[]) {
       const response = await fetch(`${HYPERZOD_BASE_URL}/merchant/v1/product/create`, {
         method: 'POST',
         headers: {
-          Accept: 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'X-TENANT': TENANT_ID,
-          'X-API-KEY': HYPERZOD_API_KEY || '',
-          'X-MERCHANT': merchantId,
+          'x-tenant': TENANT_ID,
+          'x-api-key': HYPERZOD_API_KEY || '',
+          'x-merchant': merchantId,
         },
         body: JSON.stringify(productPayload),
       });
@@ -350,11 +351,11 @@ async function createCategory(merchantId: string, name: string) {
   const response = await fetch(`${HYPERZOD_BASE_URL}/merchant/v1/category/create`, {
     method: 'POST',
     headers: {
-      Accept: 'application/json',
+      'Accept': 'application/json',
       'Content-Type': 'application/json',
-      'X-TENANT': TENANT_ID,
-      'X-API-KEY': HYPERZOD_API_KEY || '',
-      'X-MERCHANT': merchantId,
+      'x-tenant': TENANT_ID,
+      'x-api-key': HYPERZOD_API_KEY || '',
+      'x-merchant': merchantId,
     },
     body: JSON.stringify({ name, status: true }),
   });
