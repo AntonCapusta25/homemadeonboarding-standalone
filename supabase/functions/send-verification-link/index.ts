@@ -20,7 +20,11 @@ const MAX_REQUESTS_PER_IP = 10; // Max 10 requests per IP per minute
 const emailRateLimits = new Map<string, { count: number; resetAt: number }>();
 const ipRateLimits = new Map<string, { count: number; resetAt: number }>();
 
-function isRateLimited(key: string, store: Map<string, { count: number; resetAt: number }>, maxRequests: number): boolean {
+function isRateLimited(
+  key: string,
+  store: Map<string, { count: number; resetAt: number }>,
+  maxRequests: number,
+): boolean {
   const now = Date.now();
   const record = store.get(key);
 
@@ -38,9 +42,7 @@ function isRateLimited(key: string, store: Map<string, { count: number; resetAt:
 }
 
 function getClientIp(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown";
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
 }
 
 serve(async (req) => {
@@ -54,19 +56,19 @@ serve(async (req) => {
     // Check IP rate limit first
     if (isRateLimited(clientIp, ipRateLimits, MAX_REQUESTS_PER_IP)) {
       console.warn(`Rate limit exceeded for IP: ${clientIp}`);
-      return new Response(
-        JSON.stringify({ error: "Too many requests. Please try again later." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
-      );
+      return new Response(JSON.stringify({ error: "Too many requests. Please try again later." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+      });
     }
 
     const { email, redirectTo }: SendVerificationRequest = await req.json();
 
     if (!email) {
-      return new Response(
-        JSON.stringify({ error: "Email is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Email is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -75,23 +77,23 @@ serve(async (req) => {
     if (isRateLimited(normalizedEmail, emailRateLimits, MAX_REQUESTS_PER_EMAIL)) {
       console.warn(`Rate limit exceeded for email: ${normalizedEmail}`);
       return new Response(
-        JSON.stringify({ error: "Too many verification requests for this email. Please check your inbox or try again in a minute." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+        JSON.stringify({
+          error: "Too many verification requests for this email. Please check your inbox or try again in a minute.",
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } },
       );
     }
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     console.log(`Checking for existing profile with email: ${normalizedEmail}`);
 
     // FIRST check if user exists in auth - prevents duplicate user creation
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      (u) => u.email?.toLowerCase() === normalizedEmail
-    );
+    const existingUser = existingUsers?.users?.find((u) => u.email?.toLowerCase() === normalizedEmail);
 
     // Check if this email exists in pending_profiles or chef_profiles
     const { data: pendingProfile } = await supabaseAdmin
@@ -110,13 +112,14 @@ serve(async (req) => {
     const hasExistingData = pendingProfile || chefProfile || existingUser;
 
     if (!hasExistingData) {
-      return new Response(
-        JSON.stringify({ found: false, message: "No existing profile found" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ found: false, message: "No existing profile found" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const chefName = pendingProfile?.chef_name || chefProfile?.chef_name || existingUser?.user_metadata?.chef_name || "";
+    const chefName =
+      pendingProfile?.chef_name || chefProfile?.chef_name || existingUser?.user_metadata?.chef_name || "";
     const businessName = pendingProfile?.business_name || chefProfile?.business_name || "";
 
     console.log(`Found existing profile for: ${normalizedEmail}, sending verification link`);
@@ -137,10 +140,10 @@ serve(async (req) => {
 
       if (linkError) {
         console.error("Error generating magic link:", linkError);
-        return new Response(
-          JSON.stringify({ error: "Failed to generate verification link" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Failed to generate verification link" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       // Build the magic link URL with production domain
@@ -148,10 +151,9 @@ serve(async (req) => {
       magicLinkUrl = `${productionUrl}/auth/v1/verify?token=${tokenHash}&type=magiclink&redirect_to=${encodeURIComponent(finalRedirectTo)}`;
 
       // Actually use the action_link but replace domain
-      magicLinkUrl = linkData.properties?.action_link?.replace(
-        /https:\/\/[^\/]+/,
-        Deno.env.get("SUPABASE_URL") ?? ""
-      ) || magicLinkUrl;
+      magicLinkUrl =
+        linkData.properties?.action_link?.replace(/https:\/\/[^\/]+/, Deno.env.get("SUPABASE_URL") ?? "") ||
+        magicLinkUrl;
     } else {
       // Create user and generate magic link
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -161,10 +163,10 @@ serve(async (req) => {
 
       if (createError) {
         console.error("Error creating user:", createError);
-        return new Response(
-          JSON.stringify({ error: "Failed to create user account" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Failed to create user account" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       // Generate magic link for new user
@@ -178,16 +180,14 @@ serve(async (req) => {
 
       if (linkError) {
         console.error("Error generating magic link:", linkError);
-        return new Response(
-          JSON.stringify({ error: "Failed to generate verification link" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Failed to generate verification link" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      magicLinkUrl = linkData.properties?.action_link?.replace(
-        /https:\/\/[^\/]+/,
-        Deno.env.get("SUPABASE_URL") ?? ""
-      ) || "";
+      magicLinkUrl =
+        linkData.properties?.action_link?.replace(/https:\/\/[^\/]+/, Deno.env.get("SUPABASE_URL") ?? "") || "";
     }
 
     // Send the magic link email using SendGrid
@@ -285,13 +285,13 @@ serve(async (req) => {
         sent: true,
         message: "Verification link sent to your email",
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: any) {
     console.error("Error in send-verification-link:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
