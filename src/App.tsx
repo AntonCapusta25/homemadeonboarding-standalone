@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GlobalHeader } from "@/components/GlobalHeader";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
+import Resume from "./pages/Resume";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/resume" element={<Resume />} />
             
             <Route 
               path="/admin" 

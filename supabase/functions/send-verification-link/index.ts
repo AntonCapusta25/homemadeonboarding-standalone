@@ -90,7 +90,7 @@ serve(async (req) => {
     // Check if this email exists in pending_profiles or chef_profiles
     const { data: pendingProfile } = await supabaseAdmin
       .from("pending_profiles")
-      .select("id, chef_name, business_name")
+      .select("id, chef_name, business_name, session_token")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
@@ -217,6 +217,12 @@ serve(async (req) => {
     // Send the magic link email using SendGrid
     const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
     
+    // Build a resume link that includes the session token for direct progress restore
+    let resumeLink = "";
+    if (pendingProfile?.session_token) {
+      resumeLink = `${productionUrl}/resume?token=${pendingProfile.session_token}`;
+    }
+    
     if (SENDGRID_API_KEY) {
       const emailHtml = `
 <!DOCTYPE html>
@@ -254,7 +260,17 @@ serve(async (req) => {
                 </a>
               </div>
               
-              <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 0 0 20px; text-align: center;">
+              ${resumeLink ? `
+              <div style="text-align: center; margin: 16px 0;">
+                <p style="color: #888; font-size: 13px; margin-bottom: 8px;">Or use this direct link to restore your progress:</p>
+                <a href="${resumeLink}" 
+                   style="color: #C65D3B; font-size: 14px; text-decoration: underline;">
+                  Resume where you left off →
+                </a>
+              </div>
+              ` : ''}
+              
+              <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 20px 0; text-align: center;">
                 Or copy and paste this link into your browser:
               </p>
               <p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 8px; font-size: 12px; word-break: break-all; color: #666;">
