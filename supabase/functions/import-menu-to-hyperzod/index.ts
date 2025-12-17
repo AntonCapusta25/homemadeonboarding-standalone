@@ -43,9 +43,8 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   if (listResponse.ok) {
     const listData = await listResponse.json();
     const categories = listData?.data?.data || listData?.data || [];
-    const existing = categories.find((c: any) => 
-      c.name === categoryName || 
-      c.language_translation?.some((t: any) => t.value === categoryName)
+    const existing = categories.find(
+      (c: any) => c.name === categoryName || c.language_translation?.some((t: any) => t.value === categoryName),
     );
     if (existing) {
       console.log(`Found existing category: ${existing._id || existing.category_id}`);
@@ -75,7 +74,7 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
 
   const createData = await createResponse.json();
   console.log(`Create category response:`, JSON.stringify(createData));
-  
+
   if (createResponse.ok && createData?.data) {
     return createData.data._id || createData.data.category_id;
   }
@@ -91,10 +90,10 @@ serve(async (req) => {
 
   try {
     if (!HYPERZOD_API_KEY) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing HYPERZOD_API_KEY" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ success: false, error: "Missing HYPERZOD_API_KEY" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const body = (await req.json().catch(() => null)) as ImportRequest | null;
@@ -102,17 +101,17 @@ serve(async (req) => {
     const dishes = Array.isArray(body?.dishes) ? body!.dishes : [];
 
     if (!merchant_id) {
-      return new Response(
-        JSON.stringify({ success: false, error: "merchant_id is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ success: false, error: "merchant_id is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!dishes.length) {
-      return new Response(
-        JSON.stringify({ success: false, error: "No dishes to import" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ success: false, error: "No dishes to import" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`Importing ${dishes.length} dishes to merchant ${merchant_id}`);
@@ -120,12 +119,12 @@ serve(async (req) => {
     // Create default categories
     const mainCategoryId = await getOrCreateCategory(merchant_id, "Main Dishes");
     const extrasCategoryId = await getOrCreateCategory(merchant_id, "Extras");
-    
+
     if (!mainCategoryId) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Failed to create product categories" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ success: false, error: "Failed to create product categories" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`Using categories - Main: ${mainCategoryId}, Extras: ${extrasCategoryId}`);
@@ -151,7 +150,7 @@ serve(async (req) => {
         // Use appropriate category based on dish type
         const categoryId = isUpsell && extrasCategoryId ? extrasCategoryId : mainCategoryId;
 
-        // Based on Hyperzod API schema - product_pricing has NO type field
+        // FIXED: Added required 'type' field to product_pricing
         const productPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
@@ -160,6 +159,7 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
+            type: "fixed", // REQUIRED: "fixed" or "variable"
             price_buy: 0,
             price_sell: priceSell,
             price_sell_compare: null,
@@ -184,7 +184,6 @@ serve(async (req) => {
         };
 
         console.log(`Creating product: ${dishName}`);
-        console.log(`Payload: ${JSON.stringify(productPayload)}`);
 
         const response = await fetch(PRODUCT_CREATE_URL, {
           method: "POST",
@@ -198,7 +197,7 @@ serve(async (req) => {
         });
 
         const text = await response.text();
-        console.log(`Product ${dishName} response: ${response.status} - ${text}`);
+        console.log(`Product ${dishName} response: ${response.status} - ${text.substring(0, 200)}`);
 
         if (response.ok) {
           const data = JSON.parse(text);
@@ -244,9 +243,9 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error("Fatal error:", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error?.message || String(error) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ success: false, error: error?.message || String(error) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
