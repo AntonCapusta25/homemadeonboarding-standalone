@@ -112,6 +112,7 @@ export function ChefDetailsModal({
   const [detectingPricingType, setDetectingPricingType] = useState(false);
   const [processingMenu, setProcessingMenu] = useState(false);
   const [processStep, setProcessStep] = useState<string>('');
+  const [testingImport, setTestingImport] = useState(false);
   const [selectedBackground, setSelectedBackground] = useState('cozy_wooden_table');
   const [selectedAmbience, setSelectedAmbience] = useState('soft_window_light');
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
@@ -394,6 +395,61 @@ export function ChefDetailsModal({
       toast({ title: 'Error', description: err?.message, variant: 'destructive' });
     } finally {
       setDetectingPricingType(false);
+    }
+  };
+
+  const handleTestSingleImport = async () => {
+    if (!merchantId.trim()) {
+      toast({ title: 'Error', description: 'Please enter a Merchant ID first', variant: 'destructive' });
+      return;
+    }
+    if (!menu || menu.dishes.length === 0) {
+      toast({ title: 'Error', description: 'No menu dishes found', variant: 'destructive' });
+      return;
+    }
+
+    const firstDish = menu.dishes[0];
+    setTestingImport(true);
+    setHyperzodError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('test-hyperzod-import', {
+        body: { 
+          merchant_id: merchantId.trim(),
+          dish: {
+            name: firstDish.name,
+            description: firstDish.description,
+            price: firstDish.price,
+            image_url: firstDish.image_url
+          }
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.success) {
+        toast({ 
+          title: '✓ Test Successful!', 
+          description: `Product "${firstDish.name}" imported successfully`
+        });
+      } else {
+        setHyperzodError({ 
+          error: 'Test import failed',
+          details: { field: 'response', message: JSON.stringify(data?.response || data, null, 2) }
+        });
+        toast({ 
+          title: 'Test Failed', 
+          description: data?.response?.message || 'Check error details',
+          variant: 'destructive'
+        });
+      }
+    } catch (err: any) {
+      setHyperzodError({ error: err?.message || 'Test failed' });
+      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+    } finally {
+      setTestingImport(false);
     }
   };
 
@@ -1321,6 +1377,20 @@ export function ChefDetailsModal({
                             </div>
                           </PopoverContent>
                         </Popover>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={handleTestSingleImport}
+                          disabled={testingImport || !merchantId.trim() || !menu}
+                          className="gap-2"
+                        >
+                          {testingImport ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Search className="w-4 h-4" />
+                          )}
+                          Test 1st
+                        </Button>
                       </div>
                       <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
                         <Download className="w-4 h-4" />
