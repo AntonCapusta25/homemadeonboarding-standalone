@@ -178,20 +178,23 @@ export function ContactStep({
         return;
       }
 
-      if (data?.found) {
-        // Existing profile found - require verification
-        setVerificationRequired(true);
-        setVerificationSent(true);
-        toast.info(t('contact.verificationSent', 'We found your profile! Check your email to verify and continue.'));
-        
-        if (onVerificationRequired) {
-          onVerificationRequired(emailValue);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to check email:', err);
-    } finally {
-      setIsLookingUp(false);
+       if (data?.found && data?.sent) {
+         // Existing auth account found - require verification
+         setVerificationRequired(true);
+         setVerificationSent(true);
+         toast.info(t('contact.verificationSent', 'We found your profile! Check your email to verify and continue.'));
+
+         if (onVerificationRequired) {
+           onVerificationRequired(emailValue);
+         }
+       } else if (data?.found && data?.noAuthUser) {
+         // Profile exists but no auth account yet - let them continue
+         toast.info(t('contact.profileFoundContinue', 'We found your profile! Continue to complete your registration.'));
+       }
+     } catch (err) {
+       console.error('Failed to check email:', err);
+     } finally {
+       setIsLookingUp(false);
       setHasLookedUp(true);
     }
   };

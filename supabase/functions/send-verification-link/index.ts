@@ -112,11 +112,21 @@ serve(async (req) => {
 
     console.log(`Found existing profile for: ${normalizedEmail}, sending verification link`);
 
-    // Check if user already exists in auth
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      (u) => u.email?.toLowerCase() === normalizedEmail
-    );
+    // Check if user already exists in auth (use direct lookup to avoid pagination issues)
+    let existingUser: { email?: string | null } | null = null;
+
+    try {
+      // @ts-ignore - available in supabase-js v2
+      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail);
+      if (userError) {
+        console.warn("getUserByEmail error:", userError);
+      }
+      existingUser = (userData as any)?.user ?? null;
+    } catch (e) {
+      console.warn("getUserByEmail not available, falling back to listUsers")
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      existingUser = existingUsers?.users?.find((u) => u.email?.toLowerCase() === normalizedEmail) ?? null;
+    }
 
     let magicLinkUrl: string;
     const productionUrl = "https://chef-craft-flow.lovable.app";
@@ -247,19 +257,38 @@ serve(async (req) => {
       });
 
       if (!sendgridResponse.ok) {
-        console.error("SendGrid error:", await sendgridResponse.text());
-      } else {
-        console.log(`Verification email sent successfully to: ${normalizedEmail}`);
+        const sendgridText = await sendgridResponse.text();
+        console.error("SendGrid error:", sendgridText);
+        return new Response(
+          JSON.stringify({
+            found: true,
+            sent: false,
+            error: "Failed to send email. Please try again.",
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
+
+      console.log(`Verification email sent successfully to: ${normalizedEmail}`);
+
+      return new Response(
+        JSON.stringify({
+          found: true,
+          sent: true,
+          message: "Verification link sent to your email",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    // If SendGrid isn't configured, return a clear error so we don't silently "succeed"
     return new Response(
       JSON.stringify({
         found: true,
-        sent: true,
-        message: "Verification link sent to your email",
+        sent: false,
+        error: "Email service is not configured",
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("Error in send-verification-link:", error);
