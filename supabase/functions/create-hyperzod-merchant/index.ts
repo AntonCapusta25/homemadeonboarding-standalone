@@ -137,8 +137,6 @@ serve(async (req) => {
           value: chef.business_name || chef.chef_name || "Unknown Chef",
         },
       ],
-      tenant_id: TENANT_ID,
-      apikey: HYPERZOD_API_KEY,
     };
 
     console.log("Attempting CREATE...");
@@ -149,6 +147,7 @@ serve(async (req) => {
         Accept: "application/json",
         "Content-Type": "application/json",
         "x-tenant": TENANT_ID,
+        "x-api-key": HYPERZOD_API_KEY || "",
       },
       body: JSON.stringify(merchantPayload),
     });
