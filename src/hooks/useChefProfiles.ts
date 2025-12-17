@@ -124,7 +124,10 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   }, []);
 
   const fetchChefs = useCallback(async () => {
-    setLoading(true);
+    // Only show loading skeleton on initial load, not on updates
+    if (chefs.length === 0) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -137,9 +140,9 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             .from('chef_admin_data')
             .select('chef_profile_id')
             .not('assigned_admin_id', 'is', null);
-          
+
           const assignedIds = new Set((assignedData || []).map(d => d.chef_profile_id));
-          
+
           // We'll need to filter out assigned ones after fetching
           adminFilteredChefIds = []; // Empty means we need inverse filter
         } else {
@@ -147,9 +150,9 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             .from('chef_admin_data')
             .select('chef_profile_id')
             .eq('assigned_admin_id', sortByAdmin);
-          
+
           adminFilteredChefIds = (adminData || []).map(d => d.chef_profile_id);
-          
+
           // If no chefs assigned to this admin, return empty
           if (adminFilteredChefIds.length === 0) {
             setChefs([]);
@@ -324,7 +327,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       let authUsersCount = 0;
       let authUsersLast30Days = 0;
       let authUsersLast7Days = 0;
-      
+
       try {
         const { data: session } = await supabase.auth.getSession();
         if (session?.session?.access_token) {
@@ -333,7 +336,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
               Authorization: `Bearer ${session.session.access_token}`,
             },
           });
-          
+
           if (!authError && authData) {
             authUsersCount = authData.totalAuthUsers || 0;
             authUsersLast30Days = authData.usersLast30Days || 0;
@@ -359,7 +362,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         allChefs.forEach((chef) => {
           const status = adminStatusMap[chef.id] || 'new';
           statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
-          
+
           // Track plans from actual database field
           const plan = chef.plan || 'starter';
           planBreakdown[plan] = (planBreakdown[plan] || 0) + 1;
@@ -383,7 +386,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
         // Use auth.users count as the source of truth for total signups
         const totalSignups = authUsersCount > 0 ? authUsersCount : (allChefs.length + uniquePendingFromTable);
-        
+
         // Completion rate = profiles with onboarding_completed=true / total signups
         const completedOnboarding = allChefs.filter(c => c.onboarding_completed === true).length;
         const incompleteChefProfiles = allChefs.filter(c => c.onboarding_completed !== true).length;
@@ -417,7 +420,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
   // Optimistic update helper
   const optimisticUpdate = (chefId: string, updates: Partial<ChefWithStats>) => {
-    setChefs(prev => prev.map(chef => 
+    setChefs(prev => prev.map(chef =>
       chef.id === chefId ? { ...chef, ...updates } : chef
     ));
   };
@@ -425,11 +428,11 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   const updateChefStatus = async (chefId: string, status: string, currentAdminId: string, adminName?: string) => {
     const previousChef = chefs.find(c => c.id === chefId);
     const now = new Date().toISOString();
-    
+
     // Optimistic update - happens immediately
-    optimisticUpdate(chefId, { 
-      admin_status: status, 
-      crm_last_contact_date: now 
+    optimisticUpdate(chefId, {
+      admin_status: status,
+      crm_last_contact_date: now
     });
 
     // Fire-and-forget DB operations
@@ -509,7 +512,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
 
   const assignAdmin = async (chefId: string, newAdminId: string | null, currentAdminId: string, adminName?: string) => {
     const previousChef = chefs.find(c => c.id === chefId);
-    
+
     // Optimistic update - happens immediately
     optimisticUpdate(chefId, { assigned_admin_id: newAdminId });
 
@@ -548,9 +551,9 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     const chef = chefs.find(c => c.id === chefId);
     const newCount = (chef?.call_attempts || 0) + 1;
     const now = new Date().toISOString();
-    
+
     // Optimistic update - happens immediately (also auto-assign to calling admin)
-    optimisticUpdate(chefId, { 
+    optimisticUpdate(chefId, {
       call_attempts: newCount,
       crm_last_contact_date: now,
       assigned_admin_id: currentAdminId, // Auto-assign to the admin who logged the call
@@ -593,7 +596,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
   const updateFollowUpDate = async (chefId: string, date: Date | null, currentAdminId: string, adminName?: string) => {
     const previousChef = chefs.find(c => c.id === chefId);
     const dateStr = date ? date.toISOString() : null;
-    
+
     // Optimistic update - happens immediately
     optimisticUpdate(chefId, { crm_follow_up_date: dateStr });
 

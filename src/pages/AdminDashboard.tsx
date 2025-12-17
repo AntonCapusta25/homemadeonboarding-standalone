@@ -100,9 +100,9 @@ export default function AdminDashboard() {
     statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
     adminId: user?.id,
     includePending: true,
-    searchQuery: searchQuery.trim() || undefined,
+    // Remove searchQuery from here - we'll filter client-side
     sortByAdmin: adminFilter !== 'all' ? adminFilter : undefined,
-  }), [page, statusFilter, user?.id, searchQuery, adminFilter]);
+  }), [page, statusFilter, user?.id, adminFilter]); // Removed searchQuery from deps
 
   const {
     chefs,
@@ -376,8 +376,21 @@ export default function AdminDashboard() {
     }
   };
 
-  // With server-side search, chefs already filtered - use directly
-  const filteredChefs = chefs;
+  // Client-side search filtering for instant results
+  const filteredChefs = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return chefs;
+    }
+
+    const query = searchQuery.trim().toLowerCase();
+    return chefs.filter(chef =>
+      chef.business_name?.toLowerCase().includes(query) ||
+      chef.chef_name?.toLowerCase().includes(query) ||
+      chef.contact_email?.toLowerCase().includes(query) ||
+      chef.city?.toLowerCase().includes(query) ||
+      chef.contact_phone?.includes(query)
+    );
+  }, [chefs, searchQuery]);
 
   if (authLoading || chefsLoading) {
     return (
