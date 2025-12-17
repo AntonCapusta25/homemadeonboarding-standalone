@@ -150,7 +150,7 @@ serve(async (req) => {
         // Use appropriate category based on dish type
         const categoryId = isUpsell && extrasCategoryId ? extrasCategoryId : mainCategoryId;
 
-        // NOTE: Hyperzod docs for Merchant API/Product "Create a product" do not require product_pricing.type
+        // Hyperzod requires product_pricing.type - detected valid value is "flat"
         const productPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
@@ -159,6 +159,7 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
+            type: "flat",
             price_buy: 0,
             price_sell: priceSell,
             price_sell_compare: null,
