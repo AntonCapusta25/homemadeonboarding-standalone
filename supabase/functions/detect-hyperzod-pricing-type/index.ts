@@ -1,191 +1,203 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const HYPERZOD_API_KEY = Deno.env.get('HYPERZOD_API_KEY');
-const TENANT_ID = '3331';
-const BASE_URL = 'https://api.hyperzod.io';
+const HYPERZOD_API_KEY = Deno.env.get("HYPERZOD_API_KEY");
+const TENANT_ID = "3331";
+const BASE_URL = "https://api.hyperzod.app";
 
-// Different pricing type values to try
-const PRICING_TYPES_TO_TRY = [
-  // Numeric values
+// IMPORTANT: We test pricing type against the SAME endpoint + payload shape used by import-menu-to-hyperzod
+const PRICING_TYPES_TO_TRY: Array<string | number> = [
+  // numeric
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-  // String values
-  'simple', 'single', 'fixed', 'standard', 'default', 'regular', 'price',
-  'flat', 'base', 'basic', 'one', 'unit', 'item', 'product', 'static',
-  'fixed_price', 'single_price', 'flat_rate', 'per_unit', 'each',
+  // strings
+  "fixed",
+  "simple",
+  "standard",
+  "default",
+  "regular",
+  "flat",
+  "static",
+  "single",
+  "unit",
+  "item",
 ];
 
+function safeString(input: unknown, maxLen: number) {
+  if (typeof input !== "string") return "";
+  return input.trim().slice(0, maxLen);
+}
+
+async function getOrCreateCategory(merchantId: string): Promise<string | null> {
+  const listResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/list?merchant_id=${merchantId}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "X-TENANT": TENANT_ID,
+      "X-API-KEY": HYPERZOD_API_KEY!,
+    },
+  });
+
+  if (listResponse.ok) {
+    const listData = await listResponse.json();
+    const categories = listData?.data?.data || listData?.data || [];
+    const existing = categories?.[0];
+    if (existing) return existing._id || existing.category_id;
+  }
+
+  const createResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/create`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-TENANT": TENANT_ID,
+      "X-API-KEY": HYPERZOD_API_KEY!,
+    },
+    body: JSON.stringify({
+      merchant_id: merchantId,
+      description: "",
+      view_type: "card",
+      image: "",
+      sort_order: 0,
+      status: 1,
+      language_translation: [{ key: "name", locale: "en", value: "Test Category" }],
+    }),
+  });
+
+  const createData = await createResponse.json();
+  if (createResponse.ok && createData?.data) {
+    return createData.data._id || createData.data.category_id;
+  }
+
+  return null;
+}
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { merchant_id } = await req.json();
-
-    if (!merchant_id) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'merchant_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     if (!HYPERZOD_API_KEY) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'HYPERZOD_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('Starting pricing type detection for merchant:', merchant_id);
-
-    const results: { type: any; status: number; success: boolean; error?: string }[] = [];
-    const validTypes: any[] = [];
-
-    // First, get or create a category
-    let categoryId: string | null = null;
-    try {
-      const catResponse = await fetch(`${BASE_URL}/admin/v1/product/categories/list?merchant_id=${merchant_id}`, {
-        method: 'GET',
-        headers: {
-          'x-api-key': HYPERZOD_API_KEY,
-          'x-tenant': TENANT_ID,
-        },
+      return new Response(JSON.stringify({ success: false, error: "HYPERZOD_API_KEY not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      
-      const catData = await catResponse.json();
-      if (catData?.data?.length > 0) {
-        categoryId = catData.data[0].id || catData.data[0]._id;
-        console.log('Found existing category:', categoryId);
-      }
-    } catch (e) {
-      console.log('Could not fetch categories:', e);
     }
 
-    // Create a category if none exists
+    const { merchant_id } = await req.json();
+    const merchantId = safeString(merchant_id, 128);
+
+    if (!merchantId) {
+      return new Response(JSON.stringify({ success: false, error: "merchant_id is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("Detecting pricing type for merchant:", merchantId);
+
+    const categoryId = await getOrCreateCategory(merchantId);
     if (!categoryId) {
-      try {
-        const createCatResponse = await fetch(`${BASE_URL}/admin/v1/product/category/create`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': HYPERZOD_API_KEY,
-            'x-tenant': TENANT_ID,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            merchant_id: merchant_id,
-            name: 'Test Category',
-            status: 1,
-          }),
-        });
-        
-        const createCatData = await createCatResponse.json();
-        categoryId = createCatData?.data?.id || createCatData?.data?._id;
-        console.log('Created test category:', categoryId);
-      } catch (e) {
-        console.log('Could not create category:', e);
-      }
+      return new Response(JSON.stringify({ success: false, error: "Failed to create/find a category" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Try each pricing type
+    const results: Array<{ type: string | number; status: number; ok: boolean; body: unknown }> = [];
+    const validTypes: Array<string | number> = [];
+
     for (const pricingType of PRICING_TYPES_TO_TRY) {
-      const testProductPayload = {
-        merchant_id: merchant_id,
-        name: `_TEST_DETECT_TYPE_${pricingType}_${Date.now()}`,
-        description: 'Temporary test product for pricing type detection - DELETE ME',
-        status: 0, // Inactive so it won't show up
+      const testName = `_TEST_TYPE_${String(pricingType)}_${Date.now()}`;
+
+      const payload = {
+        merchant_id: merchantId,
+        sku: testName,
+        language_translation: [
+          { key: "name", locale: "en", value: testName },
+          { key: "description", locale: "en", value: "Temporary test product" },
+        ],
         product_pricing: {
           type: pricingType,
-          selling_price: 1,
-          cost_price: 0,
-          compare_price: 0,
+          price_buy: 0,
+          price_sell: 100,
+          price_sell_compare: null,
+          profit: 0,
+          margin: 0,
+          is_tax_chargaeble: false,
+          tax: 0,
         },
-        category_id: categoryId || undefined,
+        has_product_options: false,
+        product_options: [],
+        product_category: [categoryId],
+        product_tags: ["__test__"],
+        product_labels: [],
+        status: true,
+        is_quantity_enabled: false,
+        is_inventory_enabled: false,
+        product_inventory: 0,
+        is_featured: false,
+        sort_order: 0,
+        product_quantity: { min_quantity: 0, max_quantity: 0 },
+        product_images: [],
       };
 
-      try {
-        console.log(`Testing pricing type: ${pricingType}`);
-        
-        const response = await fetch(`${BASE_URL}/admin/v1/product/create`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': HYPERZOD_API_KEY,
-            'x-tenant': TENANT_ID,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(testProductPayload),
-        });
+      console.log("Testing pricing type:", pricingType);
 
-        const data = await response.json();
-        
-        const result = {
-          type: pricingType,
-          status: response.status,
-          success: response.ok && data?.success !== false,
-          error: !response.ok || data?.success === false ? JSON.stringify(data) : undefined,
-        };
-        
-        results.push(result);
-        
-        if (result.success) {
-          validTypes.push(pricingType);
-          console.log(`✓ Valid pricing type found: ${pricingType}`);
-          
-          // Try to delete the test product
-          const productId = data?.data?.id || data?.data?._id;
-          if (productId) {
-            try {
-              await fetch(`${BASE_URL}/admin/v1/product/delete`, {
-                method: 'POST',
-                headers: {
-                  'x-api-key': HYPERZOD_API_KEY,
-                  'x-tenant': TENANT_ID,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ id: productId, merchant_id }),
-              });
-              console.log(`Deleted test product: ${productId}`);
-            } catch (delErr) {
-              console.log('Could not delete test product:', delErr);
-            }
-          }
-        } else {
-          console.log(`✗ Invalid pricing type: ${pricingType} - ${result.error?.slice(0, 100)}`);
-        }
-      } catch (err) {
-        results.push({
-          type: pricingType,
-          status: 0,
-          success: false,
-          error: err instanceof Error ? err.message : 'Network error',
-        });
+      const response = await fetch(`${BASE_URL}/merchant/v1/catalog/product/create`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-TENANT": TENANT_ID,
+          "X-API-KEY": HYPERZOD_API_KEY!,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      let parsed: unknown;
+      const raw = await response.text();
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = raw;
+      }
+
+      const ok = response.ok;
+      results.push({ type: pricingType, status: response.status, ok, body: parsed });
+
+      if (ok) {
+        validTypes.push(pricingType);
+        console.log("✓ Valid pricing type:", pricingType);
+      } else {
+        console.log("✗ Invalid pricing type:", pricingType, "status:", response.status);
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
+        merchant_id: merchantId,
         valid_types: validTypes,
-        message: validTypes.length > 0 
-          ? `Found ${validTypes.length} valid pricing type(s): ${validTypes.join(', ')}`
-          : 'No valid pricing types found. Check API permissions or contact Hyperzod support.',
+        message:
+          validTypes.length > 0
+            ? `Found valid pricing type(s): ${validTypes.map(String).join(", ")}`
+            : "No valid pricing types found",
         total_tested: PRICING_TYPES_TO_TRY.length,
-        results: results,
+        results,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error('Error in detect-hyperzod-pricing-type:', error);
+    console.error("Error in detect-hyperzod-pricing-type:", error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
+
