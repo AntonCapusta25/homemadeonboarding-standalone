@@ -197,71 +197,76 @@ export function ContactStep({
     setSaving(true);
 
     try {
-      // Use auto-create-account edge function (service role bypasses RLS)
-      const { data: accountData, error: accountError } = await supabase.functions.invoke('auto-create-account', {
-        body: {
-          email: email.trim().toLowerCase(),
-          phone: phone.trim(),
-          chefName: `${firstName} ${lastName}`.trim(),
-        },
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Step 1: Check if user already exists (via edge function to bypass RLS)
+      const { data: lookupData } = await supabase.functions.invoke('lookup-pending-profile', {
+        body: { email: normalizedEmail },
       });
 
-      if (accountError) {
-        console.error('Error creating account:', accountError);
-        toast.error(`Failed: ${accountError.message || 'Unknown error'}`);
-        setSaving(false);
-        return;
-      }
+      const isExistingUser = lookupData?.found === true;
 
-      if (!accountData?.success) {
-        console.error('Account creation failed:', accountData?.error);
-        toast.error(accountData?.error || 'Failed to create account');
-        setSaving(false);
-        return;
-      }
+      if (isExistingUser) {
+        // EXISTING USER: Send magic link and block until verified
+        console.log('Existing user found, sending magic link for verification');
 
-      // Auto-verify with token if available
-      if (accountData.verifyToken) {
-        try {
-          await supabase.auth.verifyOtp({
+        const { data: magicLinkData, error: magicLinkError } = await supabase.functions.invoke('send-magic-link', {
+          body: {
+            email: normalizedEmail,
+            chefName: lookupData.profile?.chef_name?.split(' ')[0] || firstName,
+            businessName: lookupData.profile?.business_name || '',
+          },
+        });
+
+        if (magicLinkError || !magicLinkData?.success) {
+          toast.error('Failed to send verification link. Please try again.');
+          setSaving(false);
+          return;
+        }
+
+        // Show verification screen and BLOCK
+        setVerificationRequired(true);
+        setVerificationSent(true);
+        toast.info('We found your account! Check your email to continue where you left off.');
+
+        if (onVerificationRequired) {
+          onVerificationRequired(normalizedEmail);
+        }
+      } else {
+        // NEW USER: Create account and CONTINUE to next step
+        console.log('New user, creating account silently');
+
+        const { data: accountData, error: accountError } = await supabase.functions.invoke('auto-create-account', {
+          body: {
+            email: normalizedEmail,
+            phone: phone.trim(),
+            chefName: `${firstName} ${lastName}`.trim(),
+          },
+        });
+
+        if (accountError || !accountData?.success) {
+          console.error('Account creation failed:', accountError || accountData?.error);
+          toast.error('Failed to continue. Please try again.');
+          setSaving(false);
+          return;
+        }
+
+        // Auto-verify silently if token available
+        if (accountData.verifyToken) {
+          supabase.auth.verifyOtp({
             token_hash: accountData.verifyToken,
             type: accountData.tokenType || 'magiclink',
-          });
-        } catch (e) {
-          console.log('Auto-verify will happen via email:', e);
+          }).catch(e => console.log('Auto-verify background:', e));
         }
-      }
 
-      // Send magic link email
-      const { data: magicLinkData, error: magicLinkError } = await supabase.functions.invoke('send-magic-link', {
-        body: {
-          email: email.trim().toLowerCase(),
-          chefName: firstName,
-        },
-      });
+        // Notify about account creation (optional)
+        if (onAccountCreated && accountData.userId) {
+          onAccountCreated(accountData.userId);
+        }
 
-      if (magicLinkError) {
-        console.error('Error sending magic link:', magicLinkError);
-        toast.error(`Failed to send magic link: ${magicLinkError.message || 'Unknown error'}`);
-        setSaving(false);
-        return;
-      }
-
-      if (!magicLinkData?.success) {
-        const errorMsg = magicLinkData?.error || 'Failed to send magic link';
-        console.error('Magic link failed:', errorMsg);
-        toast.error(errorMsg);
-        setSaving(false);
-        return;
-      }
-
-      // Show verification required screen
-      setVerificationRequired(true);
-      setVerificationSent(true);
-      toast.success(t('contact.magicLinkSent', 'Magic link sent! Check your email to continue.'));
-
-      if (onVerificationRequired) {
-        onVerificationRequired(email.trim().toLowerCase());
+        // CONTINUE to next step - don't show verification screen!
+        toast.success(`Welcome, ${firstName}! Let's continue.`);
+        onNext();
       }
     } catch (err: any) {
       console.error('Error in contact step:', err);
