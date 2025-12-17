@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.parse-menu-upload]
 verify_jwt = false
+
+[functions.lookup-pending-profile-by-token]
+verify_jwt = false
