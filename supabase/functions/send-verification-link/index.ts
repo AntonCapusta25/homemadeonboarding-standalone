@@ -23,24 +23,24 @@ const ipRateLimits = new Map<string, { count: number; resetAt: number }>();
 function isRateLimited(key: string, store: Map<string, { count: number; resetAt: number }>, maxRequests: number): boolean {
   const now = Date.now();
   const record = store.get(key);
-  
+
   if (!record || now > record.resetAt) {
     store.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return false;
   }
-  
+
   if (record.count >= maxRequests) {
     return true;
   }
-  
+
   record.count++;
   return false;
 }
 
 function getClientIp(req: Request): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-         req.headers.get("x-real-ip") ||
-         "unknown";
+    req.headers.get("x-real-ip") ||
+    "unknown";
 }
 
 serve(async (req) => {
@@ -50,7 +50,7 @@ serve(async (req) => {
 
   try {
     const clientIp = getClientIp(req);
-    
+
     // Check IP rate limit first
     if (isRateLimited(clientIp, ipRateLimits, MAX_REQUESTS_PER_IP)) {
       console.warn(`Rate limit exceeded for IP: ${clientIp}`);
@@ -70,7 +70,7 @@ serve(async (req) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    
+
     // Check email-specific rate limit
     if (isRateLimited(normalizedEmail, emailRateLimits, MAX_REQUESTS_PER_EMAIL)) {
       console.warn(`Rate limit exceeded for email: ${normalizedEmail}`);
@@ -87,6 +87,12 @@ serve(async (req) => {
 
     console.log(`Checking for existing profile with email: ${normalizedEmail}`);
 
+    // FIRST check if user exists in auth - prevents duplicate user creation
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    );
+
     // Check if this email exists in pending_profiles or chef_profiles
     const { data: pendingProfile } = await supabaseAdmin
       .from("pending_profiles")
@@ -100,23 +106,20 @@ serve(async (req) => {
       .eq("contact_email", normalizedEmail)
       .maybeSingle();
 
-    if (!pendingProfile && !chefProfile) {
+    // If user exists anywhere, we need to handle it
+    const hasExistingData = pendingProfile || chefProfile || existingUser;
+
+    if (!hasExistingData) {
       return new Response(
         JSON.stringify({ found: false, message: "No existing profile found" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const chefName = pendingProfile?.chef_name || chefProfile?.chef_name || "";
+    const chefName = pendingProfile?.chef_name || chefProfile?.chef_name || existingUser?.user_metadata?.chef_name || "";
     const businessName = pendingProfile?.business_name || chefProfile?.business_name || "";
 
     console.log(`Found existing profile for: ${normalizedEmail}, sending verification link`);
-
-    // Check if user already exists in auth
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      (u) => u.email?.toLowerCase() === normalizedEmail
-    );
 
     let magicLinkUrl: string;
     const productionUrl = "https://chef-craft-flow.lovable.app";
@@ -143,7 +146,7 @@ serve(async (req) => {
       // Build the magic link URL with production domain
       const tokenHash = linkData.properties?.hashed_token;
       magicLinkUrl = `${productionUrl}/auth/v1/verify?token=${tokenHash}&type=magiclink&redirect_to=${encodeURIComponent(finalRedirectTo)}`;
-      
+
       // Actually use the action_link but replace domain
       magicLinkUrl = linkData.properties?.action_link?.replace(
         /https:\/\/[^\/]+/,
@@ -189,7 +192,7 @@ serve(async (req) => {
 
     // Send the magic link email using SendGrid
     const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-    
+
     if (SENDGRID_API_KEY) {
       const emailHtml = `
 <!DOCTYPE html>
