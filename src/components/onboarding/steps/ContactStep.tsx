@@ -114,35 +114,7 @@ export function ContactStep({
     }
   };
 
-  const sendVerificationLink = async (emailToVerify: string): Promise<{ sent: boolean; rateLimited?: boolean; error?: string }> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('send-magic-link', {
-        body: {
-          email: emailToVerify.trim().toLowerCase(),
-          redirectTo: `${window.location.origin}/onboarding?verified=true`
-        },
-      });
 
-      if (error) {
-        console.error('Error sending verification link:', error);
-        // Check if it's a rate limit error
-        if (error.message?.includes('429') || error.message?.includes('Too many')) {
-          return { sent: false, rateLimited: true, error: t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.') };
-        }
-        return { sent: false, error: error.message };
-      }
-
-      // Check for rate limit in response data
-      if (data?.error?.includes('Too many')) {
-        return { sent: false, rateLimited: true, error: data.error };
-      }
-
-      return { sent: data?.sent || false };
-    } catch (err: any) {
-      console.error('Failed to send verification link:', err);
-      return { sent: false, error: err?.message };
-    }
-  };
 
   const handleEmailLookup = async (emailValue: string) => {
     if (!validateEmail(emailValue)) {
