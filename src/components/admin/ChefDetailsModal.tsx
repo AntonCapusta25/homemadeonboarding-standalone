@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, Wifi, AlertTriangle, Upload
+  Download, Store, Wifi, AlertTriangle, Upload, Search
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -108,6 +108,7 @@ export function ChefDetailsModal({
   const [creatingMerchant, setCreatingMerchant] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [importingMenu, setImportingMenu] = useState(false);
+  const [detectingPricingType, setDetectingPricingType] = useState(false);
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
@@ -395,6 +396,53 @@ export function ChefDetailsModal({
       toast({ title: 'Error', description: err?.message, variant: 'destructive' });
     } finally {
       setImportingMenu(false);
+    }
+  };
+
+  const handleDetectPricingType = async () => {
+    if (!merchantId.trim()) {
+      toast({ title: 'Error', description: 'Please enter a Merchant ID first', variant: 'destructive' });
+      return;
+    }
+
+    setDetectingPricingType(true);
+    setHyperzodError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('detect-hyperzod-pricing-type', {
+        body: { merchant_id: merchantId.trim() }
+      });
+
+      if (error) {
+        setHyperzodError({ error: error.message });
+        toast({ title: 'Detection Failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success && data?.valid_types?.length > 0) {
+        toast({ 
+          title: 'Valid Pricing Types Found!', 
+          description: `Valid types: ${data.valid_types.join(', ')}`,
+        });
+        setHyperzodError({
+          error: `✓ Detection Complete: Found ${data.valid_types.length} valid type(s)`,
+          details: { field: 'valid_types', message: data.valid_types.join(', ') }
+        });
+      } else {
+        setHyperzodError({ 
+          error: data?.message || 'No valid pricing types found',
+          details: { field: 'tested', message: `Tested ${data?.total_tested || 0} values` }
+        });
+        toast({ 
+          title: 'No Valid Types Found', 
+          description: data?.message || 'Could not find a valid pricing type',
+          variant: 'destructive'
+        });
+      }
+    } catch (err: any) {
+      setHyperzodError({ error: err?.message || 'Network error' });
+      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDetectingPricingType(false);
     }
   };
 
@@ -794,6 +842,25 @@ export function ChefDetailsModal({
                 <>
                   <Store className="w-4 h-4 mr-2" />
                   Create Merchant
+                </>
+              )}
+            </Button>
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={handleDetectPricingType} 
+              disabled={detectingPricingType || !merchantId.trim()}
+              title="Detect valid product_pricing.type values"
+            >
+              {detectingPricingType ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Detecting...
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Detect Pricing Type
                 </>
               )}
             </Button>
