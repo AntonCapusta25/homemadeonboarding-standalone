@@ -9,11 +9,6 @@ const HYPERZOD_API_KEY = Deno.env.get("HYPERZOD_API_KEY");
 const TENANT_ID = "3331";
 const BASE_URL = "https://api.hyperzod.app";
 
-/**
- * HYPERZOD MERCHANT CREATION - OFFICIAL API
- * Endpoint: POST /admin/v1/merchant/create
- */
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -31,62 +26,56 @@ serve(async (req) => {
 
     console.log("Creating merchant for:", chef.business_name || chef.chef_name);
 
-    // Extract postal code from address
+    // Extract postal code
     const extractPostalCode = (address: string): string => {
       if (!address) return "";
       const match = address.match(/\d{4}\s*[A-Z]{2}/i);
       return match ? match[0].replace(/\s/g, "") : "";
     };
 
-    // Map service type to accepted_order_types
+    // Map service type
     const mapServiceType = (serviceType: string): string[] => {
       if (serviceType === "delivery") return ["delivery"];
       if (serviceType === "pickup") return ["pickup"];
-      return ["delivery", "pickup"]; // both or unsure
+      return ["delivery", "pickup"];
     };
 
     const acceptedOrderTypes = mapServiceType(chef.service_type || "unsure");
     const postalCode = extractPostalCode(chef.address || "");
 
-    // OFFICIAL PAYLOAD STRUCTURE (from API docs)
+    // CORRECTED PAYLOAD based on API docs
     const merchantPayload = {
-      // Basic info
       name: chef.business_name || chef.chef_name || "Unknown Chef",
       address: chef.address || "",
-      post_code: postalCode,
+      post_code: postalCode || "",
       country_code: "NL",
       country: "Netherlands",
-      state: "Noord-Holland",
+      state: chef.state || "",
       city: chef.city || "",
       phone: chef.contact_phone || "+31600000000",
       email: chef.contact_email || "",
       
-      // Merchant settings
       type: "ecommerce",
       accepted_order_types: acceptedOrderTypes,
       status: 1,
       delivery_by: "tenant",
       
-      // Commission structure (REQUIRED object format)
+      // Commission object - value must be NUMERIC
       commission: {
         type: "percentage",
-        value: "15",
+        value: 15,
         calculate_on_status: 1,
       },
       
-      // Tax settings
       tax_method: "inclusive",
-      
-      // Categories and translations (empty arrays)
       merchant_category_ids: [],
       language_translation: [],
       
-      // Tenant ID and API key
       tenant_id: TENANT_ID,
       apikey: HYPERZOD_API_KEY,
     };
 
-    console.log("Sending payload with keys:", Object.keys(merchantPayload).join(", "));
+    console.log("Payload:", JSON.stringify(merchantPayload, null, 2));
 
     const response = await fetch(`${BASE_URL}/admin/v1/merchant/create`, {
       method: "POST",
@@ -99,8 +88,32 @@ serve(async (req) => {
     });
 
     const responseText = await response.text();
-    console.log("Response status:", response.status);
-    console.log("Response body:", responseText.substring(0, 500));
+    console.log("Status:", response.status);
+    console.log("Response:", responseText);
+
+    if (response.status === 422) {
+      // Validation error - parse details
+      let validationErrors = {};
+      try {
+        const errorData = JSON.parse(responseText);
+        validationErrors = errorData.data || errorData.errors || errorData;
+        console.error("Validation errors:", JSON.stringify(validationErrors, null, 2));
+      } catch {}
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Validation failed",
+          validation_errors: validationErrors,
+          hint: "Check which fields are missing or have wrong format",
+          payload_sent: merchantPayload,
+        }),
+        {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     if (!response.ok) {
       let errorMessage = responseText;
@@ -109,12 +122,10 @@ serve(async (req) => {
         errorMessage = errorData.message || errorData.error || JSON.stringify(errorData);
       } catch {}
 
-      console.error("API Error:", errorMessage);
-
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Failed to create merchant (${response.status})`,
+          error: `Failed (${response.status})`,
           details: errorMessage,
         }),
         {
@@ -124,7 +135,7 @@ serve(async (req) => {
       );
     }
 
-    // Success
+    // Success!
     let merchantData;
     try {
       merchantData = JSON.parse(responseText);
@@ -133,13 +144,13 @@ serve(async (req) => {
     }
 
     console.log("✅ SUCCESS! Merchant created");
-    console.log("Merchant ID:", merchantData?.data?._id || merchantData?._id || "unknown");
+    console.log("Merchant ID:", merchantData?.data?._id || "unknown");
 
     return new Response(
       JSON.stringify({
         success: true,
         merchant: merchantData,
-        message: "Merchant created successfully in Hyperzod",
+        message: "Merchant created successfully!",
       }),
       {
         status: 200,
