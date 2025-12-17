@@ -680,6 +680,16 @@ export default function AdminDashboard() {
               </Select>
 
               <Button
+                variant={adminFilter === user?.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAdminFilter(adminFilter === user?.id ? 'all' : (user?.id || 'all'))}
+                className="gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                My Assigned
+              </Button>
+
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={handleExportCsv}
