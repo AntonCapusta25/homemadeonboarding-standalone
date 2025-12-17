@@ -225,16 +225,10 @@ export function ContactStep({
     try {
       const normalizedEmail = email.trim().toLowerCase();
 
-      // Step 1: Check if user already exists (via edge function to bypass RLS)
-      const { data: lookupData } = await supabase.functions.invoke('lookup-pending-profile', {
-        body: { email: normalizedEmail },
-      });
-
-      const isExistingUser = lookupData?.found === true;
-
-      if (isExistingUser) {
-        // EXISTING USER: Use Supabase native signInWithOtp (no edge function needed)
-        console.log('Existing user found, sending magic link via Supabase OTP');
+      // Use the state we already set from the lookup
+      if (isReturningUser) {
+        // EXISTING USER: Send magic link and block until verified
+        console.log('Existing user detected, sending magic link');
 
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email: normalizedEmail,
@@ -253,7 +247,7 @@ export function ContactStep({
         // Show verification screen and BLOCK
         setVerificationRequired(true);
         setVerificationSent(true);
-        toast.info('We found your account! Check your email to continue where you left off.');
+        toast.success('Check your email! We sent you a magic link to restore your progress.');
 
         if (onVerificationRequired) {
           onVerificationRequired(normalizedEmail);
@@ -361,7 +355,8 @@ export function ContactStep({
               onClick={() => {
                 setVerificationRequired(false);
                 setVerificationSent(false);
-                setHasLookedUp(false);
+                setIsReturningUser(false);
+                setReturningUserName('');
                 onChange('email', '');
               }}
               className="w-full text-muted-foreground"
