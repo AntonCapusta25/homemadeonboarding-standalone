@@ -117,16 +117,10 @@ serve(async (req) => {
         }
       }
       
-      // Generate a magic link for the user
-      const productionUrl = "https://signup.homemadechefs.com";
-      const redirectTo = `${productionUrl}/onboarding`;
-      
+      // Generate a magic link token for auto-login
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email: email,
-        options: {
-          redirectTo,
-        },
       });
 
       if (linkError) {
@@ -139,100 +133,13 @@ serve(async (req) => {
       const token = url.searchParams.get('token');
       const type = url.searchParams.get('type');
 
-      // Build the magic link URL
-      const magicLinkUrl = linkData.properties?.action_link?.replace(
-        /https:\/\/[^\/]+/,
-        Deno.env.get("SUPABASE_URL") ?? ""
-      ) || "";
-
-      // Send custom magic link email using SendGrid
-      const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-      if (SENDGRID_API_KEY && magicLinkUrl) {
-        const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Login Link - Homemade</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #FFF8F5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
-          <tr>
-            <td style="padding: 40px 40px 20px;">
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #C65D3B; font-size: 28px; margin: 0 0 8px;">🏠 Homemade Chef</h1>
-                <p style="color: #666; font-size: 14px; margin: 0;">Your login link</p>
-              </div>
-              
-              <h2 style="color: #333; font-size: 24px; margin: 0 0 16px; text-align: center;">
-                Hi${chefName ? ` ${chefName}` : ""}! 👋
-              </h2>
-              
-              <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
-                Here's your magic link to access your Homemade Chef account. Click the button below to log in and continue your onboarding.
-              </p>
-              
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${magicLinkUrl}" 
-                   style="display: inline-block; background: linear-gradient(135deg, #C65D3B 0%, #E07B5B 100%); color: white; font-size: 16px; font-weight: 600; padding: 16px 40px; border-radius: 50px; text-decoration: none; box-shadow: 0 4px 16px rgba(198, 93, 59, 0.3);">
-                  ✨ Log In to Your Account
-                </a>
-              </div>
-              
-              <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 0 0 20px; text-align: center;">
-                Or copy and paste this link into your browser:
-              </p>
-              <p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 8px; font-size: 12px; word-break: break-all; color: #666;">
-                ${magicLinkUrl}
-              </p>
-              
-              <div style="border-top: 1px solid #eee; margin-top: 32px; padding-top: 24px;">
-                <p style="color: #888; font-size: 13px; line-height: 1.5; margin: 0; text-align: center;">
-                  This link will expire in 24 hours. If you didn't request this email, you can safely ignore it.
-                </p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #FFF8F5; padding: 20px 40px; border-radius: 0 0 16px 16px;">
-              <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-                © ${new Date().getFullYear()} Homemade Chef. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-        fetch("https://api.sendgrid.com/v3/mail/send", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${SENDGRID_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            personalizations: [{ to: [{ email }] }],
-            from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
-            subject: `Your login link - Homemade 🏠`,
-            content: [{ type: "text/html", value: emailHtml }],
-            // Disable click tracking so auth links aren't rewritten to url*.homemademeals.net
-            tracking_settings: {
-              click_tracking: { enable: false, enable_text: false },
-              open_tracking: { enable: true },
-            },
-          }),
-        }).then(res => {
-          if (!res.ok) console.error("SendGrid error sending magic link email");
-          else console.log(`Magic link email sent to: ${email}`);
-        }).catch(err => console.error("Failed to send magic link email:", err));
-      }
+      // Also send a magic link email for future logins (fire and forget)
+      supabaseAdmin.auth.signInWithOtp({
+        email: email,
+        options: {
+          emailRedirectTo: 'https://chef-craft-flow.lovable.app/dashboard',
+        }
+      }).catch(err => console.log('Magic link email send (non-blocking):', err));
 
       return new Response(
         JSON.stringify({ 
@@ -322,15 +229,9 @@ serve(async (req) => {
     }
 
     // Generate a magic link for auto-login
-    const productionUrl = "https://signup.homemadechefs.com";
-    const redirectTo = `${productionUrl}/onboarding`;
-    
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
-      options: {
-        redirectTo,
-      },
     });
 
     if (linkError) {
@@ -343,100 +244,15 @@ serve(async (req) => {
     const token = url.searchParams.get('token');
     const type = url.searchParams.get('type');
 
-    // Build the magic link URL
-    const magicLinkUrl = linkData.properties?.action_link?.replace(
-      /https:\/\/[^\/]+/,
-      Deno.env.get("SUPABASE_URL") ?? ""
-    ) || "";
-
-    // Send custom magic link email using SendGrid
-    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-    if (SENDGRID_API_KEY && magicLinkUrl) {
-      const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to Homemade!</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #FFF8F5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
-          <tr>
-            <td style="padding: 40px 40px 20px;">
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #C65D3B; font-size: 28px; margin: 0 0 8px;">🏠 Homemade Chef</h1>
-                <p style="color: #666; font-size: 14px; margin: 0;">Welcome aboard!</p>
-              </div>
-              
-              <h2 style="color: #333; font-size: 24px; margin: 0 0 16px; text-align: center;">
-                Hi${chefName ? ` ${chefName}` : ""}! 🎉
-              </h2>
-              
-              <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
-                Your Homemade Chef account has been created! Save this email - you can use the button below anytime to log back in and continue where you left off.
-              </p>
-              
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${magicLinkUrl}" 
-                   style="display: inline-block; background: linear-gradient(135deg, #C65D3B 0%, #E07B5B 100%); color: white; font-size: 16px; font-weight: 600; padding: 16px 40px; border-radius: 50px; text-decoration: none; box-shadow: 0 4px 16px rgba(198, 93, 59, 0.3);">
-                  ✨ Log In to Your Account
-                </a>
-              </div>
-              
-              <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 0 0 20px; text-align: center;">
-                Or copy and paste this link into your browser:
-              </p>
-              <p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 8px; font-size: 12px; word-break: break-all; color: #666;">
-                ${magicLinkUrl}
-              </p>
-              
-              <div style="border-top: 1px solid #eee; margin-top: 32px; padding-top: 24px;">
-                <p style="color: #888; font-size: 13px; line-height: 1.5; margin: 0; text-align: center;">
-                  This link will expire in 24 hours. You can always request a new one by entering your email in the app.
-                </p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #FFF8F5; padding: 20px 40px; border-radius: 0 0 16px 16px;">
-              <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-                © ${new Date().getFullYear()} Homemade Chef. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-      fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${SENDGRID_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-          body: JSON.stringify({
-            personalizations: [{ to: [{ email }] }],
-            from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
-            subject: `Welcome to Homemade! Here's your login link 🏠`,
-            content: [{ type: "text/html", value: emailHtml }],
-            // Disable click tracking so auth links aren't rewritten to url*.homemademeals.net
-            tracking_settings: {
-              click_tracking: { enable: false, enable_text: false },
-              open_tracking: { enable: true },
-            },
-          }),
-      }).then(res => {
-        if (!res.ok) console.error("SendGrid error sending welcome email");
-        else console.log(`Welcome email with magic link sent to: ${email}`);
-      }).catch(err => console.error("Failed to send welcome email:", err));
-    }
+    // Send a magic link email for future logins (fire and forget)
+    supabaseAdmin.auth.signInWithOtp({
+      email: email,
+      options: {
+        emailRedirectTo: 'https://chef-craft-flow.lovable.app/dashboard',
+      }
+    }).then(() => {
+      console.log(`Magic link email sent to: ${email}`);
+    }).catch(err => console.log('Magic link email send error (non-blocking):', err));
 
     console.log(`Account auto-created successfully for: ${email}`);
 

@@ -102,11 +102,6 @@ async function sendMagicLinkEmail(
       from: { email: "info@homemademeals.net", name: "Homemade Chef" },
       subject: `Welcome to Homemade${businessName ? ` - ${businessName}` : ""} 🍳`,
       content: [{ type: "text/html", value: emailHtml }],
-      // Disable click tracking so auth links aren't rewritten to url*.homemademeals.net
-      tracking_settings: {
-        click_tracking: { enable: false, enable_text: false },
-        open_tracking: { enable: true },
-      },
     }),
   });
 
@@ -181,7 +176,7 @@ serve(async (req) => {
         type: "magiclink",
         email: email,
         options: {
-          redirectTo: "https://signup.homemadechefs.com/onboarding",
+          redirectTo: "https://chef-craft-flow.lovable.app/summary",
         },
       });
 
@@ -191,7 +186,7 @@ serve(async (req) => {
       }
 
       // Replace preview URL with production URL in the redirect_to parameter
-      const productionUrl = "https://signup.homemadechefs.com";
+      const productionUrl = "https://chef-craft-flow.lovable.app";
       let magicLinkUrl = linkData.properties.action_link;
 
       // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too
@@ -284,7 +279,7 @@ serve(async (req) => {
       type: "magiclink",
       email: email,
       options: {
-        redirectTo: "https://signup.homemadechefs.com/onboarding",
+        redirectTo: "https://chef-craft-flow.lovable.app/summary",
       },
     });
 
@@ -294,7 +289,7 @@ serve(async (req) => {
     }
 
     // Replace preview URL with production URL in the redirect_to parameter
-    const productionUrl = "https://signup.homemadechefs.com";
+    const productionUrl = "https://chef-craft-flow.lovable.app";
     let magicLinkUrl = linkData.properties.action_link;
 
     // The redirect_to is URL-encoded in the query string, so we need to replace encoded URLs too

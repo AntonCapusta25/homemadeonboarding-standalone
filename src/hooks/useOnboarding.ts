@@ -429,13 +429,12 @@ export function useOnboarding() {
       }
 
       // Determine which step to resume from based on current_step
-      const rawStepIndex = STEP_ORDER.indexOf(data.profile.current_step as StepId);
-      const nextStepIndex = rawStepIndex >= 0
-        ? rawStepIndex
-        : getResumeStepIndex({ ...initialProfile, ...restoredProfile } as ChefProfile);
-
-      setCurrentStepIndex(nextStepIndex);
-      setCompletedSteps(new Set(STEP_ORDER.slice(0, Math.max(0, nextStepIndex))));
+      const stepIndex = STEP_ORDER.indexOf(data.profile.current_step as StepId);
+      if (stepIndex > currentStepIndex) {
+        // Mark previous steps as completed
+        const completed = STEP_ORDER.slice(0, stepIndex);
+        setCompletedSteps(new Set(completed));
+      }
 
       console.log('Restored pending profile for email:', email);
       return true;

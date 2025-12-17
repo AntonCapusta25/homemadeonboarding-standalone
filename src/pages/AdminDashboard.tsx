@@ -76,7 +76,6 @@ export default function AdminDashboard() {
 
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [adminFilter, setAdminFilter] = useState<string>('all');
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
@@ -116,7 +115,6 @@ export default function AdminDashboard() {
     adminId: user?.id,
     includePending: true,
     searchQuery: searchQuery.trim() || undefined,
-    sortByAdmin: adminFilter !== 'all' ? adminFilter : undefined,
   });
 
   const { stats: adminStats, loading: statsLoading, error: statsError } = useAdminStatistics();
@@ -245,6 +243,49 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const [backfillLoading, setBackfillLoading] = useState(false);
+
+  const handleBackfillProfiles = async () => {
+    try {
+      setBackfillLoading(true);
+      toast({
+        title: 'Running backfill...',
+        description: 'Creating missing chef profiles',
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session?.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const { data, error } = await supabase.functions.invoke('backfill-chef-profiles', {
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Backfill Complete',
+        description: data?.message || `Created ${data?.created || 0} profiles`,
+      });
+
+      refetch();
+    } catch (error) {
+      console.error('Backfill error:', error);
+      toast({
+        title: 'Backfill Failed',
+        description: error instanceof Error ? error.message : 'Could not run backfill',
+        variant: 'destructive',
+      });
+    } finally {
+      setBackfillLoading(false);
+    }
   };
 
   const handleExportCsv = async () => {
@@ -621,31 +662,6 @@ export default function AdminDashboard() {
                 </SelectContent>
               </Select>
 
-              <Select value={adminFilter} onValueChange={setAdminFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Filter by admin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Admins</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {admins.map((admin) => (
-                    <SelectItem key={admin.id} value={admin.id}>
-                      {admin.name || admin.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button
-                variant={adminFilter === user?.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAdminFilter(adminFilter === user?.id ? 'all' : (user?.id || 'all'))}
-                className="gap-2"
-              >
-                <UserPlus className="w-4 h-4" />
-                My Assigned
-              </Button>
-
               <Button
                 variant="outline"
                 size="sm"
@@ -656,6 +672,20 @@ export default function AdminDashboard() {
                 Export CSV
               </Button>
 
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackfillProfiles}
+                disabled={backfillLoading}
+                className="gap-2"
+              >
+                {backfillLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Backfill Profiles
+              </Button>
 
             </div>
           </div>

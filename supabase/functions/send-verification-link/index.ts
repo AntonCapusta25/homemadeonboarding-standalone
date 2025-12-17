@@ -90,7 +90,7 @@ serve(async (req) => {
     // Check if this email exists in pending_profiles or chef_profiles
     const { data: pendingProfile } = await supabaseAdmin
       .from("pending_profiles")
-      .select("id, chef_name, business_name, session_token")
+      .select("id, chef_name, business_name")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
@@ -112,54 +112,15 @@ serve(async (req) => {
 
     console.log(`Found existing profile for: ${normalizedEmail}, sending verification link`);
 
-    // Check if user already exists in auth (robust lookup)
-    let existingUser: { email?: string | null } | null = null;
-
-    const findAuthUserByEmail = async (email: string) => {
-      // Prefer direct lookup when available
-      try {
-        // @ts-ignore - available in some supabase-js v2 builds
-        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-        if (userError) {
-          console.warn("getUserByEmail error:", userError);
-          return null;
-        }
-        return (userData as any)?.user ?? null;
-      } catch (e) {
-        console.warn("getUserByEmail not available, falling back to paginated listUsers");
-      }
-
-      // Fallback: paginate listUsers to avoid missing users beyond first page
-      const perPage = 200;
-      for (let page = 1; page <= 25; page++) {
-        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-          page,
-          perPage,
-        });
-
-        if (listError) {
-          console.warn("listUsers error:", listError);
-          return null;
-        }
-
-        const found = existingUsers?.users?.find((u) => u.email?.toLowerCase() === email);
-        if (found) return found as any;
-
-        const count = existingUsers?.users?.length ?? 0;
-        if (count < perPage) break; // reached end
-      }
-
-      return null;
-    };
-
-    existingUser = await findAuthUserByEmail(normalizedEmail);
+    // Check if user already exists in auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    );
 
     let magicLinkUrl: string;
-    const productionUrl = "https://signup.homemadechefs.com";
-
-    // Always redirect to the public production onboarding flow.
-    // Using preview URLs can send users through a Lovable login bridge.
-    const finalRedirectTo = `${productionUrl}/onboarding`;
+    const productionUrl = "https://chef-craft-flow.lovable.app";
+    const finalRedirectTo = redirectTo || `${productionUrl}/onboarding?verified=true`;
 
     if (existingUser) {
       // Generate magic link for existing user
@@ -179,49 +140,55 @@ serve(async (req) => {
         );
       }
 
-      const actionLink = linkData?.properties?.action_link;
-      if (!actionLink) {
-        console.error("Magic link generation did not return an action_link");
+      // Build the magic link URL with production domain
+      const tokenHash = linkData.properties?.hashed_token;
+      magicLinkUrl = `${productionUrl}/auth/v1/verify?token=${tokenHash}&type=magiclink&redirect_to=${encodeURIComponent(finalRedirectTo)}`;
+      
+      // Actually use the action_link but replace domain
+      magicLinkUrl = linkData.properties?.action_link?.replace(
+        /https:\/\/[^\/]+/,
+        Deno.env.get("SUPABASE_URL") ?? ""
+      ) || magicLinkUrl;
+    } else {
+      // Create user and generate magic link
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: normalizedEmail,
+        email_confirm: false,
+      });
+
+      if (createError) {
+        console.error("Error creating user:", createError);
+        return new Response(
+          JSON.stringify({ error: "Failed to create user account" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Generate magic link for new user
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink",
+        email: normalizedEmail,
+        options: {
+          redirectTo: finalRedirectTo,
+        },
+      });
+
+      if (linkError) {
+        console.error("Error generating magic link:", linkError);
         return new Response(
           JSON.stringify({ error: "Failed to generate verification link" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Log a redacted URL for debugging (never log tokens)
-      try {
-        const u = new URL(actionLink);
-        if (u.searchParams.has('token')) u.searchParams.set('token', '[redacted]');
-        if (u.searchParams.has('token_hash')) u.searchParams.set('token_hash', '[redacted]');
-        console.log('Generated verification link (redacted):', u.toString());
-      } catch {
-        // ignore
-      }
-
-      magicLinkUrl = actionLink;
-    } else {
-      // No auth user exists - just return found status without creating account
-      // The account will be created when they complete onboarding via auto-create-account
-      console.log(`Profile found but no auth user for: ${normalizedEmail}`);
-      return new Response(
-        JSON.stringify({
-          found: true,
-          sent: false,
-          noAuthUser: true,
-          message: "Profile found but no account yet. Continue onboarding to create your account.",
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      magicLinkUrl = linkData.properties?.action_link?.replace(
+        /https:\/\/[^\/]+/,
+        Deno.env.get("SUPABASE_URL") ?? ""
+      ) || "";
     }
 
     // Send the magic link email using SendGrid
     const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-    
-    // Build a resume link that includes the session token for direct progress restore
-    let resumeLink = "";
-    if (pendingProfile?.session_token) {
-      resumeLink = `${productionUrl}/resume?token=${pendingProfile.session_token}`;
-    }
     
     if (SENDGRID_API_KEY) {
       const emailHtml = `
@@ -260,17 +227,7 @@ serve(async (req) => {
                 </a>
               </div>
               
-              ${resumeLink ? `
-              <div style="text-align: center; margin: 16px 0;">
-                <p style="color: #888; font-size: 13px; margin-bottom: 8px;">Or use this direct link to restore your progress:</p>
-                <a href="${resumeLink}" 
-                   style="color: #C65D3B; font-size: 14px; text-decoration: underline;">
-                  Resume where you left off →
-                </a>
-              </div>
-              ` : ''}
-              
-              <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 20px 0; text-align: center;">
+              <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 0 0 20px; text-align: center;">
                 Or copy and paste this link into your browser:
               </p>
               <p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 8px; font-size: 12px; word-break: break-all; color: #666;">
@@ -309,48 +266,23 @@ serve(async (req) => {
           from: { email: "chefs@homemademeals.net", name: "Homemade Chef" },
           subject: `Verify your email to continue - Homemade 🔐`,
           content: [{ type: "text/html", value: emailHtml }],
-          // Disable click-tracking so the magic link isn't rewritten to url*.homemademeals.net
-          // (those tracking redirects can break/expire flows and confuse users)
-          tracking_settings: {
-            click_tracking: { enable: false, enable_text: false },
-            open_tracking: { enable: true },
-          },
         }),
       });
 
       if (!sendgridResponse.ok) {
-        const sendgridText = await sendgridResponse.text();
-        console.error("SendGrid error:", sendgridText);
-        return new Response(
-          JSON.stringify({
-            found: true,
-            sent: false,
-            error: "Failed to send email. Please try again.",
-          }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.error("SendGrid error:", await sendgridResponse.text());
+      } else {
+        console.log(`Verification email sent successfully to: ${normalizedEmail}`);
       }
-
-      console.log(`Verification email sent successfully to: ${normalizedEmail}`);
-
-      return new Response(
-        JSON.stringify({
-          found: true,
-          sent: true,
-          message: "Verification link sent to your email",
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
-    // If SendGrid isn't configured, return a clear error so we don't silently "succeed"
     return new Response(
       JSON.stringify({
         found: true,
-        sent: false,
-        error: "Email service is not configured",
+        sent: true,
+        message: "Verification link sent to your email",
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("Error in send-verification-link:", error);

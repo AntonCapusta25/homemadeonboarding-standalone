@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { StepLayout } from '../StepLayout';
-import { Mail, Phone, User, Loader2, ShieldCheck, RefreshCw, KeyRound } from 'lucide-react';
+import { Mail, Phone, User, Loader2, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -41,8 +41,6 @@ export function ContactStep({
   const [verificationRequired, setVerificationRequired] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [resending, setResending] = useState(false);
-  const [requestingLink, setRequestingLink] = useState(false);
-  const [showRequestLink, setShowRequestLink] = useState(false);
   const leadTrackedRef = useRef(false);
   const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -120,7 +118,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: emailToVerify.trim().toLowerCase(),
-          redirectTo: `https://signup.homemadechefs.com/onboarding`
+          redirectTo: `${window.location.origin}/onboarding?verified=true`
         },
       });
 
@@ -155,7 +153,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: emailValue.trim().toLowerCase(),
-          redirectTo: `https://signup.homemadechefs.com/onboarding`
+          redirectTo: `${window.location.origin}/onboarding?verified=true`
         },
       });
 
@@ -178,23 +176,20 @@ export function ContactStep({
         return;
       }
 
-       if (data?.found && data?.sent) {
-         // Existing auth account found - require verification
-         setVerificationRequired(true);
-         setVerificationSent(true);
-         toast.info(t('contact.verificationSent', 'We found your profile! Check your email to verify and continue.'));
-
-         if (onVerificationRequired) {
-           onVerificationRequired(emailValue);
-         }
-       } else if (data?.found && data?.noAuthUser) {
-         // Profile exists but no auth account yet - let them continue
-         toast.info(t('contact.profileFoundContinue', 'We found your profile! Continue to complete your registration.'));
-       }
-     } catch (err) {
-       console.error('Failed to check email:', err);
-     } finally {
-       setIsLookingUp(false);
+      if (data?.found) {
+        // Existing profile found - require verification
+        setVerificationRequired(true);
+        setVerificationSent(true);
+        toast.info(t('contact.verificationSent', 'We found your profile! Check your email to verify and continue.'));
+        
+        if (onVerificationRequired) {
+          onVerificationRequired(emailValue);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check email:', err);
+    } finally {
+      setIsLookingUp(false);
       setHasLookedUp(true);
     }
   };
@@ -210,52 +205,6 @@ export function ContactStep({
       toast.error(result.error || t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.'));
     } else {
       toast.error(t('contact.verificationFailed', 'Failed to send verification. Please try again.'));
-    }
-  };
-
-  const handleRequestMagicLink = async () => {
-    if (!validateEmail(email)) {
-      toast.error(t('contact.emailInvalid', 'Please enter a valid email address'));
-      return;
-    }
-    
-    setRequestingLink(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('send-verification-link', {
-        body: { 
-          email: email.trim().toLowerCase(),
-          redirectTo: `https://signup.homemadechefs.com/onboarding`
-        },
-      });
-
-      if (error) {
-        if (error.message?.includes('429') || error.message?.includes('Too many')) {
-          toast.error(t('contact.rateLimitError', 'Too many requests. Please wait a minute before trying again.'));
-        } else {
-          toast.error(t('contact.magicLinkFailed', 'Failed to send login link. Please try again.'));
-        }
-        return;
-      }
-
-      if (data?.error?.includes('Too many')) {
-        toast.error(data.error);
-        return;
-      }
-
-      if (data?.found && data?.sent) {
-        toast.success(t('contact.magicLinkSent', 'Login link sent! Check your email.'));
-        setVerificationRequired(true);
-        setVerificationSent(true);
-      } else if (data?.found && data?.noAuthUser) {
-        // Profile exists but no auth account yet - let them continue
-        toast.info(t('contact.profileFoundContinue', 'We found your profile! Continue to complete your registration.'));
-      } else if (!data?.found) {
-        toast.info(t('contact.noAccountFound', 'No account found with this email. Continue to create one!'));
-      }
-    } catch (err) {
-      toast.error(t('contact.magicLinkFailed', 'Failed to send login link. Please try again.'));
-    } finally {
-      setRequestingLink(false);
     }
   };
 
@@ -290,34 +239,31 @@ export function ContactStep({
     
     if (!validate()) return;
     
-    // Silently create account in background for new users only
-    // (Returning users are already authenticated via magic link)
-    if (!user) {
-      supabase.functions.invoke('auto-create-account', {
-        body: {
-          email: email.trim(),
-          chefName: `${firstName} ${lastName}`.trim(),
-        },
-      }).then(({ data, error }) => {
-        if (error) {
-          console.error('Auto-create account error (background):', error);
-          return;
-        }
+    // Silently create account in background for new users
+    supabase.functions.invoke('auto-create-account', {
+      body: {
+        email: email.trim(),
+        chefName: `${firstName} ${lastName}`.trim(),
+      },
+    }).then(({ data, error }) => {
+      if (error) {
+        console.error('Auto-create account error (background):', error);
+        return;
+      }
 
-        if (data?.verifyToken) {
-          supabase.auth.verifyOtp({
-            token_hash: data.verifyToken,
-            type: data.tokenType || 'magiclink',
-          }).catch(err => console.error('OTP verification error (background):', err));
-        }
+      if (data?.verifyToken) {
+        supabase.auth.verifyOtp({
+          token_hash: data.verifyToken,
+          type: data.tokenType || 'magiclink',
+        }).catch(err => console.error('OTP verification error (background):', err));
+      }
 
-        if (onAccountCreated && data?.userId) {
-          onAccountCreated(data.userId);
-        }
-      }).catch(err => {
-        console.error('Error in background account creation:', err);
-      });
-    }
+      if (onAccountCreated && data?.userId) {
+        onAccountCreated(data.userId);
+      }
+    }).catch(err => {
+      console.error('Error in background account creation:', err);
+    });
 
     onNext();
   };
@@ -472,28 +418,6 @@ export function ContactStep({
           </div>
           {errors.email && (
             <p className="text-sm text-destructive mt-1">{errors.email}</p>
-          )}
-          {validateEmail(email) && !verificationRequired && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleRequestMagicLink}
-              disabled={requestingLink}
-              className="mt-2 text-xs text-muted-foreground hover:text-primary"
-            >
-              {requestingLink ? (
-                <>
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  {t('contact.sendingLink', 'Sending...')}
-                </>
-              ) : (
-                <>
-                  <KeyRound className="w-3 h-3 mr-1" />
-                  {t('contact.alreadyHaveAccount', 'Already have an account? Request login link')}
-                </>
-              )}
-            </Button>
           )}
         </div>
 

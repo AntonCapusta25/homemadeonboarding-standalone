@@ -66,7 +66,6 @@ interface UseChefProfilesOptions {
   adminId?: string;
   includePending?: boolean;
   searchQuery?: string;
-  sortByAdmin?: string; // Sort by assigned_admin_id
 }
 
 interface Analytics {
@@ -81,7 +80,7 @@ interface Analytics {
 }
 
 export function useChefProfiles(options: UseChefProfilesOptions = {}) {
-  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId, includePending = true, searchQuery, sortByAdmin } = options;
+  const { page = 1, pageSize = 10, statusFilter, cityFilter, assignedToMe, adminId, includePending = true, searchQuery } = options;
 
   const [chefs, setChefs] = useState<ChefWithStats[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
@@ -128,47 +127,10 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     setError(null);
 
     try {
-      // If filtering by admin, first get chef IDs assigned to that admin
-      let adminFilteredChefIds: string[] | null = null;
-      if (sortByAdmin) {
-        if (sortByAdmin === 'unassigned') {
-          // Get all chef_profile_ids that have admin data
-          const { data: assignedData } = await supabase
-            .from('chef_admin_data')
-            .select('chef_profile_id')
-            .not('assigned_admin_id', 'is', null);
-          
-          const assignedIds = new Set((assignedData || []).map(d => d.chef_profile_id));
-          
-          // We'll need to filter out assigned ones after fetching
-          adminFilteredChefIds = []; // Empty means we need inverse filter
-        } else {
-          const { data: adminData } = await supabase
-            .from('chef_admin_data')
-            .select('chef_profile_id')
-            .eq('assigned_admin_id', sortByAdmin);
-          
-          adminFilteredChefIds = (adminData || []).map(d => d.chef_profile_id);
-          
-          // If no chefs assigned to this admin, return empty
-          if (adminFilteredChefIds.length === 0) {
-            setChefs([]);
-            setTotalCount(0);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       // First fetch chef profiles - for universal search, fetch ALL matching records then paginate
       let query = supabase
         .from('chef_profiles')
         .select('*', { count: 'exact' });
-
-      // Apply admin filter at database level if we have specific IDs
-      if (adminFilteredChefIds && adminFilteredChefIds.length > 0) {
-        query = query.in('id', adminFilteredChefIds);
-      }
 
       if (cityFilter && cityFilter !== 'all') {
         query = query.eq('city', cityFilter);
@@ -186,8 +148,8 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         .not('contact_phone', 'is', null)
         .order('created_at', { ascending: false });
 
-      // Only paginate when not searching or admin filtering (these return all results then paginate client-side)
-      if (!searchQuery?.trim() && !sortByAdmin) {
+      // Only paginate when not searching (search returns all results then paginates client-side)
+      if (!searchQuery?.trim()) {
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
         query = query.range(from, to);
@@ -264,12 +226,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       if (assignedToMe && adminId) {
         mergedData = mergedData.filter(chef => chef.assigned_admin_id === adminId);
       }
-
-      // Apply sortByAdmin filter for "unassigned" case (filter out those with assignments)
-      if (sortByAdmin === 'unassigned') {
-        mergedData = mergedData.filter(chef => !chef.assigned_admin_id);
-      }
-      // Note: For specific admin filter, we already filtered at DB level via adminFilteredChefIds
 
       // Deduplicate by contact_email
       const deduplicatedChefs = mergedData.reduce((acc: ChefWithStats[], chef) => {
@@ -408,7 +364,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId, includePending, searchQuery, sortByAdmin]);
+  }, [page, pageSize, statusFilter, cityFilter, assignedToMe, adminId, includePending, searchQuery]);
 
   useEffect(() => {
     fetchChefs();
@@ -455,24 +411,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
           admin_user_id: currentAdminId,
           admin_name: adminName,
         });
-
-        // Send notification when status is "called_no_answer"
-        if (status === 'called_no_answer' && previousChef) {
-          try {
-            await supabase.functions.invoke('send-notification-email', {
-              body: {
-                type: 'called_no_answer',
-                chefName: previousChef.chef_name || previousChef.business_name || 'Chef',
-                email: previousChef.contact_email,
-                phone: previousChef.contact_phone,
-                businessName: previousChef.business_name,
-              },
-            });
-            console.log('Called no answer notification sent to chef');
-          } catch (notifyErr) {
-            console.error('Failed to send called_no_answer notification:', notifyErr);
-          }
-        }
       } catch (err) {
         console.error('Failed to update status:', err);
         if (previousChef) {
@@ -549,11 +487,10 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
     const newCount = (chef?.call_attempts || 0) + 1;
     const now = new Date().toISOString();
     
-    // Optimistic update - happens immediately (also auto-assign to calling admin)
+    // Optimistic update - happens immediately
     optimisticUpdate(chefId, { 
       call_attempts: newCount,
-      crm_last_contact_date: now,
-      assigned_admin_id: currentAdminId, // Auto-assign to the admin who logged the call
+      crm_last_contact_date: now
     });
 
     // Fire-and-forget DB operations
@@ -566,7 +503,6 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             call_attempts: newCount,
             crm_last_contact_date: now,
             crm_updated_by: currentAdminId,
-            assigned_admin_id: currentAdminId, // Auto-assign to the admin who logged the call
           }, { onConflict: 'chef_profile_id' });
 
         if (error) throw error;
@@ -582,7 +518,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       } catch (err) {
         console.error('Failed to log call:', err);
         if (chef) {
-          optimisticUpdate(chefId, { call_attempts: chef.call_attempts, assigned_admin_id: chef.assigned_admin_id });
+          optimisticUpdate(chefId, { call_attempts: chef.call_attempts });
         }
       }
     })();

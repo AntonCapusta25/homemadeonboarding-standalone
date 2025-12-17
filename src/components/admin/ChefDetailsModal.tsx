@@ -13,17 +13,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin, 
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, Wifi, AlertTriangle, Rocket, Search
+  Download, Store, Wifi, AlertTriangle, Upload, Search
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
-import { MenuUploadSection } from './MenuUploadSection';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -87,7 +85,6 @@ interface MenuData {
     price: number;
     category: string | null;
     is_upsell: boolean;
-    image_url: string | null;
   }[];
 }
 
@@ -110,93 +107,22 @@ export function ChefDetailsModal({
   const [saving, setSaving] = useState(false);
   const [creatingMerchant, setCreatingMerchant] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
-  const [processStep, setProcessStep] = useState<string>('');
-  const [selectedBackground, setSelectedBackground] = useState('cozy_wooden_table');
-  const [selectedAmbience, setSelectedAmbience] = useState('soft_window_light');
+  const [importingMenu, setImportingMenu] = useState(false);
+  const [detectingPricingType, setDetectingPricingType] = useState(false);
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
   const [storedMerchantId, setStoredMerchantId] = useState<string | null>(null);
-  
-  // Background job state
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<{
-    status: string;
-    current_step: string | null;
-    merchant_id: string | null;
-    images_generated: number;
-    dishes_imported: number;
-    error_message: string | null;
-  } | null>(null);
 
   useEffect(() => {
     if (isOpen && chef.id) {
       fetchChefData();
       setAdminStatus(chef.admin_status || 'new');
       setAdminNotes(chef.admin_notes || '');
+      // Load stored hyperzod_merchant_id
       loadHyperzodMerchantId();
-      checkExistingJob();
     }
   }, [isOpen, chef.id, chef.admin_status, chef.admin_notes]);
-
-  // Poll for job status updates
-  useEffect(() => {
-    if (!currentJobId || !isOpen) return;
-    
-    const pollInterval = setInterval(async () => {
-      const { data: job } = await supabase
-        .from('merchant_setup_jobs')
-        .select('status, current_step, merchant_id, images_generated, dishes_imported, error_message')
-        .eq('id', currentJobId)
-        .single();
-      
-      if (job) {
-        setJobStatus(job);
-        setProcessStep(job.current_step || '');
-        
-        if (job.status === 'completed') {
-          setCreatingMerchant(false);
-          setCurrentJobId(null);
-          if (job.merchant_id) {
-            setStoredMerchantId(job.merchant_id);
-            setMerchantId(job.merchant_id);
-          }
-          toast({ 
-            title: '✓ Setup Complete!', 
-            description: `Merchant created, ${job.images_generated} images, ${job.dishes_imported} dishes imported`
-          });
-          fetchChefData();
-          onRefresh?.();
-        } else if (job.status === 'failed') {
-          setCreatingMerchant(false);
-          setCurrentJobId(null);
-          setHyperzodError({ error: job.error_message || 'Setup failed', details: null });
-          toast({ title: 'Setup Failed', description: job.error_message, variant: 'destructive' });
-        }
-      }
-    }, 2000);
-    
-    return () => clearInterval(pollInterval);
-  }, [currentJobId, isOpen]);
-
-  const checkExistingJob = async () => {
-    // Check for any in-progress jobs for this chef
-    const { data: existingJob } = await supabase
-      .from('merchant_setup_jobs')
-      .select('id, status, current_step, merchant_id, images_generated, dishes_imported, error_message')
-      .eq('chef_profile_id', chef.id)
-      .eq('status', 'processing')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (existingJob) {
-      setCurrentJobId(existingJob.id);
-      setJobStatus(existingJob);
-      setProcessStep(existingJob.current_step || '');
-      setCreatingMerchant(true);
-    }
-  };
 
   const loadHyperzodMerchantId = async () => {
     try {
@@ -275,7 +201,7 @@ export function ChefDetailsModal({
       if (menuData) {
         const { data: dishesData } = await supabase
           .from('dishes')
-          .select('id, name, description, price, category, is_upsell, image_url')
+          .select('id, name, description, price, category, is_upsell')
           .eq('menu_id', menuData.id)
           .order('sort_order', { ascending: true });
 
@@ -351,53 +277,174 @@ export function ChefDetailsModal({
     }
   };
 
-  // Unified handler: Create Merchant → Generate Images → Import Menu (runs synchronously)
-  const handleFullMerchantSetup = async () => {
+  const handleCreateMerchant = async () => {
     setCreatingMerchant(true);
     setHyperzodError(null);
-    setProcessStep('Starting setup...');
-    setJobStatus(null);
-
     try {
-      const { data, error } = await supabase.functions.invoke('process-merchant-setup', {
-        body: {
-          chef_profile_id: chef.id,
-          chef: chef,
-          menu_id: menu?.id,
-          ambience: selectedAmbience,
-          background: selectedBackground,
-          cuisines: chef.cuisines || [],
-        },
+      const { data, error } = await supabase.functions.invoke('create-hyperzod-merchant', {
+        body: { chef }
       });
 
-      if (error) throw new Error(error.message);
-
-      if (!data?.success) {
-        throw new Error(data?.error || 'Setup failed');
+      if (error) {
+        console.error('Merchant creation error:', error);
+        setHyperzodError({ error: error.message, details: { field: 'network', message: 'Edge function error' } });
+        toast({ 
+          title: 'Error', 
+          description: error.message || 'Failed to create merchant', 
+          variant: 'destructive' 
+        });
+        return;
       }
 
-      toast({
-        title: '✓ Setup Complete!',
-        description: `Merchant created, ${data.images_generated || 0} images, ${data.dishes_imported || 0} dishes imported`,
-      });
-
-      if (data.merchant_id) {
-        setStoredMerchantId(data.merchant_id);
-        setMerchantId(data.merchant_id);
+      if (data?.success) {
+        setHyperzodError(null);
+        // Auto-fill merchant ID for menu import and save to database
+        if (data.merchant_id) {
+          setMerchantId(data.merchant_id);
+          await saveHyperzodMerchantId(data.merchant_id);
+        }
+        toast({ 
+          title: 'Merchant Created', 
+          description: data.merchant_id 
+            ? `Merchant ID ${data.merchant_id} saved - Ready to import menu!` 
+            : 'Successfully created merchant in Hyperzod'
+        });
+      } else {
+        // Parse detailed error from Hyperzod
+        const errorMsg = data?.error || 'Failed to create merchant';
+        let details = null;
+        
+        // Try to extract validation errors
+        if (errorMsg.includes('422') || errorMsg.toLowerCase().includes('validation')) {
+          details = { field: 'validation', message: 'Missing or invalid fields. Check chef profile data.' };
+        } else if (errorMsg.includes('401')) {
+          details = { field: 'api_key', message: 'Invalid API key. Check HYPERZOD_API_KEY secret.' };
+        } else if (errorMsg.includes('403')) {
+          details = { field: 'permissions', message: 'API key lacks permission. Check Hyperzod dashboard.' };
+        } else {
+          details = { field: 'unknown', message: errorMsg };
+        }
+        
+        setHyperzodError({ error: errorMsg, details });
+        toast({ 
+          title: 'Error', 
+          description: errorMsg, 
+          variant: 'destructive' 
+        });
       }
-
-      setProcessStep('Complete!');
-      setCreatingMerchant(false);
-      fetchChefData();
-      onRefresh?.();
     } catch (err: any) {
-      console.error('Merchant setup failed:', err);
+      console.error('Error creating merchant:', err);
+      setHyperzodError({ error: err?.message || 'Network error', details: { field: 'network', message: 'Could not reach API' } });
+      toast({ 
+        title: 'Error', 
+        description: err?.message || 'Failed to create merchant', 
+        variant: 'destructive' 
+      });
+    } finally {
       setCreatingMerchant(false);
-      setHyperzodError({ error: err?.message || 'Setup failed', details: null });
-      toast({ title: 'Hyperzod Error', description: err?.message || 'Setup failed', variant: 'destructive' });
     }
   };
 
+  const handleImportMenuToHyperzod = async () => {
+    if (!merchantId.trim()) {
+      toast({ title: 'Error', description: 'Please enter a Merchant ID', variant: 'destructive' });
+      return;
+    }
+    if (!menu || menu.dishes.length === 0) {
+      toast({ title: 'Error', description: 'No menu dishes to import', variant: 'destructive' });
+      return;
+    }
+
+    setImportingMenu(true);
+    setHyperzodError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('import-menu-to-hyperzod', {
+        body: { 
+          merchant_id: merchantId.trim(),
+          dishes: menu.dishes
+        }
+      });
+
+      if (error) {
+        setHyperzodError({ error: error.message });
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success) {
+        toast({ 
+          title: 'Menu Imported', 
+          description: data.message || `Successfully imported ${menu.dishes.length} dishes`
+        });
+      } else {
+        const failedItems = data?.results?.filter((r: any) => !r.success) || [];
+        setHyperzodError({ 
+          error: data?.error || 'Some dishes failed to import',
+          details: failedItems.length > 0 ? { 
+            field: 'dishes', 
+            message: failedItems.map((r: any) => `${r.dish_name}: ${r.error}`).join(', ') 
+          } : null
+        });
+        toast({ 
+          title: data?.successful_count > 0 ? 'Partial Import' : 'Import Failed', 
+          description: data?.message || 'Failed to import menu',
+          variant: data?.successful_count > 0 ? 'default' : 'destructive'
+        });
+      }
+    } catch (err: any) {
+      setHyperzodError({ error: err?.message || 'Network error' });
+      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+    } finally {
+      setImportingMenu(false);
+    }
+  };
+
+  const handleDetectPricingType = async () => {
+    if (!merchantId.trim()) {
+      toast({ title: 'Error', description: 'Please enter a Merchant ID first', variant: 'destructive' });
+      return;
+    }
+
+    setDetectingPricingType(true);
+    setHyperzodError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('detect-hyperzod-pricing-type', {
+        body: { merchant_id: merchantId.trim() }
+      });
+
+      if (error) {
+        setHyperzodError({ error: error.message });
+        toast({ title: 'Detection Failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      if (data?.success && data?.valid_types?.length > 0) {
+        toast({ 
+          title: 'Valid Pricing Types Found!', 
+          description: `Valid types: ${data.valid_types.join(', ')}`,
+        });
+        setHyperzodError({
+          error: `✓ Detection Complete: Found ${data.valid_types.length} valid type(s)`,
+          details: { field: 'valid_types', message: data.valid_types.join(', ') }
+        });
+      } else {
+        setHyperzodError({ 
+          error: data?.message || 'No valid pricing types found',
+          details: { field: 'tested', message: `Tested ${data?.total_tested || 0} values` }
+        });
+        toast({ 
+          title: 'No Valid Types Found', 
+          description: data?.message || 'Could not find a valid pricing type',
+          variant: 'destructive'
+        });
+      }
+    } catch (err: any) {
+      setHyperzodError({ error: err?.message || 'Network error' });
+      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDetectingPricingType(false);
+    }
+  };
 
   const handleMenuDownload = async () => {
     if (!menu || menu.dishes.length === 0) {
@@ -758,102 +805,65 @@ export function ChefDetailsModal({
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           </DialogTitle>
           <div className="flex items-center gap-2 ml-auto mr-8">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button 
-                  disabled={creatingMerchant}
-                  variant={storedMerchantId ? 'outline' : 'default'}
-                >
-                  {creatingMerchant ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {processStep || 'Processing...'}
-                    </>
-                  ) : storedMerchantId ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                      Merchant: {storedMerchantId.slice(0, 8)}...
-                    </>
-                  ) : (
-                    <>
-                      <Rocket className="w-4 h-4 mr-2" />
-                      Create Merchant
-                    </>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-4" align="end">
-                <div className="space-y-4">
-                  <h4 className="font-medium text-sm">Photo Style Settings</h4>
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Background</Label>
-                      <Select value={selectedBackground} onValueChange={setSelectedBackground}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cozy_wooden_table">Cozy Wooden Table</SelectItem>
-                          <SelectItem value="clean_marble">Clean Marble Surface</SelectItem>
-                          <SelectItem value="rustic_kitchen">Rustic Kitchen</SelectItem>
-                          <SelectItem value="modern_minimal">Modern Minimal</SelectItem>
-                          <SelectItem value="outdoor_garden">Outdoor Garden</SelectItem>
-                          <SelectItem value="neutral_studio">Neutral Studio</SelectItem>
-                          <SelectItem value="dark_moody">Dark & Moody</SelectItem>
-                          <SelectItem value="light_airy">Light & Airy</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Lighting</Label>
-                      <Select value={selectedAmbience} onValueChange={setSelectedAmbience}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="soft_window_light">Soft Window Light</SelectItem>
-                          <SelectItem value="warm_golden_hour">Warm Golden Hour</SelectItem>
-                          <SelectItem value="bright_studio">Bright Studio</SelectItem>
-                          <SelectItem value="moody_dramatic">Moody Dramatic</SelectItem>
-                          <SelectItem value="natural_daylight">Natural Daylight</SelectItem>
-                          <SelectItem value="overhead_soft">Overhead Soft</SelectItem>
-                          <SelectItem value="side_rim">Side Rim Light</SelectItem>
-                          <SelectItem value="backlit_glow">Backlit Glow</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {creatingMerchant && jobStatus ? (
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="font-medium">{jobStatus.current_step || 'Processing...'}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        {jobStatus.merchant_id && <p>✓ Merchant: {jobStatus.merchant_id.slice(0, 12)}...</p>}
-                        {jobStatus.images_generated > 0 && <p>✓ {jobStatus.images_generated} images generated</p>}
-                        {jobStatus.dishes_imported > 0 && <p>✓ {jobStatus.dishes_imported} dishes imported</p>}
-                      </div>
-                      <p className="text-xs text-green-600">Safe to close - runs in background!</p>
-                    </div>
-                  ) : (
-                    <Button 
-                      onClick={handleFullMerchantSetup} 
-                      disabled={creatingMerchant}
-                      className="w-full"
-                      size="sm"
-                    >
-                      {creatingMerchant ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Rocket className="w-4 h-4 mr-2" />
-                      )}
-                      {creatingMerchant ? 'Starting...' : storedMerchantId ? 'Re-create Merchant' : 'Start Setup'}
-                    </Button>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={handleTestConnection} 
+              disabled={testingConnection}
+            >
+              {testingConnection ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <Wifi className={cn("w-4 h-4 mr-2", connectionStatus === 'success' && "text-green-500", connectionStatus === 'error' && "text-red-500")} />
+                  Test Connection
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={handleCreateMerchant} 
+              disabled={creatingMerchant}
+              variant={storedMerchantId ? 'outline' : 'default'}
+            >
+              {creatingMerchant ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : storedMerchantId ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                  Merchant: {storedMerchantId.slice(0, 8)}...
+                </>
+              ) : (
+                <>
+                  <Store className="w-4 h-4 mr-2" />
+                  Create Merchant
+                </>
+              )}
+            </Button>
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={handleDetectPricingType} 
+              disabled={detectingPricingType || !merchantId.trim()}
+              title="Detect valid product_pricing.type values"
+            >
+              {detectingPricingType ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Detecting...
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Detect Pricing Type
+                </>
+              )}
+            </Button>
           </div>
         </DialogHeader>
 
@@ -1184,25 +1194,54 @@ export function ChefDetailsModal({
               </TabsContent>
 
               <TabsContent value="menu" className="space-y-4">
-                <MenuUploadSection 
-                  chefId={chef.id}
-                  chefName={chef.chef_name}
-                  cuisines={chef.cuisines}
-                  onMenuUpdated={() => {
-                    fetchChefData();
-                    onRefresh?.();
-                  }}
-                />
                 {!menu ? (
                   <p className="text-muted-foreground text-center py-8">No menu generated yet</p>
                 ) : (
                   <>
-                    <div className="flex items-center justify-end">
+                    <div className="flex flex-wrap items-center gap-2 justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <Input
+                            placeholder="Merchant ID"
+                            value={merchantId}
+                            onChange={(e) => setMerchantId(e.target.value)}
+                            className={cn("w-56 h-8 text-sm pr-8", storedMerchantId && "border-green-300")}
+                          />
+                          {storedMerchantId && merchantId === storedMerchantId && (
+                            <CheckCircle className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                          )}
+                        </div>
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          onClick={handleImportMenuToHyperzod}
+                          disabled={importingMenu || !merchantId.trim()}
+                          className="gap-2"
+                        >
+                          {importingMenu ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Importing...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              Import to Hyperzod
+                            </>
+                          )}
+                        </Button>
+                      </div>
                       <Button variant="outline" size="sm" onClick={handleMenuDownload} className="gap-2">
                         <Download className="w-4 h-4" />
                         Download ZIP
                       </Button>
                     </div>
+                    {storedMerchantId && (
+                      <p className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Hyperzod merchant ID saved: {storedMerchantId}
+                      </p>
+                    )}
                     {menu.summary && (
                       <Card className="p-4">
                         <h4 className="font-medium mb-2">Menu Summary</h4>
@@ -1218,28 +1257,17 @@ export function ChefDetailsModal({
                     <div className="space-y-2">
                       <h4 className="font-medium">Dishes ({menu.dishes.filter(d => !d.is_upsell).length})</h4>
                       {menu.dishes.filter(d => !d.is_upsell).map((dish) => (
-                        <div key={dish.id} className="flex gap-3 p-3 border rounded-lg">
-                          {dish.image_url ? (
-                            <img 
-                              src={dish.image_url} 
-                              alt={dish.name} 
-                              className="w-16 h-16 object-cover rounded-md flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                              <Utensils className="w-6 h-6 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
+                        <div key={dish.id} className="flex justify-between items-start p-3 border rounded-lg">
+                          <div>
                             <p className="font-medium">{dish.name}</p>
                             {dish.description && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{dish.description}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{dish.description}</p>
                             )}
                             {dish.category && (
                               <Badge variant="outline" className="mt-1 text-xs">{dish.category}</Badge>
                             )}
                           </div>
-                          <p className="font-semibold flex-shrink-0">€{Number(dish.price).toFixed(2)}</p>
+                          <p className="font-semibold">€{Number(dish.price).toFixed(2)}</p>
                         </div>
                       ))}
                     </div>
@@ -1247,19 +1275,8 @@ export function ChefDetailsModal({
                       <div className="space-y-2">
                         <h4 className="font-medium">Upsells ({menu.dishes.filter(d => d.is_upsell).length})</h4>
                         {menu.dishes.filter(d => d.is_upsell).map((dish) => (
-                          <div key={dish.id} className="flex gap-3 items-center p-3 border rounded-lg bg-muted/30">
-                            {dish.image_url ? (
-                              <img 
-                                src={dish.image_url} 
-                                alt={dish.name} 
-                                className="w-12 h-12 object-cover rounded-md flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                                <Utensils className="w-4 h-4 text-muted-foreground" />
-                              </div>
-                            )}
-                            <p className="font-medium flex-1">{dish.name}</p>
+                          <div key={dish.id} className="flex justify-between items-center p-3 border rounded-lg bg-muted/30">
+                            <p className="font-medium">{dish.name}</p>
                             <p className="font-semibold">€{Number(dish.price).toFixed(2)}</p>
                           </div>
                         ))}

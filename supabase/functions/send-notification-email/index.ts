@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface NotificationEmailRequest {
-  type: 'abandonment' | 'welcome' | 'new_signup' | 'food_safety_skipped' | 'food_safety_followup' | 'called_no_answer';
+  type: 'abandonment' | 'welcome' | 'new_signup' | 'food_safety_skipped' | 'food_safety_followup';
   chefName: string;
   email: string;
   phone?: string;
@@ -213,43 +213,6 @@ const handler = async (req: Request): Promise<Response> => {
           <p style="color: #666;">
             Best regards,<br>
             The Homemade Team
-          </p>
-        </div>
-      `;
-    } else if (type === 'called_no_answer') {
-      // Send notification to chef that we tried to call them
-      toEmail = email;
-      subject = `We tried to reach you! 📞 - Homemade`;
-      htmlContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #f97316;">Hi ${chefName}! 👋</h1>
-          <p style="font-size: 16px; color: #333;">
-            We tried to call you about your Homemade chef profile, but couldn't reach you.
-          </p>
-          <div style="background: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fed7aa;">
-            <h3 style="margin-top: 0; color: #c2410c;">📞 Let's Connect!</h3>
-            <p style="color: #333;">
-              We'd love to speak with you to help complete your onboarding and get you started on Homemade.
-            </p>
-            <p style="color: #333;">
-              Please call us back or reply to this email with a good time to reach you.
-            </p>
-          </div>
-          <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">
-            <h3 style="margin-top: 0; color: #166534;">📅 Book a Meeting</h3>
-            <p style="color: #333;">
-              You can also schedule a call at your convenience:
-              <br><br>
-              <a href="https://calendly.com/homemademeals-info/interview-with-homemade" style="background: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Book a Call</a>
-            </p>
-          </div>
-          <p style="font-size: 16px; color: #333;">
-            We're excited to have you join our platform!
-          </p>
-          <p style="color: #666;">
-            Best regards,<br>
-            The Homemade Team<br>
-            <a href="https://wa.me/3197010208809">WhatsApp: +31 97010208809</a>
           </p>
         </div>
       `;
