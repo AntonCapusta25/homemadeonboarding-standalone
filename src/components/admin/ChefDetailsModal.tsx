@@ -256,9 +256,15 @@ export function ChefDetailsModal({
 
       if (data?.success) {
         setHyperzodError(null);
+        // Auto-fill merchant ID for menu import
+        if (data.merchant_id) {
+          setMerchantId(data.merchant_id);
+        }
         toast({ 
           title: 'Merchant Created', 
-          description: `Successfully created merchant in Hyperzod` 
+          description: data.merchant_id 
+            ? `Merchant ID ${data.merchant_id} - Ready to import menu!` 
+            : 'Successfully created merchant in Hyperzod'
         });
       } else {
         // Parse detailed error from Hyperzod
