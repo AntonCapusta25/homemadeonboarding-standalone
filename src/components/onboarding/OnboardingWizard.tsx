@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useOnboarding, clearOnboardingProgress } from '@/hooks/useOnboarding';
 import { useAuth } from '@/hooks/useAuth';
 import { useAbandonmentTracking } from '@/hooks/useAbandonmentTracking';
@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 
 export function OnboardingWizard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { t } = useTranslation();
@@ -91,7 +92,7 @@ export function OnboardingWizard() {
     if (verified === 'true' && user) {
       // User just verified via magic link - restore their profile
       toast.success(t('contact.verificationSuccess', 'Email verified! Restoring your progress...'));
-      
+
       // Look up and restore profile by user email
       if (user.email) {
         lookupByEmail(user.email).then((found) => {
@@ -100,14 +101,37 @@ export function OnboardingWizard() {
           }
         });
       }
-      
+
       // Clear the verified param from URL
       searchParams.delete('verified');
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, user, lookupByEmail, setSearchParams, t]);
 
-  // Map onboarding types to DB enum values
+  // Show a friendly message if the verification link was invalid/expired
+  useEffect(() => {
+    if (!location.hash) return;
+
+    const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+    const params = new URLSearchParams(hash);
+    const errorCode = params.get('error_code');
+    const errorDescription = params.get('error_description');
+
+    if (!errorCode && !errorDescription) return;
+
+    if (errorCode === 'otp_expired') {
+      toast.error(t('contact.magicLinkExpired', 'This email link is invalid or has expired. Please request a new one.'));
+    } else {
+      toast.error(decodeURIComponent(errorDescription || 'Login failed. Please request a new link.'));
+    }
+
+    // Remove hash so it doesn't keep showing
+    try {
+      window.history.replaceState({}, document.title, location.pathname + location.search);
+    } catch {
+      // ignore
+    }
+  }, [location.hash, location.pathname, location.search, t]);
   const mapFoodSafetyStatus = (status: string) => {
     const map: Record<string, 'have_certificate' | 'getting_certificate' | 'need_help'> = {
       'has_certificate': 'have_certificate',

@@ -156,28 +156,10 @@ serve(async (req) => {
 
     let magicLinkUrl: string;
     const productionUrl = "https://chef-craft-flow.lovable.app";
-    const defaultRedirectTo = `${productionUrl}/onboarding?verified=true`;
 
-    const resolveRedirectTo = (candidate?: string) => {
-      if (!candidate) return defaultRedirectTo;
-      try {
-        const url = new URL(candidate);
-        if (!['http:', 'https:'].includes(url.protocol)) return defaultRedirectTo;
-
-        const requestOrigin = req.headers.get('origin') ?? '';
-        const allowedOrigins = new Set([productionUrl, requestOrigin].filter(Boolean));
-        if (!allowedOrigins.has(url.origin)) return defaultRedirectTo;
-
-        // Ensure we always return to onboarding and include verified=true
-        if (!url.pathname.startsWith('/onboarding')) url.pathname = '/onboarding';
-        url.searchParams.set('verified', 'true');
-        return url.toString();
-      } catch {
-        return defaultRedirectTo;
-      }
-    };
-
-    const finalRedirectTo = resolveRedirectTo(redirectTo);
+    // Always redirect to the public production onboarding flow.
+    // Using preview URLs can send users through a Lovable login bridge.
+    const finalRedirectTo = `${productionUrl}/onboarding?verified=true`;
 
     if (existingUser) {
       // Generate magic link for existing user
