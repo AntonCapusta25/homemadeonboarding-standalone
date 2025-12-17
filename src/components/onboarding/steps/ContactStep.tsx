@@ -253,12 +253,12 @@ export function ContactStep({
         // Show verification screen and BLOCK
         setVerificationRequired(true);
         setVerificationSent(true);
-        setSaving(false); // IMPORTANT: Stop loading state so UI updates
         toast.success('Check your email! We sent you a magic link to restore your progress.');
 
         if (onVerificationRequired) {
           onVerificationRequired(normalizedEmail);
         }
+        // Don't return here - let finally block set saving to false
       } else {
         // NEW USER: Create account and CONTINUE to next step
         console.log('New user, creating account silently');
