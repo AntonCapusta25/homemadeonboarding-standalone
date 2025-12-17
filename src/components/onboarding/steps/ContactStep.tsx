@@ -37,7 +37,7 @@ export function ContactStep({
   const { user } = useAuth();
   const [errors, setErrors] = useState<{ email?: string; phone?: string; firstName?: string }>({});
   const [isLookingUp, setIsLookingUp] = useState(false);
-  const [hasLookedUp, setHasLookedUp] = useState(false);
+  const [isReturningUser, setIsReturningUser] = useState(false);
   const [verificationRequired, setVerificationRequired] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [resending, setResending] = useState(false);
@@ -143,8 +143,43 @@ export function ContactStep({
     }
   };
 
+
   const handleEmailLookup = async (emailValue: string) => {
-    // No-op: Email lookup removed in favor of explicit magic link on Next click
+    if (!validateEmail(emailValue)) return;
+
+    setIsLookingUp(true);
+
+    try {
+      const normalizedEmail = emailValue.trim().toLowerCase();
+
+      // Check pending_profiles
+      const { data: pendingProfile } = await supabase
+        .from('pending_profiles')
+        .select('id, chef_name')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      // Check chef_profiles
+      const { data: chefProfile } = await supabase
+        .from('chef_profiles')
+        .select('id, chef_name')
+        .eq('contact_email', normalizedEmail)
+        .maybeSingle();
+
+      if (pendingProfile || chefProfile) {
+        setIsReturningUser(true);
+        const name = pendingProfile?.chef_name || chefProfile?.chef_name || '';
+        toast.info(`Welcome back${name ? `, ${name.split(' ')[0]}` : ''}! Click Next to continue.`, {
+          duration: 4000,
+        });
+      } else {
+        setIsReturningUser(false);
+      }
+    } catch (err) {
+      console.error('Failed to check email:', err);
+    } finally {
+      setIsLookingUp(false);
+    }
   };
 
   const handleResendVerification = async () => {
@@ -329,7 +364,7 @@ export function ContactStep({
               onClick={() => {
                 setVerificationRequired(false);
                 setVerificationSent(false);
-                setHasLookedUp(false);
+                setIsReturningUser(false);
                 onChange('email', '');
               }}
               className="w-full text-muted-foreground"
@@ -402,7 +437,15 @@ export function ContactStep({
                 onChange('email', newEmail);
                 if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
 
-                // Email validation only - no auto-lookup
+                // Debounced lookup when email looks valid
+                if (lookupTimeoutRef.current) {
+                  clearTimeout(lookupTimeoutRef.current);
+                }
+                if (validateEmail(newEmail)) {
+                  lookupTimeoutRef.current = setTimeout(() => {
+                    handleEmailLookup(newEmail);
+                  }, 800);
+                }
               }}
               className="pl-10 pr-10"
             />
