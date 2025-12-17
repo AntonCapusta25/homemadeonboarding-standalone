@@ -251,8 +251,12 @@ export function ContactStep({
         }
 
         // Show verification screen and BLOCK
-        setVerificationRequired(true);
-        setVerificationSent(true);
+        // Use setTimeout to ensure state updates trigger re-render
+        setTimeout(() => {
+          setVerificationRequired(true);
+          setVerificationSent(true);
+        }, 0);
+
         toast.success('Check your email! We sent you a magic link to restore your progress.');
 
         if (onVerificationRequired) {
