@@ -207,17 +207,18 @@ export function ContactStep({
       const isExistingUser = lookupData?.found === true;
 
       if (isExistingUser) {
-        // EXISTING USER: Send magic link and block until verified
-        console.log('Existing user found, sending magic link for verification');
+        // EXISTING USER: Use Supabase native signInWithOtp (no edge function needed)
+        console.log('Existing user found, sending magic link via Supabase OTP');
 
-        const { data: magicLinkData, error: magicLinkError } = await supabase.functions.invoke('send-verification-link', {
-          body: {
-            email: normalizedEmail,
-            redirectTo: 'https://signup.homemadechefs.com/onboarding',
+        const { error: otpError } = await supabase.auth.signInWithOtp({
+          email: normalizedEmail,
+          options: {
+            emailRedirectTo: 'https://signup.homemadechefs.com/onboarding',
           },
         });
 
-        if (magicLinkError || !magicLinkData?.success) {
+        if (otpError) {
+          console.error('Error sending magic link:', otpError);
           toast.error('Failed to send verification link. Please try again.');
           setSaving(false);
           return;
