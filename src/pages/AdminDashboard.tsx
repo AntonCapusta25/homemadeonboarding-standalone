@@ -88,7 +88,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchInput);
-      setPage(1); // Reset to first page on search
+      // Don't reset page - we're doing client-side filtering now
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
