@@ -111,14 +111,55 @@ export function ChefDetailsModal({
   const [hyperzodError, setHyperzodError] = useState<{ error: string; details?: any } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
+  const [storedMerchantId, setStoredMerchantId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && chef.id) {
       fetchChefData();
       setAdminStatus(chef.admin_status || 'new');
       setAdminNotes(chef.admin_notes || '');
+      // Load stored hyperzod_merchant_id
+      loadHyperzodMerchantId();
     }
   }, [isOpen, chef.id, chef.admin_status, chef.admin_notes]);
+
+  const loadHyperzodMerchantId = async () => {
+    try {
+      const { data } = await supabase
+        .from('chef_profiles')
+        .select('hyperzod_merchant_id')
+        .eq('id', chef.id)
+        .maybeSingle();
+      
+      if (data?.hyperzod_merchant_id) {
+        setStoredMerchantId(data.hyperzod_merchant_id);
+        setMerchantId(data.hyperzod_merchant_id);
+      } else {
+        setStoredMerchantId(null);
+        setMerchantId('');
+      }
+    } catch (err) {
+      console.error('Error loading hyperzod merchant id:', err);
+    }
+  };
+
+  const saveHyperzodMerchantId = async (newMerchantId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chef_profiles')
+        .update({ hyperzod_merchant_id: newMerchantId })
+        .eq('id', chef.id);
+      
+      if (error) {
+        console.error('Error saving hyperzod merchant id:', error);
+        toast({ title: 'Warning', description: 'Merchant created but ID could not be saved to database', variant: 'destructive' });
+      } else {
+        setStoredMerchantId(newMerchantId);
+      }
+    } catch (err) {
+      console.error('Error saving hyperzod merchant id:', err);
+    }
+  };
 
   const fetchChefData = async () => {
     setLoading(true);
@@ -256,14 +297,15 @@ export function ChefDetailsModal({
 
       if (data?.success) {
         setHyperzodError(null);
-        // Auto-fill merchant ID for menu import
+        // Auto-fill merchant ID for menu import and save to database
         if (data.merchant_id) {
           setMerchantId(data.merchant_id);
+          await saveHyperzodMerchantId(data.merchant_id);
         }
         toast({ 
           title: 'Merchant Created', 
           description: data.merchant_id 
-            ? `Merchant ID ${data.merchant_id} - Ready to import menu!` 
+            ? `Merchant ID ${data.merchant_id} saved - Ready to import menu!` 
             : 'Successfully created merchant in Hyperzod'
         });
       } else {
@@ -736,11 +778,17 @@ export function ChefDetailsModal({
             <Button 
               onClick={handleCreateMerchant} 
               disabled={creatingMerchant}
+              variant={storedMerchantId ? 'outline' : 'default'}
             >
               {creatingMerchant ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Creating...
+                </>
+              ) : storedMerchantId ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                  Merchant: {storedMerchantId.slice(0, 8)}...
                 </>
               ) : (
                 <>
@@ -1085,12 +1133,17 @@ export function ChefDetailsModal({
                   <>
                     <div className="flex flex-wrap items-center gap-2 justify-between">
                       <div className="flex items-center gap-2">
-                        <Input
-                          placeholder="Merchant ID"
-                          value={merchantId}
-                          onChange={(e) => setMerchantId(e.target.value)}
-                          className="w-48 h-8 text-sm"
-                        />
+                        <div className="relative">
+                          <Input
+                            placeholder="Merchant ID"
+                            value={merchantId}
+                            onChange={(e) => setMerchantId(e.target.value)}
+                            className={cn("w-56 h-8 text-sm pr-8", storedMerchantId && "border-green-300")}
+                          />
+                          {storedMerchantId && merchantId === storedMerchantId && (
+                            <CheckCircle className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                          )}
+                        </div>
                         <Button 
                           variant="default" 
                           size="sm" 
@@ -1116,6 +1169,12 @@ export function ChefDetailsModal({
                         Download ZIP
                       </Button>
                     </div>
+                    {storedMerchantId && (
+                      <p className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Hyperzod merchant ID saved: {storedMerchantId}
+                      </p>
+                    )}
                     {menu.summary && (
                       <Card className="p-4">
                         <h4 className="font-medium mb-2">Menu Summary</h4>
