@@ -197,46 +197,45 @@ export function ContactStep({
     setSaving(true);
 
     try {
-      // Save pending profile to database
-      const profileData = {
-        email: email.trim().toLowerCase(),
-        phone: phone.trim(),
-        chef_name: `${firstName} ${lastName}`.trim(),
-      };
+      // Use auto-create-account edge function (service role bypasses RLS)
+      const { data: accountData, error: accountError } = await supabase.functions.invoke('auto-create-account', {
+        body: {
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+          chefName: `${firstName} ${lastName}`.trim(),
+        },
+      });
 
-      // Check if profile already exists
-      const { data: existing } = await supabase
-        .from('pending_profiles')
-        .select('id')
-        .eq('email', profileData.email)
-        .maybeSingle();
-
-      let profileId;
-      if (existing) {
-        // Update existing
-        const { error } = await supabase
-          .from('pending_profiles')
-          .update(profileData)
-          .eq('id', existing.id);
-
-        if (error) throw error;
-        profileId = existing.id;
-      } else {
-        // Insert new
-        const { data, error } = await supabase
-          .from('pending_profiles')
-          .insert(profileData)
-          .select('id')
-          .single();
-
-        if (error) throw error;
-        profileId = data.id;
+      if (accountError) {
+        console.error('Error creating account:', accountError);
+        toast.error(`Failed: ${accountError.message || 'Unknown error'}`);
+        setSaving(false);
+        return;
       }
 
-      // Send magic link
+      if (!accountData?.success) {
+        console.error('Account creation failed:', accountData?.error);
+        toast.error(accountData?.error || 'Failed to create account');
+        setSaving(false);
+        return;
+      }
+
+      // Auto-verify with token if available
+      if (accountData.verifyToken) {
+        try {
+          await supabase.auth.verifyOtp({
+            token_hash: accountData.verifyToken,
+            type: accountData.tokenType || 'magiclink',
+          });
+        } catch (e) {
+          console.log('Auto-verify will happen via email:', e);
+        }
+      }
+
+      // Send magic link email
       const { data: magicLinkData, error: magicLinkError } = await supabase.functions.invoke('send-magic-link', {
         body: {
-          email: profileData.email,
+          email: email.trim().toLowerCase(),
           chefName: firstName,
         },
       });
