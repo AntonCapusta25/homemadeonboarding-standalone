@@ -370,7 +370,7 @@ export function OnboardingWizard() {
     setResending(true);
     try {
       // Use production URL for magic link redirect
-      const redirectTo = 'https://chef-craft-flow.lovable.app/summary';
+      const redirectTo = 'https://signup.homemadechefs.com/onboarding?verified=true';
       
       const { error } = await supabase.functions.invoke('create-chef-account', {
         body: {

@@ -120,7 +120,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: emailToVerify.trim().toLowerCase(),
-          redirectTo: `https://chef-craft-flow.lovable.app/onboarding?verified=true`
+          redirectTo: `https://signup.homemadechefs.com/onboarding?verified=true`
         },
       });
 
@@ -155,7 +155,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: emailValue.trim().toLowerCase(),
-          redirectTo: `https://chef-craft-flow.lovable.app/onboarding?verified=true`
+          redirectTo: `https://signup.homemadechefs.com/onboarding?verified=true`
         },
       });
 
@@ -224,7 +224,7 @@ export function ContactStep({
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
         body: { 
           email: email.trim().toLowerCase(),
-          redirectTo: `https://chef-craft-flow.lovable.app/onboarding?verified=true`
+          redirectTo: `https://signup.homemadechefs.com/onboarding?verified=true`
         },
       });
 

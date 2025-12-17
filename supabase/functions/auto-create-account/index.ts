@@ -118,7 +118,7 @@ serve(async (req) => {
       }
       
       // Generate a magic link for the user
-      const productionUrl = "https://chef-craft-flow.lovable.app";
+      const productionUrl = "https://signup.homemadechefs.com";
       const redirectTo = `${productionUrl}/onboarding?verified=true`;
       
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -317,7 +317,7 @@ serve(async (req) => {
     }
 
     // Generate a magic link for auto-login
-    const productionUrl = "https://chef-craft-flow.lovable.app";
+    const productionUrl = "https://signup.homemadechefs.com";
     const redirectTo = `${productionUrl}/onboarding?verified=true`;
     
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({

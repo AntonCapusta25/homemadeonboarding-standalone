@@ -155,7 +155,7 @@ serve(async (req) => {
     existingUser = await findAuthUserByEmail(normalizedEmail);
 
     let magicLinkUrl: string;
-    const productionUrl = "https://chef-craft-flow.lovable.app";
+    const productionUrl = "https://signup.homemadechefs.com";
 
     // Always redirect to the public production onboarding flow.
     // Using preview URLs can send users through a Lovable login bridge.
