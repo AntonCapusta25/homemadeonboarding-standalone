@@ -112,21 +112,47 @@ serve(async (req) => {
 
     console.log(`Found existing profile for: ${normalizedEmail}, sending verification link`);
 
-    // Check if user already exists in auth (use direct lookup to avoid pagination issues)
+    // Check if user already exists in auth (robust lookup)
     let existingUser: { email?: string | null } | null = null;
 
-    try {
-      // @ts-ignore - available in supabase-js v2
-      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail);
-      if (userError) {
-        console.warn("getUserByEmail error:", userError);
+    const findAuthUserByEmail = async (email: string) => {
+      // Prefer direct lookup when available
+      try {
+        // @ts-ignore - available in some supabase-js v2 builds
+        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+        if (userError) {
+          console.warn("getUserByEmail error:", userError);
+          return null;
+        }
+        return (userData as any)?.user ?? null;
+      } catch (e) {
+        console.warn("getUserByEmail not available, falling back to paginated listUsers");
       }
-      existingUser = (userData as any)?.user ?? null;
-    } catch (e) {
-      console.warn("getUserByEmail not available, falling back to listUsers")
-      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-      existingUser = existingUsers?.users?.find((u) => u.email?.toLowerCase() === normalizedEmail) ?? null;
-    }
+
+      // Fallback: paginate listUsers to avoid missing users beyond first page
+      const perPage = 200;
+      for (let page = 1; page <= 25; page++) {
+        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+
+        if (listError) {
+          console.warn("listUsers error:", listError);
+          return null;
+        }
+
+        const found = existingUsers?.users?.find((u) => u.email?.toLowerCase() === email);
+        if (found) return found as any;
+
+        const count = existingUsers?.users?.length ?? 0;
+        if (count < perPage) break; // reached end
+      }
+
+      return null;
+    };
+
+    existingUser = await findAuthUserByEmail(normalizedEmail);
 
     let magicLinkUrl: string;
     const productionUrl = "https://chef-craft-flow.lovable.app";
