@@ -243,6 +243,9 @@ export function ContactStep({
         toast.success(t('contact.magicLinkSent', 'Login link sent! Check your email.'));
         setVerificationRequired(true);
         setVerificationSent(true);
+      } else if (data?.found && data?.noAuthUser) {
+        // Profile exists but no auth account yet - let them continue
+        toast.info(t('contact.profileFoundContinue', 'We found your profile! Continue to complete your registration.'));
       } else if (!data?.found) {
         toast.info(t('contact.noAccountFound', 'No account found with this email. Continue to create one!'));
       }

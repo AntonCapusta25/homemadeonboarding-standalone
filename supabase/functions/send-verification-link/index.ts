@@ -150,41 +150,18 @@ serve(async (req) => {
         Deno.env.get("SUPABASE_URL") ?? ""
       ) || magicLinkUrl;
     } else {
-      // Create user and generate magic link
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email: normalizedEmail,
-        email_confirm: false,
-      });
-
-      if (createError) {
-        console.error("Error creating user:", createError);
-        return new Response(
-          JSON.stringify({ error: "Failed to create user account" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Generate magic link for new user
-      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-        type: "magiclink",
-        email: normalizedEmail,
-        options: {
-          redirectTo: finalRedirectTo,
-        },
-      });
-
-      if (linkError) {
-        console.error("Error generating magic link:", linkError);
-        return new Response(
-          JSON.stringify({ error: "Failed to generate verification link" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      magicLinkUrl = linkData.properties?.action_link?.replace(
-        /https:\/\/[^\/]+/,
-        Deno.env.get("SUPABASE_URL") ?? ""
-      ) || "";
+      // No auth user exists - just return found status without creating account
+      // The account will be created when they complete onboarding via auto-create-account
+      console.log(`Profile found but no auth user for: ${normalizedEmail}`);
+      return new Response(
+        JSON.stringify({ 
+          found: true, 
+          sent: false, 
+          noAuthUser: true,
+          message: "Profile found but no account yet. Continue onboarding to create your account." 
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Send the magic link email using SendGrid
