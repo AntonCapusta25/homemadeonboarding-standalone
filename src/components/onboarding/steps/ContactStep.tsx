@@ -21,17 +21,17 @@ interface ContactStepProps {
   onVerificationRequired?: (email: string) => void;
 }
 
-export function ContactStep({ 
-  email, 
-  phone, 
-  firstName = '', 
-  lastName = '', 
-  onChange, 
-  onNext, 
-  onPrevious, 
-  onAccountCreated, 
+export function ContactStep({
+  email,
+  phone,
+  firstName = '',
+  lastName = '',
+  onChange,
+  onNext,
+  onPrevious,
+  onAccountCreated,
   onLookupByEmail,
-  onVerificationRequired 
+  onVerificationRequired
 }: ContactStepProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -51,7 +51,7 @@ export function ContactStep({
       setVerificationRequired(false);
       setVerificationSent(false);
       toast.success(t('contact.verificationSuccess', 'Email verified! Restoring your progress...'));
-      
+
       // Now restore the profile
       if (onLookupByEmail) {
         onLookupByEmail(email).then((found) => {
@@ -77,14 +77,14 @@ export function ContactStep({
   // Track Lead event when valid phone is entered
   const trackLeadEvent = (phoneValue: string) => {
     if (leadTrackedRef.current) return;
-    
+
     const cleaned = phoneValue.replace(/[\s\-\(\)\.]/g, '');
     const isValidPhone = /^\+?\d{8,15}$/.test(cleaned);
-    
+
     if (isValidPhone) {
       const fireLead = () => {
         let tracked = false;
-        
+
         if (typeof window !== 'undefined' && (window as any).fbq) {
           (window as any).fbq('track', 'Lead', {
             content_name: 'Chef Onboarding Contact',
@@ -92,7 +92,7 @@ export function ContactStep({
           });
           tracked = true;
         }
-        
+
         if (typeof window !== 'undefined' && (window as any).ttq) {
           (window as any).ttq.track('SubmitForm', {
             content_name: 'Chef Onboarding Contact',
@@ -100,7 +100,7 @@ export function ContactStep({
           });
           tracked = true;
         }
-        
+
         if (tracked) {
           leadTrackedRef.current = true;
         }
@@ -116,7 +116,7 @@ export function ContactStep({
   const sendVerificationLink = async (emailToVerify: string): Promise<{ sent: boolean; rateLimited?: boolean; error?: string }> => {
     try {
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
-        body: { 
+        body: {
           email: emailToVerify.trim().toLowerCase(),
           redirectTo: `${window.location.origin}/onboarding?verified=true`
         },
@@ -147,11 +147,11 @@ export function ContactStep({
     if (!validateEmail(emailValue) || hasLookedUp) return;
 
     setIsLookingUp(true);
-    
+
     try {
       // First check if this email exists without restoring data
       const { data, error } = await supabase.functions.invoke('send-verification-link', {
-        body: { 
+        body: {
           email: emailValue.trim().toLowerCase(),
           redirectTo: `${window.location.origin}/onboarding?verified=true`
         },
@@ -181,7 +181,7 @@ export function ContactStep({
         setVerificationRequired(true);
         setVerificationSent(true);
         toast.info(t('contact.verificationSent', 'We found your profile! Check your email to verify and continue.'));
-        
+
         if (onVerificationRequired) {
           onVerificationRequired(emailValue);
         }
@@ -198,7 +198,7 @@ export function ContactStep({
     setResending(true);
     const result = await sendVerificationLink(email);
     setResending(false);
-    
+
     if (result.sent) {
       toast.success(t('contact.verificationResent', 'Verification link sent again!'));
     } else if (result.rateLimited) {
@@ -210,62 +210,111 @@ export function ContactStep({
 
   const validate = () => {
     const newErrors: { email?: string; phone?: string; firstName?: string } = {};
-    
+
     if (!firstName.trim()) {
       newErrors.firstName = t('contact.firstNameRequired', 'First name is required');
     }
-    
+
     if (!email.trim()) {
       newErrors.email = t('contact.emailRequired', 'Email is required');
     } else if (!validateEmail(email)) {
       newErrors.email = t('contact.emailInvalid', 'Please enter a valid email address');
     }
-    
+
     if (!phone.trim()) {
       newErrors.phone = t('contact.phoneRequired', 'Phone number is required');
     } else if (!validatePhone(phone)) {
       newErrors.phone = t('contact.phoneInvalid', 'Please enter a valid phone number (8-15 digits)');
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const [saving, setSaving] = useState(false);
 
   const handleNext = async () => {
     if (verificationRequired) {
       toast.error(t('contact.verificationRequired', 'Please verify your email first by clicking the link we sent.'));
       return;
     }
-    
+
     if (!validate()) return;
-    
-    // Silently create account in background for new users
-    supabase.functions.invoke('auto-create-account', {
-      body: {
-        email: email.trim(),
-        chefName: `${firstName} ${lastName}`.trim(),
-      },
-    }).then(({ data, error }) => {
+
+    setSaving(true);
+
+    try {
+      // Save pending profile to database
+      const profileData = {
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        chef_name: `${firstName} ${lastName}`.trim(),
+      };
+
+      // Check if profile already exists
+      const { data: existing } = await supabase
+        .from('pending_profiles')
+        .select('id')
+        .eq('email', profileData.email)
+        .maybeSingle();
+
+      let profileId;
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
+          .from('pending_profiles')
+          .update(profileData)
+          .eq('id', existing.id);
+
+        if (error) throw error;
+        profileId = existing.id;
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from('pending_profiles')
+          .insert(profileData)
+          .select('id')
+          .single();
+
+        if (error) throw error;
+        profileId = data.id;
+      }
+
+      // Send magic link
+      const { data, error } = await supabase.functions.invoke('send-magic-link', {
+        body: {
+          email: profileData.email,
+          chefName: firstName,
+        },
+      });
+
       if (error) {
-        console.error('Auto-create account error (background):', error);
+        console.error('Error sending magic link:', error);
+        toast.error(t('contact.magicLinkFailed', 'Failed to send magic link. Please try again.'));
+        setSaving(false);
         return;
       }
 
-      if (data?.verifyToken) {
-        supabase.auth.verifyOtp({
-          token_hash: data.verifyToken,
-          type: data.tokenType || 'magiclink',
-        }).catch(err => console.error('OTP verification error (background):', err));
+      if (!data?.success) {
+        toast.error(t('contact.magicLinkFailed', 'Failed to send magic link. Please try again.'));
+        setSaving(false);
+        return;
       }
 
-      if (onAccountCreated && data?.userId) {
-        onAccountCreated(data.userId);
-      }
-    }).catch(err => {
-      console.error('Error in background account creation:', err);
-    });
+      // Show verification required screen
+      setVerificationRequired(true);
+      setVerificationSent(true);
+      toast.success(t('contact.magicLinkSent', 'Magic link sent! Check your email to continue.'));
 
-    onNext();
+      if (onVerificationRequired) {
+        onVerificationRequired(profileData.email);
+      }
+    } catch (err: any) {
+      console.error('Error in contact step:', err);
+      toast.error(t('contact.errorOccurred', 'An error occurred. Please try again.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isValid = email.trim().length > 0 && phone.trim().length > 0 && firstName.trim().length > 0 && validatePhone(phone);
@@ -285,7 +334,7 @@ export function ContactStep({
           <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
             <ShieldCheck className="w-10 h-10 text-primary" />
           </div>
-          
+
           <div className="space-y-2">
             <h3 className="text-xl font-semibold text-foreground">
               {t('contact.checkYourEmail', 'Check Your Email')}
@@ -321,7 +370,7 @@ export function ContactStep({
                 </>
               )}
             </Button>
-            
+
             <Button
               variant="ghost"
               onClick={() => {
@@ -346,7 +395,7 @@ export function ContactStep({
       subtitle={t('contact.subtitle')}
       onNext={handleNext}
       onPrevious={onPrevious}
-      isNextDisabled={!isValid || verificationRequired}
+      isNextDisabled={!isValid || verificationRequired || saving}
     >
       <div className="max-w-md mx-auto space-y-6 relative">
         <div className="grid grid-cols-2 gap-4">
@@ -399,7 +448,7 @@ export function ContactStep({
                 const newEmail = e.target.value;
                 onChange('email', newEmail);
                 if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
-                
+
                 // Debounced lookup when email looks valid
                 if (lookupTimeoutRef.current) {
                   clearTimeout(lookupTimeoutRef.current);

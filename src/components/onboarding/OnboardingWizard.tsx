@@ -45,7 +45,7 @@ export function OnboardingWizard() {
   const [showFastVerification, setShowFastVerification] = useState(false);
   const [verificationComplete, setVerificationComplete] = useState(false);
   const [isGeneratingMenu, setIsGeneratingMenu] = useState(false);
-  
+
   const {
     currentStep,
     displayStepNumber,
@@ -76,7 +76,7 @@ export function OnboardingWizard() {
           .select('onboarding_completed')
           .eq('user_id', user.id)
           .maybeSingle();
-        
+
         if (data?.onboarding_completed) {
           setShowCongrats(true);
         }
@@ -87,25 +87,37 @@ export function OnboardingWizard() {
 
   // Handle magic link verification return
   useEffect(() => {
-    const verified = searchParams.get('verified');
-    if (verified === 'true' && user) {
-      // User just verified via magic link - restore their profile
-      toast.success(t('contact.verificationSuccess', 'Email verified! Restoring your progress...'));
-      
-      // Look up and restore profile by user email
-      if (user.email) {
-        lookupByEmail(user.email).then((found) => {
-          if (found) {
-            toast.success(t('contact.profileRestored', 'Welcome back! Your progress has been restored.'));
-          }
-        });
+    const handleMagicLinkReturn = async () => {
+      if (!user || authLoading) return;
+
+      // User just authenticated - check if they have a pending profile
+      const { data: pendingProfile } = await supabase
+        .from('pending_profiles')
+        .select('*')
+        .eq('email', user.email)
+        .maybeSingle();
+
+      if (pendingProfile) {
+        // Restore profile data
+        const restoredData = {
+          email: pendingProfile.email,
+          phone: pendingProfile.phone || '',
+          firstName: pendingProfile.chef_name?.split(' ')[0] || '',
+          lastName: pendingProfile.chef_name?.split(' ').slice(1).join(' ') || '',
+          city: pendingProfile.city || '',
+        };
+
+        updateProfile(restoredData);
+
+        toast.success(t('contact.profileRestored', 'Welcome back! Your progress has been restored.'));
+
+        // Move to address step (after contact)
+        // The user has verified their email, so they can continue
       }
-      
-      // Clear the verified param from URL
-      searchParams.delete('verified');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, user, lookupByEmail, setSearchParams, t]);
+    };
+
+    handleMagicLinkReturn();
+  }, [user, authLoading, updateProfile, t]);
 
   // Map onboarding types to DB enum values
   const mapFoodSafetyStatus = (status: string) => {
@@ -197,9 +209,9 @@ export function OnboardingWizard() {
     try {
       // User is already logged in (account created at contact step)
       // Now we need to create/update the chef_profile from pending_profile data
-      
+
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (user) {
         // Create or update chef profile (TOS acceptance moved to food safety step in verification)
         const { data: chefProfile, error: upsertError } = await supabase
@@ -221,9 +233,9 @@ export function OnboardingWizard() {
             plan: mapPlanType(profile.plan),
             logo_url: profile.logoUrl,
             onboarding_completed: true,
-          }, { 
+          }, {
             onConflict: 'user_id',
-            ignoreDuplicates: false 
+            ignoreDuplicates: false
           })
           .select('id')
           .single();
@@ -305,7 +317,7 @@ export function OnboardingWizard() {
                 }
 
                 await supabase.from('dishes').insert(dishesToInsert);
-                
+
                 // Show success toast
                 toast.success(t('onboarding.menuGeneratedSuccess', 'Your personalized menu is ready! 🎉'));
               }
@@ -329,7 +341,7 @@ export function OnboardingWizard() {
 
       // Clear localStorage progress
       clearOnboardingProgress();
-      
+
       // Show congrats screen instead of redirecting
       setShowCongrats(true);
     } catch (error: any) {
@@ -342,12 +354,12 @@ export function OnboardingWizard() {
 
   const handleResendMagicLink = async () => {
     if (!pendingProfileId) return;
-    
+
     setResending(true);
     try {
       // Use production URL for magic link redirect
       const redirectTo = 'https://chef-craft-flow.lovable.app/summary';
-      
+
       const { error } = await supabase.functions.invoke('create-chef-account', {
         body: {
           email: profile.email,
@@ -422,7 +434,7 @@ export function OnboardingWizard() {
         // Skip welcome step since we have a landing page now
         goToNext();
         return null;
-      
+
       case 'city':
         return (
           <CityStep
@@ -432,7 +444,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'cuisine':
         return (
           <CuisineStep
@@ -442,7 +454,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'contact':
         return (
           <ContactStep
@@ -460,7 +472,7 @@ export function OnboardingWizard() {
             onLookupByEmail={lookupByEmail}
           />
         );
-      
+
       case 'address':
         return (
           <AddressStep
@@ -473,7 +485,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'business-name':
         return (
           <BusinessNameStep
@@ -486,7 +498,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'logo':
         return (
           <LogoStep
@@ -500,7 +512,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'service-type':
         return (
           <ServiceTypeStep
@@ -510,7 +522,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'availability':
         return (
           <AvailabilityStep
@@ -520,7 +532,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'dish-types':
         return (
           <DishTypesStep
@@ -530,7 +542,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'food-safety-status':
         return (
           <FoodSafetyStep
@@ -541,7 +553,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'kvk-nvwa-status':
         return (
           <KvkNvwaStep
@@ -552,7 +564,7 @@ export function OnboardingWizard() {
             onPrevious={goToPrevious}
           />
         );
-      
+
       case 'plan':
         return (
           <PlanStep
@@ -564,7 +576,7 @@ export function OnboardingWizard() {
             saving={saving}
           />
         );
-      
+
       default:
         return null;
     }
@@ -599,10 +611,10 @@ export function OnboardingWizard() {
           {renderStep()}
         </div>
       </div>
-      
+
       {/* Menu generation indicator */}
       <MenuGeneratingIndicator isVisible={isGeneratingMenu} />
-      
+
       {/* Contact buttons */}
       <ContactButtons />
     </div>
