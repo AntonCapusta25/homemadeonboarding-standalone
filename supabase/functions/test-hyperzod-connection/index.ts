@@ -33,11 +33,10 @@ serve(async (req) => {
     const response = await fetch(`${BASE_URL}/admin/v1/merchant/list?limit=1`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${HYPERZOD_API_KEY}`,
-        'x-api-key': HYPERZOD_API_KEY,
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'x-tenant': TENANT_ID,
+        'Content-Type': 'application/json',
+        'X-TENANT': TENANT_ID,
+        'X-API-KEY': HYPERZOD_API_KEY,
       },
     });
 
