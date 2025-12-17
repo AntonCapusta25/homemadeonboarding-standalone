@@ -82,6 +82,73 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   return null;
 }
 
+const PRODUCT_CREATE_URL = `${BASE_URL}/merchant/v1/catalog/product/create`;
+
+function tryParseJson(text: string): any | null {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function hasTypeInvalidError(parsed: any): boolean {
+  const errs = parsed?.data?.["product_pricing.type"];
+  return Array.isArray(errs) && errs.some((m: string) => m.toLowerCase().includes("invalid"));
+}
+
+async function createProductWithPricingTypeFallback(
+  dishName: string,
+  productPayload: any,
+): Promise<{ ok: boolean; status: number; text: string; data: any | null }> {
+  const typeCandidates: Array<string | number> = ["simple", "single", "fixed", 1];
+
+  for (const candidate of typeCandidates) {
+    const payload = {
+      ...productPayload,
+      product_pricing: {
+        ...productPayload.product_pricing,
+        type: candidate,
+      },
+    };
+
+    const response = await fetch(PRODUCT_CREATE_URL, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY!,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await response.text();
+    const parsed = tryParseJson(text);
+    console.log(`Product ${dishName} (type=${candidate}) response: ${response.status} - ${text}`);
+
+    if (response.ok) {
+      return { ok: true, status: response.status, text, data: parsed };
+    }
+
+    // If it's not a type validation issue, don't keep retrying.
+    if (response.status !== 422 || !hasTypeInvalidError(parsed)) {
+      return { ok: false, status: response.status, text, data: parsed };
+    }
+  }
+
+  return {
+    ok: false,
+    status: 422,
+    text: JSON.stringify({
+      success: false,
+      message: "Validation Failed",
+      data: { "product_pricing.type": ["The selected product pricing.type is invalid."] },
+    }),
+    data: null,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -157,9 +224,12 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
+            // Hyperzod validates allowed values server-side; we may retry with alternatives.
             type: "simple",
             price_sell: priceSell,
             price_sell_compare: priceSell, // Must be >= price_sell
+            profit: 0,
+            margin: 0,
             is_tax_chargaeble: false,
             tax: 0,
           },
@@ -181,28 +251,12 @@ serve(async (req) => {
         console.log(`Creating product: ${dishName}`);
         console.log(`Payload: ${JSON.stringify(productPayload)}`);
 
-        const response = await fetch(`${BASE_URL}/merchant/v1/catalog/product/create`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-TENANT": TENANT_ID,
-            "X-API-KEY": HYPERZOD_API_KEY,
-          },
-          body: JSON.stringify(productPayload),
-        });
+        const { ok, status, text, data } = await createProductWithPricingTypeFallback(
+          dishName,
+          productPayload,
+        );
 
-        const responseText = await response.text();
-        console.log(`Product ${dishName} response: ${response.status} - ${responseText}`);
-
-        if (response.ok) {
-          let data: any;
-          try {
-            data = JSON.parse(responseText);
-          } catch {
-            data = { raw: responseText };
-          }
-
+        if (ok) {
           results.push({
             dish_name: dishName,
             success: true,
@@ -212,7 +266,7 @@ serve(async (req) => {
           results.push({
             dish_name: dishName,
             success: false,
-            error: `${response.status}: ${responseText}`,
+            error: `${status}: ${text}`,
           });
         }
       } catch (dishError: any) {
