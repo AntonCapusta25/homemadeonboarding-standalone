@@ -125,6 +125,7 @@ export type Database = {
           kvk_status: Database["public"]["Enums"]["kvk_status"] | null
           logo_url: string | null
           onboarding_completed: boolean | null
+          onboarding_reminder_sent_at: string | null
           plan: Database["public"]["Enums"]["plan_type"] | null
           service_type: Database["public"]["Enums"]["service_type"] | null
           tos_accepted_at: string | null
@@ -152,6 +153,7 @@ export type Database = {
           kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
           logo_url?: string | null
           onboarding_completed?: boolean | null
+          onboarding_reminder_sent_at?: string | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
           tos_accepted_at?: string | null
@@ -179,6 +181,7 @@ export type Database = {
           kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
           logo_url?: string | null
           onboarding_completed?: boolean | null
+          onboarding_reminder_sent_at?: string | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
           tos_accepted_at?: string | null
@@ -426,6 +429,7 @@ export type Database = {
           id: string
           kvk_status: Database["public"]["Enums"]["kvk_status"] | null
           logo_url: string | null
+          onboarding_reminder_sent_at: string | null
           phone: string | null
           plan: Database["public"]["Enums"]["plan_type"] | null
           service_type: Database["public"]["Enums"]["service_type"] | null
@@ -449,6 +453,7 @@ export type Database = {
           id?: string
           kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
           logo_url?: string | null
+          onboarding_reminder_sent_at?: string | null
           phone?: string | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null
@@ -472,6 +477,7 @@ export type Database = {
           id?: string
           kvk_status?: Database["public"]["Enums"]["kvk_status"] | null
           logo_url?: string | null
+          onboarding_reminder_sent_at?: string | null
           phone?: string | null
           plan?: Database["public"]["Enums"]["plan_type"] | null
           service_type?: Database["public"]["Enums"]["service_type"] | null

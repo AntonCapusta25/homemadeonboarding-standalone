@@ -59,3 +59,9 @@ verify_jwt = false
 
 [functions.generate-menu-images]
 verify_jwt = false
+
+[functions.onboarding-followup-cron]
+verify_jwt = false
+
+[functions.parse-menu-file]
+verify_jwt = false
