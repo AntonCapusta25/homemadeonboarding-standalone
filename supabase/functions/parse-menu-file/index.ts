@@ -68,7 +68,7 @@ ${systemPrompt}`;
 
       // Use Gemini native format with inline_data
       requestBody = {
-        model: "google/gemini-2.0-flash-exp",
+        model: "google/gemini-2.5-flash-image", // Use image model for vision
         messages: [
           {
             role: "user",
@@ -98,7 +98,7 @@ Content:
 ${content}`;
 
       requestBody = {
-        model: "google/gemini-2.0-flash-exp",
+        model: "google/gemini-2.5-flash", // Use standard flash for text
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
