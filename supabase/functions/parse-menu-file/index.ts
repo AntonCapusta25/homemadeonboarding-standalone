@@ -55,44 +55,56 @@ Important rules:
 
 Return ONLY the JSON array, no other text.`;
 
-    let userPrompt: string;
-    let messages: any[];
+    let requestBody: any;
 
     if (isBase64) {
-      // Handle image input with vision API
+      // Handle image input with Gemini vision API format
       const base64Data = content.split(",")[1]; // Remove data:image/...;base64, prefix
       const mimeType = content.match(/data:(image\/[^;]+);/)?.[1] || "image/jpeg";
 
-      userPrompt = `Parse this menu image and extract all dishes as JSON. The image shows a restaurant menu.`;
+      const userPrompt = `Parse this menu image and extract all dishes as JSON. The image shows a restaurant menu.
 
-      messages = [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: userPrompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${base64Data}`,
+${systemPrompt}`;
+
+      // Use Gemini native format with inline_data
+      requestBody = {
+        model: "google/gemini-2.0-flash-exp",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: userPrompt,
               },
-            },
-          ],
-        },
-      ];
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Data}`,
+                },
+              },
+            ],
+          },
+        ],
+        temperature: 0.3,
+      };
     } else {
       // Handle text input
-      userPrompt = `Parse this menu content and extract all dishes as JSON:
+      const userPrompt = `Parse this menu content and extract all dishes as JSON:
 
 Filename: ${filename || "menu"}
 
 Content:
 ${content}`;
 
-      messages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ];
+      requestBody = {
+        model: "google/gemini-2.0-flash-exp",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.3,
+      };
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -101,11 +113,7 @@ ${content}`;
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp",
-        messages,
-        temperature: 0.3,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
