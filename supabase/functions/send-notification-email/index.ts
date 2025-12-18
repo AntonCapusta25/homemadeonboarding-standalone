@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface NotificationEmailRequest {
-  type: 'abandonment' | 'welcome' | 'new_signup' | 'food_safety_skipped' | 'food_safety_followup' | 'called_no_answer';
+  type: 'abandonment' | 'welcome' | 'new_signup' | 'food_safety_skipped' | 'food_safety_followup' | 'called_no_answer' | 'onboarding_reminder' | 'meeting_booked' | 'interested_followup';
   chefName: string;
   email: string;
   phone?: string;
@@ -22,6 +22,9 @@ interface NotificationEmailRequest {
   foodSafetyStatus?: string;
   kvkStatus?: string;
   plan?: string;
+  progress?: number;
+  incompleteTasks?: string[];
+  magicLink?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -245,6 +248,118 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
           <p style="font-size: 16px; color: #333;">
             We're excited to have you join our platform!
+          </p>
+          <p style="color: #666;">
+            Best regards,<br>
+            The Homemade Team<br>
+            <a href="https://wa.me/3197010208809">WhatsApp: +31 97010208809</a>
+          </p>
+        </div>
+      `;
+    } else if (type === 'onboarding_reminder') {
+      // Manual onboarding reminder with progress and magic link
+      toEmail = email;
+      const progress = request.progress || 0;
+      const incompleteTasks = request.incompleteTasks || [];
+      const magicLink = request.magicLink || 'https://signup.homemadechefs.com/onboarding';
+      
+      const taskListHtml = incompleteTasks.length > 0 
+        ? incompleteTasks.map(task => `<li style="margin: 8px 0; color: #555;">${task}</li>`).join('')
+        : '<li style="color: #555;">Complete your profile to get started!</li>';
+
+      subject = `You're ${progress}% done! Complete your chef profile 🍳`;
+      htmlContent = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 40px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #C65D3B; font-size: 28px; margin: 0 0 8px;">🍳 Homemade Chef</h1>
+            <p style="color: #666; font-size: 14px; margin: 0;">Your culinary journey awaits!</p>
+          </div>
+          
+          <h2 style="color: #333; font-size: 24px; margin: 0 0 16px; text-align: center;">
+            Hi ${chefName}! 👋
+          </h2>
+          
+          <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+            ${businessName ? `We noticed you haven't finished setting up <strong>${businessName}</strong> yet.` : "We noticed you haven't finished setting up your chef profile yet."} 
+            You're <strong>${progress}%</strong> of the way there!
+          </p>
+          
+          <div style="background: #f0f0f0; border-radius: 10px; height: 20px; margin: 20px 0; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #C65D3B 0%, #E07B5B 100%); height: 100%; width: ${progress}%; border-radius: 10px;"></div>
+          </div>
+          
+          <div style="background: #fff7ed; padding: 20px; border-radius: 12px; margin: 24px 0; border: 1px solid #fed7aa;">
+            <h3 style="margin: 0 0 12px; color: #c2410c; font-size: 16px;">📋 Remaining Steps:</h3>
+            <ul style="margin: 0; padding-left: 20px;">
+              ${taskListHtml}
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${magicLink}" 
+               style="display: inline-block; background: linear-gradient(135deg, #C65D3B 0%, #E07B5B 100%); color: white; font-size: 16px; font-weight: 600; padding: 16px 40px; border-radius: 50px; text-decoration: none; box-shadow: 0 4px 16px rgba(198, 93, 59, 0.3);">
+              ✨ Complete Your Profile
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; text-align: center;">
+            Questions? Reply to this email or <a href="https://wa.me/3197010208809" style="color: #C65D3B;">WhatsApp us</a>!
+          </p>
+        </div>
+      `;
+    } else if (type === 'meeting_booked') {
+      // Confirmation after meeting is booked
+      toEmail = email;
+      subject = `Great news! Your meeting is confirmed 🎉 - Homemade`;
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #22c55e;">Hi ${chefName}! 🎉</h1>
+          <p style="font-size: 16px; color: #333;">
+            Thank you for booking a meeting with the Homemade team! We're excited to speak with you.
+          </p>
+          <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">
+            <h3 style="margin-top: 0; color: #166534;">📅 What to Expect</h3>
+            <ul style="color: #333;">
+              <li>A quick introduction to the Homemade platform</li>
+              <li>Review of your chef profile and menu</li>
+              <li>Answer any questions you have</li>
+              <li>Next steps to get you selling!</li>
+            </ul>
+          </div>
+          <p style="font-size: 16px; color: #333;">
+            In the meantime, feel free to complete any remaining steps in your profile.
+          </p>
+          <p style="color: #666;">
+            See you soon!<br>
+            The Homemade Team<br>
+            <a href="https://wa.me/3197010208809">WhatsApp: +31 97010208809</a>
+          </p>
+        </div>
+      `;
+    } else if (type === 'interested_followup') {
+      // Follow-up for interested chefs
+      toEmail = email;
+      subject = `Let's get you started on Homemade! 🚀`;
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #f97316;">Hi ${chefName}! 👋</h1>
+          <p style="font-size: 16px; color: #333;">
+            We're thrilled that you're interested in joining Homemade! ${businessName ? `<strong>${businessName}</strong> sounds amazing.` : ''}
+          </p>
+          <div style="background: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fed7aa;">
+            <h3 style="margin-top: 0; color: #c2410c;">🎯 Next Steps</h3>
+            <ol style="color: #333;">
+              <li>Complete your profile if you haven't already</li>
+              <li>Book a quick call with our team</li>
+              <li>Finish your food safety training</li>
+              <li>Get approved and start selling!</li>
+            </ol>
+          </div>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="https://calendly.com/homemademeals-info/interview-with-homemade" style="background: #f97316; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">📞 Book a Call Now</a>
+          </div>
+          <p style="font-size: 16px; color: #333;">
+            We can't wait to see your delicious dishes on our platform!
           </p>
           <p style="color: #666;">
             Best regards,<br>

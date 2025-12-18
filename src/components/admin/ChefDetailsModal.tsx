@@ -19,8 +19,16 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin,
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, AlertTriangle, Rocket, Upload, Pencil, Trash2, Save
+  Download, Store, AlertTriangle, Rocket, Upload, Pencil, Trash2, Save, Send, ChevronDown
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { useAuth } from '@/hooks/useAuth';
@@ -116,7 +124,7 @@ export function ChefDetailsModal({
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [merchantId, setMerchantId] = useState('');
   const [storedMerchantId, setStoredMerchantId] = useState<string | null>(null);
-
+  const [sendingEmail, setSendingEmail] = useState(false);
   // Menu upload states
   interface ParsedDish {
     name: string;
@@ -542,6 +550,84 @@ export function ChefDetailsModal({
     }
   };
 
+  // Get incomplete tasks for email
+  const getIncompleteTasks = (): string[] => {
+    const tasks = [
+      { key: 'city', name: 'City', check: !!chef.city },
+      { key: 'cuisines', name: 'Cuisines', check: (chef.cuisines?.length || 0) > 0 },
+      { key: 'contact', name: 'Contact Info', check: !!chef.contact_email && !!chef.contact_phone },
+      { key: 'address', name: 'Address', check: !!chef.address },
+      { key: 'business_name', name: 'Business Name', check: !!chef.business_name },
+      { key: 'logo', name: 'Logo', check: !!chef.logo_url },
+      { key: 'service_type', name: 'Service Type', check: !!chef.service_type && chef.service_type !== 'unsure' },
+      { key: 'availability', name: 'Availability', check: (chef.availability?.length || 0) > 0 },
+      { key: 'dish_types', name: 'Dish Types', check: (chef.dish_types?.length || 0) > 0 },
+      { key: 'food_safety', name: 'Food Safety', check: !!chef.food_safety_status },
+      { key: 'kvk', name: 'KVK Status', check: !!chef.kvk_status },
+      { key: 'plan', name: 'Plan', check: !!chef.plan },
+    ];
+    return tasks.filter(t => !t.check).map(t => t.name);
+  };
+
+  const handleSendEmail = async (emailType: string) => {
+    if (!chef.contact_email) {
+      toast({ title: 'No Email', description: 'Chef has no email address', variant: 'destructive' });
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      // For onboarding_reminder, use send-magic-link to generate and send the email directly
+      if (emailType === 'onboarding_reminder') {
+        const { data, error } = await supabase.functions.invoke('send-magic-link', {
+          body: {
+            email: chef.contact_email,
+            chefName: chef.chef_name || chef.business_name || 'Chef',
+            businessName: chef.business_name,
+          },
+        });
+        
+        if (error) throw error;
+        
+        toast({
+          title: 'Email Sent!',
+          description: `Onboarding reminder with magic link sent to ${chef.contact_email}`,
+        });
+        setSendingEmail(false);
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('send-notification-email', {
+        body: {
+          type: emailType,
+          chefName: chef.chef_name || chef.business_name || 'Chef',
+          email: chef.contact_email,
+          phone: chef.contact_phone,
+          businessName: chef.business_name,
+          city: chef.city,
+          cuisines: chef.cuisines,
+          progress: calculateOnboardingProgress(chef),
+          incompleteTasks: getIncompleteTasks(),
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Email Sent!',
+        description: `${emailType.replace(/_/g, ' ')} email sent to ${chef.contact_email}`,
+      });
+    } catch (err: any) {
+      console.error('Send email error:', err);
+      toast({
+        title: 'Failed to Send',
+        description: err?.message || 'Could not send the email',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   const handleMenuDownload = async () => {
     if (!menu || menu.dishes.length === 0) {
@@ -979,6 +1065,50 @@ export function ChefDetailsModal({
                 </div>
               </PopoverContent>
             </Popover>
+
+            {/* Send Email Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={sendingEmail || !chef.contact_email}>
+                  {sendingEmail ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Send Email
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Email Templates</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleSendEmail('onboarding_reminder')}>
+                  <Mail className="w-4 h-4 mr-2 text-blue-500" />
+                  📋 Complete Your Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSendEmail('called_no_answer')}>
+                  <Phone className="w-4 h-4 mr-2 text-yellow-500" />
+                  📞 We Tried to Call You
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSendEmail('interested_followup')}>
+                  <Rocket className="w-4 h-4 mr-2 text-green-500" />
+                  🚀 Let's Get Started
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSendEmail('meeting_booked')}>
+                  <Calendar className="w-4 h-4 mr-2 text-purple-500" />
+                  📅 Meeting Confirmed
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleSendEmail('food_safety_followup')}>
+                  <Shield className="w-4 h-4 mr-2 text-orange-500" />
+                  🍳 Food Safety Reminder
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSendEmail('welcome')}>
+                  <CheckCircle className="w-4 h-4 mr-2 text-emerald-500" />
+                  🎉 Welcome Email
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </DialogHeader>
 
