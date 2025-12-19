@@ -1455,8 +1455,8 @@ export function ChefDetailsModal({
                             <div className="mt-3">
                               <p className="text-xs font-medium text-red-600 mb-1">Issues Found:</p>
                               <ul className="text-xs text-muted-foreground list-disc list-inside">
-                                {verification.kitchen_analysis.issues.slice(0, 3).map((issue: string, i: number) => (
-                                  <li key={i}>{issue}</li>
+                                {verification.kitchen_analysis.issues.slice(0, 3).map((issue: any, i: number) => (
+                                  <li key={i}>{typeof issue === 'string' ? issue : issue.description || issue.fix || 'Unknown issue'}</li>
                                 ))}
                               </ul>
                             </div>
