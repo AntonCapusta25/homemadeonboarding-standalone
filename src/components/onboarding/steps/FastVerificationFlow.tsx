@@ -3,6 +3,7 @@ import { ChefProfile } from '@/types/onboarding';
 import { MenuReviewStep } from './verification/MenuReviewStep';
 import { DocumentUploadStep } from './verification/DocumentUploadStep';
 import { FoodSafetyInfoStep } from './verification/FoodSafetyInfoStep';
+import { KitchenVerificationStep } from './verification/KitchenVerificationStep';
 import { ProgressBar } from '../ProgressBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useVerification } from '@/hooks/useVerification';
@@ -16,10 +17,10 @@ interface FastVerificationFlowProps {
   onComplete: () => void;
 }
 
-// Reordered: Menu Review -> Food Safety -> Upload ID
-type VerificationStep = 'menu-review' | 'food-safety' | 'upload-id';
+// Steps: Menu Review -> Food Safety -> Kitchen Check -> Upload ID
+type VerificationStep = 'menu-review' | 'food-safety' | 'kitchen-check' | 'upload-id';
 
-const STEPS: VerificationStep[] = ['menu-review', 'food-safety', 'upload-id'];
+const STEPS: VerificationStep[] = ['menu-review', 'food-safety', 'kitchen-check', 'upload-id'];
 
 export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: FastVerificationFlowProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -60,7 +61,9 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           if (verificationProgress) {
             if (verificationProgress.documentsUploaded) {
               // All done - go to last step to confirm
-              setCurrentStepIndex(2);
+              setCurrentStepIndex(3);
+            } else if (verificationProgress.kitchenVerified) {
+              setCurrentStepIndex(3);
             } else if (verificationProgress.foodSafetyViewed) {
               setCurrentStepIndex(2);
             } else if (verificationProgress.menuReviewed) {
@@ -84,6 +87,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
       const updates: Record<string, boolean> = {};
       if (currentStep === 'menu-review') updates.menuReviewed = true;
       if (currentStep === 'food-safety') updates.foodSafetyViewed = true;
+      if (currentStep === 'kitchen-check') updates.kitchenVerified = true;
       if (currentStep === 'upload-id') updates.documentsUploaded = true;
       
       await updateProgress(chefProfileId, updates);
@@ -156,6 +160,14 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
             chefName={profile.firstName || profile.restaurantName}
           />
         );
+      case 'kitchen-check':
+        return chefProfileId ? (
+          <KitchenVerificationStep
+            chefProfileId={chefProfileId}
+            onComplete={goToNext}
+            onPrevious={goToPrevious}
+          />
+        ) : null;
       case 'upload-id':
         return (
           <DocumentUploadStep

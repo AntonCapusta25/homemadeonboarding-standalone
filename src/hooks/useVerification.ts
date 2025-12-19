@@ -11,6 +11,14 @@ export interface VerificationProgress {
   haccpDocumentUrl?: string;
   nvwaDocumentUrl?: string;
   verificationCompleted: boolean;
+  // Kitchen verification fields
+  kitchenVerified?: boolean;
+  kitchenPhoto1Url?: string;
+  kitchenPhoto2Url?: string;
+  fridgePhotoUrl?: string;
+  kitchenScore?: number;
+  kitchenStatus?: 'pass' | 'conditional' | 'fail';
+  kitchenAnalysis?: unknown;
 }
 
 export function useVerification() {
@@ -40,6 +48,14 @@ export function useVerification() {
           haccpDocumentUrl: data.haccp_document_url || undefined,
           nvwaDocumentUrl: data.nvwa_document_url || undefined,
           verificationCompleted: data.verification_completed || false,
+          // Kitchen verification
+          kitchenVerified: !!data.kitchen_verified_at,
+          kitchenPhoto1Url: data.kitchen_photo_1_url || undefined,
+          kitchenPhoto2Url: data.kitchen_photo_2_url || undefined,
+          fridgePhotoUrl: data.fridge_photo_url || undefined,
+          kitchenScore: data.kitchen_score || undefined,
+          kitchenStatus: data.kitchen_status as 'pass' | 'conditional' | 'fail' | undefined,
+          kitchenAnalysis: data.kitchen_analysis || undefined,
         };
         setProgress(result);
         return result;
@@ -74,6 +90,7 @@ export function useVerification() {
         documentsUploaded: false,
         foodSafetyViewed: false,
         verificationCompleted: false,
+        kitchenVerified: false,
       };
       setProgress(result);
       return result;
@@ -100,6 +117,7 @@ export function useVerification() {
       if (updates.haccpDocumentUrl !== undefined) dbUpdates.haccp_document_url = updates.haccpDocumentUrl;
       if (updates.nvwaDocumentUrl !== undefined) dbUpdates.nvwa_document_url = updates.nvwaDocumentUrl;
       if (updates.verificationCompleted !== undefined) dbUpdates.verification_completed = updates.verificationCompleted;
+      if (updates.kitchenVerified !== undefined) dbUpdates.kitchen_verified_at = updates.kitchenVerified ? new Date().toISOString() : null;
 
       const { error } = await supabase
         .from('chef_verification')
