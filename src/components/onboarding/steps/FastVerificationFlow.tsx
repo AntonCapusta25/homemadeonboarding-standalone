@@ -218,7 +218,8 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
   // Hide progress bar on congrats step
   const showProgressBar = currentStep !== 'congrats';
   // Don't count congrats in progress (it's a celebration, not a step)
-  const actualStepsCount = STEPS.length - 1;
+  const actualStepsCount = STEPS.length - 1; // 4 verification steps
+  // Progress: step 0 = 25%, step 3 = 100%
   const actualProgressPercent = ((currentStepIndex + 1) / actualStepsCount) * 100;
 
   return (
@@ -233,7 +234,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           <div className="mb-8 animate-fade-in">
             <ProgressBar
               progress={Math.min(actualProgressPercent, 100)}
-              currentStep={Math.min(currentStepIndex + 1, actualStepsCount)}
+              currentStep={currentStepIndex}
               totalSteps={actualStepsCount}
             />
           </div>

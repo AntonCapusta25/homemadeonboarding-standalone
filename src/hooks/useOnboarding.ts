@@ -345,9 +345,10 @@ export function useOnboarding() {
   }, []);
 
   const currentStep = STEP_ORDER[currentStepIndex];
-  const totalSteps = STEP_ORDER.length - 1; // Exclude welcome (12 visible steps)
+  const totalSteps = STEP_ORDER.length - 1; // Exclude welcome (12 data steps)
   const displayStepNumber = Math.max(0, currentStepIndex - 1); // 0-indexed after welcome
-  const progress = currentStepIndex > 0 ? Math.min(100, ((currentStepIndex - 1) / (totalSteps - 1)) * 100) : 0;
+  // Progress: 0% at step 1, 100% at final step
+  const progress = currentStepIndex > 0 ? Math.min(100, (currentStepIndex / totalSteps) * 100) : 0;
 
   // Save progress whenever it changes
   useEffect(() => {
