@@ -899,22 +899,46 @@ export default function AdminDashboard() {
                           value={chef.admin_status || 'new'}
                           onValueChange={(value) => handleStatusChange(chef.id, value)}
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-[150px] h-9">
                             <SelectValue>
-                              <Badge
-                                className={
-                                  CRM_STATUS_CONFIG[chef.admin_status || 'new']?.color ||
-                                  'bg-gray-100'
-                                }
-                              >
-                                {CRM_STATUS_CONFIG[chef.admin_status || 'new']?.label || 'New'}
-                              </Badge>
+                              <span className="flex items-center gap-2">
+                                <span className={cn(
+                                  "w-2 h-2 rounded-full shrink-0",
+                                  chef.admin_status === 'new' && "bg-blue-500",
+                                  chef.admin_status === 'called_no_answer' && "bg-yellow-500",
+                                  chef.admin_status === 'interested' && "bg-green-500",
+                                  chef.admin_status === 'meeting_set' && "bg-purple-500",
+                                  chef.admin_status === 'not_interested' && "bg-red-500",
+                                  chef.admin_status === 'not_a_chef' && "bg-rose-500",
+                                  chef.admin_status === 'active' && "bg-emerald-500",
+                                  chef.admin_status === 'inactive' && "bg-gray-500",
+                                  chef.admin_status === 'call_later' && "bg-orange-500",
+                                  !chef.admin_status && "bg-blue-500"
+                                )} />
+                                <span className="text-sm truncate">
+                                  {CRM_STATUS_CONFIG[chef.admin_status || 'new']?.label || 'New'}
+                                </span>
+                              </span>
                             </SelectValue>
                           </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(CRM_STATUS_CONFIG).map(([key, { label, color }]) => (
-                              <SelectItem key={key} value={key}>
-                                <Badge className={color}>{label}</Badge>
+                          <SelectContent className="min-w-[160px]">
+                            {Object.entries(CRM_STATUS_CONFIG).map(([key, { label }]) => (
+                              <SelectItem key={key} value={key} className="cursor-pointer">
+                                <span className="flex items-center gap-2">
+                                  <span className={cn(
+                                    "w-2 h-2 rounded-full shrink-0",
+                                    key === 'new' && "bg-blue-500",
+                                    key === 'called_no_answer' && "bg-yellow-500",
+                                    key === 'interested' && "bg-green-500",
+                                    key === 'meeting_set' && "bg-purple-500",
+                                    key === 'not_interested' && "bg-red-500",
+                                    key === 'not_a_chef' && "bg-rose-500",
+                                    key === 'active' && "bg-emerald-500",
+                                    key === 'inactive' && "bg-gray-500",
+                                    key === 'call_later' && "bg-orange-500"
+                                  )} />
+                                  <span className="text-sm">{label}</span>
+                                </span>
                               </SelectItem>
                             ))}
                           </SelectContent>
