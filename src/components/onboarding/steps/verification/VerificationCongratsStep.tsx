@@ -116,8 +116,8 @@ export function VerificationCongratsStep({ onComplete, onAdjustApplication }: Ve
       {/* Footer text */}
       <p className="text-xs text-muted-foreground">
         Need help? Contact us at{' '}
-        <a href="mailto:support@homemadechefs.com" className="text-primary hover:underline">
-          support@homemadechefs.com
+        <a href="mailto:Chefs@homemademeals.net" className="text-primary hover:underline">
+          Chefs@homemademeals.net
         </a>
       </p>
     </div>
