@@ -204,8 +204,15 @@ export type Database = {
           food_safety_quiz_score: number | null
           food_safety_skipped_at: string | null
           food_safety_viewed: boolean | null
+          fridge_photo_url: string | null
           haccp_document_url: string | null
           id: string
+          kitchen_analysis: Json | null
+          kitchen_photo_1_url: string | null
+          kitchen_photo_2_url: string | null
+          kitchen_score: number | null
+          kitchen_status: string | null
+          kitchen_verified_at: string | null
           kvk_document_url: string | null
           menu_reviewed: boolean | null
           nvwa_document_url: string | null
@@ -223,8 +230,15 @@ export type Database = {
           food_safety_quiz_score?: number | null
           food_safety_skipped_at?: string | null
           food_safety_viewed?: boolean | null
+          fridge_photo_url?: string | null
           haccp_document_url?: string | null
           id?: string
+          kitchen_analysis?: Json | null
+          kitchen_photo_1_url?: string | null
+          kitchen_photo_2_url?: string | null
+          kitchen_score?: number | null
+          kitchen_status?: string | null
+          kitchen_verified_at?: string | null
           kvk_document_url?: string | null
           menu_reviewed?: boolean | null
           nvwa_document_url?: string | null
@@ -242,8 +256,15 @@ export type Database = {
           food_safety_quiz_score?: number | null
           food_safety_skipped_at?: string | null
           food_safety_viewed?: boolean | null
+          fridge_photo_url?: string | null
           haccp_document_url?: string | null
           id?: string
+          kitchen_analysis?: Json | null
+          kitchen_photo_1_url?: string | null
+          kitchen_photo_2_url?: string | null
+          kitchen_score?: number | null
+          kitchen_status?: string | null
+          kitchen_verified_at?: string | null
           kvk_document_url?: string | null
           menu_reviewed?: boolean | null
           nvwa_document_url?: string | null
