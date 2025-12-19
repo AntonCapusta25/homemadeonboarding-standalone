@@ -396,22 +396,21 @@ export function OnboardingWizard() {
         profile={profile}
         onUpdateProfile={updateProfile}
         onComplete={() => {
-          // Fast verification complete - show congrats with verification complete flag
-          setShowFastVerification(false);
+          // Verification flow complete - just mark as done
+          // The VerificationCongratsStep within FastVerificationFlow handles the final screen
           setVerificationComplete(true);
-          setShowCongrats(true);
         }}
       />
     );
   }
 
-  // Show congrats screen
-  if (showCongrats) {
+  // Show congrats screen (only for initial onboarding completion, NOT after verification)
+  if (showCongrats && !verificationComplete) {
     return (
       <CongratsStep
         profile={profile}
         onStartFastVerification={() => setShowFastVerification(true)}
-        verificationComplete={verificationComplete}
+        verificationComplete={false}
       />
     );
   }
