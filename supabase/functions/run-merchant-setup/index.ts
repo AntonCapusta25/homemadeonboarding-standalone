@@ -86,76 +86,84 @@ Deno.serve(async (req) => {
         await updateJob({ current_step: 'creating_merchant' });
         console.log(`[run-merchant-setup] Step 1: Creating merchant...`);
 
-        const TENANT_ID = '67de2dd5d0cf03a9a79b8c72';
-        const BASE_URL = 'https://api.hyperzod.dev';
+        const TENANT_ID = '3331';
+        const BASE_URL = 'https://api.hyperzod.app';
 
-        // Build merchant payload
+        if (!hyperzodApiKey) {
+          throw new Error('Missing HYPERZOD_API_KEY');
+        }
+
+        // Build merchant payload (Hyperzod expects X-TENANT / X-API-KEY auth)
         const extractPostalCode = (address?: string): string => {
-          if (!address) return '0000XX';
-          const match = address.match(/\b(\d{4}\s?[A-Za-z]{2})\b/);
-          return match ? match[1].replace(/\s/g, '').toUpperCase() : '0000XX';
+          if (!address) return '';
+          const match = address.match(/\d{4}\s*[A-Z]{2}/i);
+          return match ? match[0].replace(/\s/g, '').toUpperCase() : '';
         };
 
-        const mapServiceType = (serviceType?: string): string => {
-          switch (serviceType) {
-            case 'delivery': return 'delivery';
-            case 'pickup': return 'pickup';
-            case 'both': return 'delivery_and_pickup';
-            default: return 'delivery_and_pickup';
-          }
+        const mapServiceType = (serviceType?: string): string[] => {
+          if (serviceType === 'delivery') return ['delivery'];
+          if (serviceType === 'pickup') return ['pickup'];
+          return ['delivery', 'pickup'];
         };
+
+        const acceptedOrderTypes = mapServiceType(chef.service_type || 'unsure');
+        const postalCode = extractPostalCode(chef.address);
 
         const merchantPayload = {
-          tenant_id: TENANT_ID,
-          name: chef.business_name || chef.chef_name || 'Unnamed Restaurant',
+          name: chef.business_name || chef.chef_name || 'Unknown Chef',
+          address: chef.address || '',
+          post_code: postalCode,
+          country_code: 'NL',
+          country: 'Netherlands',
+          state: 'Noord-Holland',
+          city: chef.city || '',
+          phone: chef.contact_phone || '+31600000000',
           email: chef.contact_email || `chef-${chef.id.slice(0, 8)}@homemade.nl`,
-          phone_number: chef.contact_phone || '+31600000000',
-          password: `HomeMade${Date.now()}!`,
-          address: {
-            line_1: chef.address || 'Address TBD',
-            line_2: '',
-            city: chef.city || 'Amsterdam',
-            state: 'Noord-Holland',
-            country: 'Netherlands',
-            country_code: 'NL',
-            zip_code: extractPostalCode(chef.address),
-            latitude: 52.3676,
-            longitude: 4.9041,
+          type: 'ecommerce',
+          accepted_order_types: acceptedOrderTypes,
+          status: 1,
+          delivery_by: 'tenant',
+          commission: {
+            delivery: { order_type: 'delivery', type: 'percentage', percent_value: 15, calculate_on_status: 1 },
+            pickup: { order_type: 'pickup', type: 'percentage', percent_value: 15, calculate_on_status: 1 },
+            custom_1: { order_type: 'custom_1', type: 'percentage', percent_value: 15, calculate_on_status: 1 },
           },
-          commission: 15,
-          is_active: true,
-          configuration: {
-            minimum_order_amount: 15,
-            service_type: mapServiceType(chef.service_type),
-            schedule: {
-              monday: { open: '10:00', close: '21:00', is_closed: false },
-              tuesday: { open: '10:00', close: '21:00', is_closed: false },
-              wednesday: { open: '10:00', close: '21:00', is_closed: false },
-              thursday: { open: '10:00', close: '21:00', is_closed: false },
-              friday: { open: '10:00', close: '21:00', is_closed: false },
-              saturday: { open: '11:00', close: '22:00', is_closed: false },
-              sunday: { open: '11:00', close: '20:00', is_closed: false },
-            },
-          },
+          tax_method: 'inclusive',
+          merchant_category_ids: [],
+          language_translation: [
+            { locale: 'en', key: 'name', value: chef.business_name || chef.chef_name || 'Unknown Chef' },
+          ],
         };
 
         const createResponse = await fetch(`${BASE_URL}/admin/v1/merchant/create`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${hyperzodApiKey}`,
+            Accept: 'application/json',
             'Content-Type': 'application/json',
-            'x-tenant': TENANT_ID,
+            'X-TENANT': TENANT_ID,
+            'X-API-KEY': hyperzodApiKey,
           },
           body: JSON.stringify(merchantPayload),
         });
 
-        const createData = await createResponse.json();
+        const createText = await createResponse.text();
 
-        if (!createResponse.ok || !createData?.data?.id) {
-          throw new Error(createData?.message || 'Failed to create merchant in Hyperzod');
+        let createData: any = null;
+        try {
+          createData = JSON.parse(createText);
+        } catch {
+          createData = { raw: createText };
         }
 
-        const merchantId = createData.data.id;
+        if (!createResponse.ok) {
+          throw new Error(createData?.message || `Hyperzod create merchant failed (${createResponse.status})`);
+        }
+
+        const merchantId = createData?.data?.merchant_id || createData?.data?._id || createData?.data?.id || null;
+        if (!merchantId) {
+          throw new Error('Hyperzod create merchant response missing merchant id');
+        }
+
         console.log(`[run-merchant-setup] Merchant created: ${merchantId}`);
 
         // Save merchant ID to chef profile
@@ -279,82 +287,24 @@ Deno.serve(async (req) => {
           .eq('menu_id', menuData.id)
           .order('sort_order', { ascending: true });
 
-        // Get or create categories in Hyperzod
-        const getOrCreateCategory = async (categoryName: string): Promise<string | null> => {
-          try {
-            // Try to find existing category
-            const listRes = await fetch(
-              `${BASE_URL}/admin/v1/product-category/list?merchant_id=${merchantId}&tenant_id=${TENANT_ID}`,
-              { headers: { 'Authorization': `Bearer ${hyperzodApiKey}`, 'x-tenant': TENANT_ID } }
-            );
-            const listData = await listRes.json();
-            const existing = listData?.data?.find((c: any) => 
-              c.name?.toLowerCase() === categoryName.toLowerCase()
-            );
-            if (existing) return existing.id;
-
-            // Create new
-            const createRes = await fetch(`${BASE_URL}/admin/v1/product-category/create`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${hyperzodApiKey}`,
-                'Content-Type': 'application/json',
-                'x-tenant': TENANT_ID,
-              },
-              body: JSON.stringify({
-                tenant_id: TENANT_ID,
-                merchant_id: merchantId,
-                name: categoryName,
-                is_active: true,
-              }),
-            });
-            const createData = await createRes.json();
-            return createData?.data?.id || null;
-          } catch {
-            return null;
-          }
-        };
-
-        const mainCategoryId = await getOrCreateCategory('Main Dishes');
-        const extrasCategoryId = await getOrCreateCategory('Extras');
-
-        let dishesImported = 0;
-        for (const dish of (updatedDishes || [])) {
-          try {
-            const isExtra = dish.is_upsell || ['drinks', 'desserts', 'extras', 'sides'].includes((dish.category || '').toLowerCase());
-            const categoryId = isExtra ? extrasCategoryId : mainCategoryId;
-
-            const productPayload = {
-              tenant_id: TENANT_ID,
+        const { data: importData, error: importError } = await supabase.functions.invoke(
+          'import-menu-to-hyperzod',
+          {
+            body: {
               merchant_id: merchantId,
-              product_category_id: categoryId,
-              name: dish.name.slice(0, 100),
-              description: (dish.description || '').slice(0, 500),
-              price: Math.round((dish.price || 10) * 100),
-              is_active: true,
-              is_featured: false,
-            };
-
-            const res = await fetch(`${BASE_URL}/admin/v1/product/create`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${hyperzodApiKey}`,
-                'Content-Type': 'application/json',
-                'x-tenant': TENANT_ID,
-              },
-              body: JSON.stringify(productPayload),
-            });
-
-            if (res.ok) {
-              dishesImported++;
-              await updateJob({ dishes_imported: dishesImported });
-            }
-          } catch (dishErr) {
-            console.error(`[run-merchant-setup] Error importing ${dish.name}:`, dishErr);
+              dishes: updatedDishes || [],
+            },
           }
+        );
+
+        if (importError) {
+          throw new Error(importError.message || 'Failed to import menu to Hyperzod');
         }
 
-        console.log(`[run-merchant-setup] Imported ${dishesImported} dishes`);
+        const importedCount = Number(importData?.successful_count ?? 0);
+        await updateJob({ dishes_imported: importedCount });
+
+        console.log(`[run-merchant-setup] Imported ${importedCount} dishes`);
 
         // Complete
         await updateJob({
