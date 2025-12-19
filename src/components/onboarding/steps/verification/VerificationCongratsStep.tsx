@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, ExternalLink, PartyPopper, Home } from 'lucide-react';
+import { CheckCircle, ExternalLink, PartyPopper, Home, HelpCircle, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import confetti from 'canvas-confetti';
@@ -7,9 +7,10 @@ import { useEffect } from 'react';
 
 interface VerificationCongratsStepProps {
   onComplete: () => void;
+  onAdjustApplication?: () => void;
 }
 
-export function VerificationCongratsStep({ onComplete }: VerificationCongratsStepProps) {
+export function VerificationCongratsStep({ onComplete, onAdjustApplication }: VerificationCongratsStepProps) {
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -91,9 +92,12 @@ export function VerificationCongratsStep({ onComplete }: VerificationCongratsSte
 
       {/* CTA Buttons */}
       <div className="space-y-3">
-        <Button onClick={onComplete} className="w-full" size="lg">
-          Go to Dashboard
-        </Button>
+        {onAdjustApplication && (
+          <Button onClick={onAdjustApplication} variant="default" className="w-full gap-2" size="lg">
+            <Settings className="w-4 h-4" />
+            <span>Adjust My Application</span>
+          </Button>
+        )}
         
         <a
           href="https://www.homemadechefs.com/"
@@ -102,7 +106,8 @@ export function VerificationCongratsStep({ onComplete }: VerificationCongratsSte
           className="block"
         >
           <Button variant="outline" className="w-full gap-2" size="lg">
-            <span>Have Questions? Visit Our Website</span>
+            <HelpCircle className="w-4 h-4" />
+            <span>Have Questions?</span>
             <ExternalLink className="w-4 h-4" />
           </Button>
         </a>

@@ -11,6 +11,7 @@ import { useVerification } from '@/hooks/useVerification';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { ContactButtons } from '@/components/onboarding/ContactButtons';
+import { ApplicationDashboard } from '@/components/onboarding/ApplicationDashboard';
 
 interface FastVerificationFlowProps {
   profile: ChefProfile;
@@ -27,6 +28,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [chefProfileId, setChefProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showDashboard, setShowDashboard] = useState(false);
   const { getOrCreateProgress, updateProgress, progress } = useVerification();
   
   const currentStep = STEPS[currentStepIndex];
@@ -51,9 +53,10 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           setChefProfileId(chefProfile.id);
           const verificationProgress = await getOrCreateProgress(chefProfile.id);
           
-          // If already completed, call onComplete immediately
+          // If already completed, go directly to congrats
           if (verificationProgress?.verificationCompleted) {
-            onComplete();
+            setCurrentStepIndex(4); // congrats step
+            setLoading(false);
             return;
           }
           
@@ -80,7 +83,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
     };
 
     loadData();
-  }, [getOrCreateProgress, onComplete]);
+  }, [getOrCreateProgress]);
 
   const goToNext = async () => {
     // Save progress for current step
@@ -139,6 +142,15 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
     await updateProgress(chefProfileId, updates);
   };
 
+  // Show application dashboard
+  if (showDashboard) {
+    return (
+      <ApplicationDashboard 
+        onBack={() => setShowDashboard(false)} 
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
@@ -195,6 +207,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
         return (
           <VerificationCongratsStep
             onComplete={handleCongratsComplete}
+            onAdjustApplication={() => setShowDashboard(true)}
           />
         );
       default:
