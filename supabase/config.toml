@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.parse-menu-file]
 verify_jwt = false
+
+[functions.run-merchant-setup]
+verify_jwt = false
