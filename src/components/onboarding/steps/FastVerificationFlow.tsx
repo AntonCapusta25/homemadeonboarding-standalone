@@ -4,6 +4,7 @@ import { MenuReviewStep } from './verification/MenuReviewStep';
 import { DocumentUploadStep } from './verification/DocumentUploadStep';
 import { FoodSafetyInfoStep } from './verification/FoodSafetyInfoStep';
 import { KitchenVerificationStep } from './verification/KitchenVerificationStep';
+import { VerificationCongratsStep } from './verification/VerificationCongratsStep';
 import { ProgressBar } from '../ProgressBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useVerification } from '@/hooks/useVerification';
@@ -17,10 +18,10 @@ interface FastVerificationFlowProps {
   onComplete: () => void;
 }
 
-// Steps: Menu Review -> Food Safety -> Kitchen Check -> Upload ID
-type VerificationStep = 'menu-review' | 'food-safety' | 'kitchen-check' | 'upload-id';
+// Steps: Menu Review -> Food Safety -> Upload ID -> Kitchen Check -> Congrats
+type VerificationStep = 'menu-review' | 'food-safety' | 'upload-id' | 'kitchen-check' | 'congrats';
 
-const STEPS: VerificationStep[] = ['menu-review', 'food-safety', 'kitchen-check', 'upload-id'];
+const STEPS: VerificationStep[] = ['menu-review', 'food-safety', 'upload-id', 'kitchen-check', 'congrats'];
 
 export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: FastVerificationFlowProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -29,7 +30,6 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
   const { getOrCreateProgress, updateProgress, progress } = useVerification();
   
   const currentStep = STEPS[currentStepIndex];
-  const progressPercent = ((currentStepIndex + 1) / STEPS.length) * 100;
 
   // Load chef profile and verification progress
   useEffect(() => {
@@ -59,10 +59,11 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           
           // Resume from last completed step
           if (verificationProgress) {
-            if (verificationProgress.documentsUploaded) {
-              // All done - go to last step to confirm
-              setCurrentStepIndex(3);
-            } else if (verificationProgress.kitchenVerified) {
+            if (verificationProgress.kitchenVerified) {
+              // Kitchen done - go to congrats
+              setCurrentStepIndex(4);
+            } else if (verificationProgress.documentsUploaded) {
+              // Documents done - go to kitchen check
               setCurrentStepIndex(3);
             } else if (verificationProgress.foodSafetyViewed) {
               setCurrentStepIndex(2);
@@ -87,8 +88,9 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
       const updates: Record<string, boolean> = {};
       if (currentStep === 'menu-review') updates.menuReviewed = true;
       if (currentStep === 'food-safety') updates.foodSafetyViewed = true;
-      if (currentStep === 'kitchen-check') updates.kitchenVerified = true;
       if (currentStep === 'upload-id') updates.documentsUploaded = true;
+      if (currentStep === 'kitchen-check') updates.kitchenVerified = true;
+      if (currentStep === 'congrats') updates.verificationCompleted = true;
       
       await updateProgress(chefProfileId, updates);
     }
@@ -105,9 +107,17 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
   };
 
   const handleDocumentStepComplete = async () => {
-    // Save progress for document upload step
+    // Save progress for document upload step and move to kitchen check
     if (chefProfileId) {
-      await updateProgress(chefProfileId, { documentsUploaded: true, verificationCompleted: true });
+      await updateProgress(chefProfileId, { documentsUploaded: true });
+    }
+    goToNext();
+  };
+
+  const handleCongratsComplete = async () => {
+    // Mark verification as fully completed
+    if (chefProfileId) {
+      await updateProgress(chefProfileId, { verificationCompleted: true });
     }
     onComplete();
   };
@@ -160,14 +170,6 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
             chefName={profile.firstName || profile.restaurantName}
           />
         );
-      case 'kitchen-check':
-        return chefProfileId ? (
-          <KitchenVerificationStep
-            chefProfileId={chefProfileId}
-            onComplete={goToNext}
-            onPrevious={goToPrevious}
-          />
-        ) : null;
       case 'upload-id':
         return (
           <DocumentUploadStep
@@ -181,10 +183,30 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
             chefProfileId={chefProfileId}
           />
         );
+      case 'kitchen-check':
+        return chefProfileId ? (
+          <KitchenVerificationStep
+            chefProfileId={chefProfileId}
+            onComplete={goToNext}
+            onPrevious={goToPrevious}
+          />
+        ) : null;
+      case 'congrats':
+        return (
+          <VerificationCongratsStep
+            onComplete={handleCongratsComplete}
+          />
+        );
       default:
         return null;
     }
   };
+
+  // Hide progress bar on congrats step
+  const showProgressBar = currentStep !== 'congrats';
+  // Don't count congrats in progress (it's a celebration, not a step)
+  const actualStepsCount = STEPS.length - 1;
+  const actualProgressPercent = ((currentStepIndex + 1) / actualStepsCount) * 100;
 
   return (
     <div className="min-h-screen bg-gradient-soft">
@@ -194,13 +216,15 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
           <Logo chefLogo={profile.logoUrl} size="sm" />
         </div>
 
-        <div className="mb-8 animate-fade-in">
-          <ProgressBar
-            progress={progressPercent}
-            currentStep={currentStepIndex + 1}
-            totalSteps={STEPS.length}
-          />
-        </div>
+        {showProgressBar && (
+          <div className="mb-8 animate-fade-in">
+            <ProgressBar
+              progress={Math.min(actualProgressPercent, 100)}
+              currentStep={Math.min(currentStepIndex + 1, actualStepsCount)}
+              totalSteps={actualStepsCount}
+            />
+          </div>
+        )}
 
         <div className="min-h-[calc(100vh-16rem)]">
           {renderStep()}
