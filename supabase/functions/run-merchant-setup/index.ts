@@ -144,6 +144,7 @@ Deno.serve(async (req) => {
           headers: {
             'Authorization': `Bearer ${hyperzodApiKey}`,
             'Content-Type': 'application/json',
+            'x-tenant': TENANT_ID,
           },
           body: JSON.stringify(merchantPayload),
         });
@@ -284,7 +285,7 @@ Deno.serve(async (req) => {
             // Try to find existing category
             const listRes = await fetch(
               `${BASE_URL}/admin/v1/product-category/list?merchant_id=${merchantId}&tenant_id=${TENANT_ID}`,
-              { headers: { 'Authorization': `Bearer ${hyperzodApiKey}` } }
+              { headers: { 'Authorization': `Bearer ${hyperzodApiKey}`, 'x-tenant': TENANT_ID } }
             );
             const listData = await listRes.json();
             const existing = listData?.data?.find((c: any) => 
@@ -298,6 +299,7 @@ Deno.serve(async (req) => {
               headers: {
                 'Authorization': `Bearer ${hyperzodApiKey}`,
                 'Content-Type': 'application/json',
+                'x-tenant': TENANT_ID,
               },
               body: JSON.stringify({
                 tenant_id: TENANT_ID,
@@ -338,6 +340,7 @@ Deno.serve(async (req) => {
               headers: {
                 'Authorization': `Bearer ${hyperzodApiKey}`,
                 'Content-Type': 'application/json',
+                'x-tenant': TENANT_ID,
               },
               body: JSON.stringify(productPayload),
             });
