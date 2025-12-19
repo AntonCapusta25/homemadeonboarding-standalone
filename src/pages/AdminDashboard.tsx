@@ -65,6 +65,7 @@ const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   interested: { label: 'Interested', color: 'bg-green-100 text-green-800 border-green-200' },
   meeting_set: { label: 'Meeting Set', color: 'bg-purple-100 text-purple-800 border-purple-200' },
   not_interested: { label: 'Not Interested', color: 'bg-red-100 text-red-800 border-red-200' },
+  not_a_chef: { label: 'Not a Chef', color: 'bg-rose-100 text-rose-800 border-rose-200' },
   active: { label: 'Active Chef', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
   inactive: { label: 'Inactive', color: 'bg-gray-100 text-gray-800 border-gray-200' },
   call_later: { label: 'Call Later', color: 'bg-orange-100 text-orange-800 border-orange-200' },
@@ -88,21 +89,25 @@ export default function AdminDashboard() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchInput);
-      // Don't reset page - we're doing client-side filtering now
+      setPage(1); // Reset to first page when searching
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Memoize the options to prevent unnecessary re-fetches
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, adminFilter]);
+
+  // Memoize the options - fetch ALL data when searching to enable proper global search
   const chefProfilesOptions = useMemo(() => ({
-    page,
-    pageSize: 10,
+    page: searchQuery ? 1 : page,
+    pageSize: searchQuery ? 1000 : 10, // Fetch all when searching
     statusFilter: statusFilter !== 'all' ? statusFilter : undefined,
     adminId: user?.id,
     includePending: true,
-    // Remove searchQuery from here - we'll filter client-side
     sortByAdmin: adminFilter !== 'all' ? adminFilter : undefined,
-  }), [page, statusFilter, user?.id, adminFilter]); // Removed searchQuery from deps
+  }), [page, statusFilter, user?.id, adminFilter, searchQuery]);
 
   const {
     chefs,
@@ -383,14 +388,23 @@ export default function AdminDashboard() {
     }
 
     const query = searchQuery.trim().toLowerCase();
-    return chefs.filter(chef =>
+    const filtered = chefs.filter(chef =>
       chef.business_name?.toLowerCase().includes(query) ||
       chef.chef_name?.toLowerCase().includes(query) ||
       chef.contact_email?.toLowerCase().includes(query) ||
       chef.city?.toLowerCase().includes(query) ||
       chef.contact_phone?.includes(query)
     );
+    
+    // When searching, paginate client-side
+    return filtered;
   }, [chefs, searchQuery]);
+
+  // Calculate effective pagination
+  const effectiveTotalPages = searchQuery ? Math.ceil(filteredChefs.length / 10) : totalPages;
+  const displayedChefs = searchQuery 
+    ? filteredChefs.slice((page - 1) * 10, page * 10)
+    : filteredChefs;
 
   if (authLoading || chefsLoading) {
     return (
@@ -702,14 +716,14 @@ export default function AdminDashboard() {
                       <TableCell><div className="h-4 bg-muted animate-pulse rounded w-1/4" /></TableCell>
                     </TableRow>
                   ))
-                ) : filteredChefs.length === 0 ? (
+                ) : displayedChefs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
-                      No chefs found
+                      {searchQuery ? `No chefs found for "${searchQuery}"` : 'No chefs found'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredChefs.map((chef) => (
+                  displayedChefs.map((chef) => (
                     <TableRow
                       key={chef.id}
                       className={cn(
@@ -1001,10 +1015,13 @@ export default function AdminDashboard() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {effectiveTotalPages > 1 && (
             <div className="flex items-center justify-between mt-6">
               <p className="text-sm text-muted-foreground">
-                Showing {(page - 1) * 10 + 1} - {Math.min(page * 10, totalCount)} of {totalCount}
+                {searchQuery 
+                  ? `Found ${filteredChefs.length} results - showing ${(page - 1) * 10 + 1} - ${Math.min(page * 10, filteredChefs.length)}`
+                  : `Showing ${(page - 1) * 10 + 1} - ${Math.min(page * 10, totalCount)} of ${totalCount}`
+                }
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -1016,13 +1033,13 @@ export default function AdminDashboard() {
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
                 <span className="text-sm">
-                  Page {page} of {totalPages}
+                  Page {page} of {effectiveTotalPages}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(effectiveTotalPages, p + 1))}
+                  disabled={page === effectiveTotalPages}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
