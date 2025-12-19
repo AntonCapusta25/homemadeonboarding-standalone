@@ -82,6 +82,14 @@ interface VerificationData {
   food_safety_quiz_score: number | null;
   food_safety_quiz_passed: boolean;
   food_safety_quiz_completed_at: string | null;
+  // Kitchen safety check fields
+  kitchen_score: number | null;
+  kitchen_status: string | null;
+  kitchen_analysis: any | null;
+  kitchen_verified_at: string | null;
+  kitchen_photo_1_url: string | null;
+  kitchen_photo_2_url: string | null;
+  fridge_photo_url: string | null;
 }
 
 interface MenuData {
@@ -300,6 +308,14 @@ export function ChefDetailsModal({
           food_safety_quiz_score: verificationData.food_safety_quiz_score,
           food_safety_quiz_passed: verificationData.food_safety_quiz_passed || false,
           food_safety_quiz_completed_at: verificationData.food_safety_quiz_completed_at,
+          // Kitchen safety check fields
+          kitchen_score: verificationData.kitchen_score,
+          kitchen_status: verificationData.kitchen_status,
+          kitchen_analysis: verificationData.kitchen_analysis,
+          kitchen_verified_at: verificationData.kitchen_verified_at,
+          kitchen_photo_1_url: verificationData.kitchen_photo_1_url,
+          kitchen_photo_2_url: verificationData.kitchen_photo_2_url,
+          fridge_photo_url: verificationData.fridge_photo_url,
         });
       }
 
@@ -1356,6 +1372,103 @@ export function ChefDetailsModal({
                       )}
                     </div>
                   </div>
+                </Card>
+
+                {/* Kitchen Safety Check Card */}
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <ChefHat className="w-4 h-4" />
+                    Kitchen Safety Check
+                  </h3>
+                  {verification?.kitchen_verified_at ? (
+                    <div className="space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Overall Score</p>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-2xl font-bold ${
+                              (verification.kitchen_score || 0) >= 70 ? 'text-green-600' :
+                              (verification.kitchen_score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {verification.kitchen_score || 0}%
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Status</p>
+                          <Badge className={
+                            verification.kitchen_status === 'pass' ? 'bg-green-100 text-green-800' :
+                            verification.kitchen_status === 'conditional' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }>
+                            {verification.kitchen_status === 'pass' ? 'Passed' :
+                             verification.kitchen_status === 'conditional' ? 'Conditional' : 'Needs Improvement'}
+                          </Badge>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Verified At</p>
+                          <p className="font-medium">
+                            {format(new Date(verification.kitchen_verified_at), 'MMM d, yyyy HH:mm')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Photos</p>
+                          <div className="flex gap-1">
+                            {verification.kitchen_photo_1_url && (
+                              <a href={verification.kitchen_photo_1_url} target="_blank" rel="noopener noreferrer">
+                                <Badge variant="outline" className="cursor-pointer hover:bg-muted">K1</Badge>
+                              </a>
+                            )}
+                            {verification.kitchen_photo_2_url && (
+                              <a href={verification.kitchen_photo_2_url} target="_blank" rel="noopener noreferrer">
+                                <Badge variant="outline" className="cursor-pointer hover:bg-muted">K2</Badge>
+                              </a>
+                            )}
+                            {verification.fridge_photo_url && (
+                              <a href={verification.fridge_photo_url} target="_blank" rel="noopener noreferrer">
+                                <Badge variant="outline" className="cursor-pointer hover:bg-muted">FR</Badge>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* AI Analysis Details */}
+                      {verification.kitchen_analysis && (
+                        <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">AI Analysis</p>
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                            {verification.kitchen_analysis.categories && Object.entries(verification.kitchen_analysis.categories).map(([key, data]: [string, any]) => (
+                              <div key={key} className="flex justify-between items-center">
+                                <span className="capitalize">{key.replace(/_/g, ' ')}</span>
+                                <Badge variant="outline" className={
+                                  data.score >= 80 ? 'bg-green-50 text-green-700' :
+                                  data.score >= 60 ? 'bg-yellow-50 text-yellow-700' :
+                                  'bg-red-50 text-red-700'
+                                }>
+                                  {data.score}%
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                          {verification.kitchen_analysis.issues && verification.kitchen_analysis.issues.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-red-600 mb-1">Issues Found:</p>
+                              <ul className="text-xs text-muted-foreground list-disc list-inside">
+                                {verification.kitchen_analysis.issues.slice(0, 3).map((issue: string, i: number) => (
+                                  <li key={i}>{issue}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <p>Kitchen safety check not completed yet</p>
+                    </div>
+                  )}
                 </Card>
 
                 {/* TOS Acceptance Card */}
