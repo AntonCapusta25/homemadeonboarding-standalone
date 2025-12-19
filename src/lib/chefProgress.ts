@@ -21,11 +21,12 @@ export const getOnboardingTasks = (chef: ChefWithStats): TaskStatus[] => [
   { name: 'Plan', completed: !!chef.plan },
 ];
 
-// Get verification tasks with their status
+// Get verification tasks with their status (4 steps matching FastVerificationFlow)
 export const getVerificationTasks = (chef: ChefWithStats): TaskStatus[] => [
   { name: 'Menu Review', completed: chef.verification_menu_reviewed || false },
   { name: 'Food Safety Training', completed: chef.verification_food_safety_viewed || false },
   { name: 'Documents Upload', completed: chef.verification_documents_uploaded || false },
+  { name: 'Kitchen Verification', completed: chef.verification_kitchen_verified || false },
 ];
 
 // Get incomplete task names
