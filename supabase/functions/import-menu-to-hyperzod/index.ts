@@ -171,20 +171,27 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
     .filter(Boolean);
 }
 
-function buildProductOptions(extras: Dish[], typeValue?: string | number): any[] {
-  const options = buildOptionItemsFromExtras(extras);
-  if (options.length === 0) return [];
+// Build product options - with alternative key names
+function buildProductOptions(extras: Dish[], typeValue?: string | number, useVariationsKey = false): any[] {
+  const optionItems = buildOptionItemsFromExtras(extras);
+  if (optionItems.length === 0) return [];
 
   const group: any = {
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
     selection_type: "multiple",
     enable_range: true,
     min_quantity: 0,
-    max_quantity: options.length,
+    max_quantity: optionItems.length,
     is_required: false,
     view_type: "list",
-    options,
   };
+
+  // Try "variations" key (as shown in UI) or "options" key
+  if (useVariationsKey) {
+    group.variations = optionItems;
+  } else {
+    group.options = optionItems;
+  }
 
   // Add type only if provided (undefined means skip the field entirely)
   if (typeValue !== undefined) {
@@ -264,56 +271,46 @@ serve(async (req) => {
     const discoveredType = hasExtras ? (await fetchExistingOptionGroupType(merchant_id)) : null;
 
     // Priority: user-provided > discovered > hardcoded candidates
-    // Based on Hyperzod docs patterns, try "addon" style naming
+    // Based on Hyperzod UI analysis - they use specific enum values
+    // The UI shows options like "Spice level" with variations "Low", "Medium", etc.
     const stringTypeCandidates = [
       ...(optionGroupTypeRequested ? [optionGroupTypeRequested] : []),
       ...(discoveredType ? [discoveredType] : []),
-      // Common Hyperzod type values (based on typical food ordering patterns)
+      // Exact enum values that Hyperzod likely uses (based on UI checkbox/radio patterns)
+      "nested",        // Most likely for tree-style options
+      "simple",        // Basic option type
+      "standard",      // Standard option type
+      "flat",          // Flat list of options
+      "group",         // Option group
+      "default",       // Default type
+      "product",       // Product-level options
+      "product_option", // Product option type
       "addon",
-      "add_on",
       "add-on",
-      "addons",
-      "add_ons",
-      "upsell",
-      "upsells",
-      "modifier",
-      "modifiers",
       "extra",
-      "extras",
-      "option",
-      "options",
-      "topping",
-      "toppings",
-      "side",
-      "sides",
-      "drink",
-      "drinks",
-      "combo",
-      "size",
+      "modifier",
       "variation",
       "variant",
-      "custom",
-      "customize",
-      "customization",
-      "addition",
-      "supplement",
-      // selection type values
+      "size",
+      "topping",
+      "side",
+      // Selection type patterns
+      "single_select",
+      "multi_select",
       "single",
-      "multi",
       "multiple",
-      "radio",
+      "multi",
       "checkbox",
+      "radio",
       "list",
       "dropdown",
-      "select",
     ].filter((v, i, arr) => arr.indexOf(v) === i);
 
-    // IMPORTANT: Hyperzod requires type field - don't try undefined
-    // But if all string values fail, we'll fallback to creating WITHOUT options
+    // Try string values, then numeric values, then finally without options
     const typeCandidates: (string | number)[] = [
       ...stringTypeCandidates,
-      // numeric fallbacks (some APIs use 0=single, 1=multiple, etc.)
-      0, 1, 2, 3, 4, 5,
+      // Numeric enum values (common pattern: 0=single, 1=multiple, 2=nested, etc.)
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     ];
 
     // STEP: Create main dishes with extras as options
@@ -373,58 +370,68 @@ serve(async (req) => {
         let created = false;
         let lastErrorDetail = "";
 
-        for (const typeValue of typeCandidates) {
-          const payload = {
-            ...basePayload,
-            has_product_options: hasExtras,
-            product_options: hasExtras ? buildProductOptions(extraDishes, typeValue) : [],
-          };
+        // Try with "options" key first (standard), then with "variations" key (as shown in UI)
+        const keyVariants = [false, true]; // false = "options" key, true = "variations" key
 
-          const typeLabel =
-            typeValue === undefined ? "(no type field)" : typeValue === "" ? "(empty string)" : String(typeValue);
+        for (const useVariationsKey of keyVariants) {
+          if (created) break;
 
-          console.log(
-            `Creating main product: ${dishName} (${hasExtras ? `with ${extraDishes.length} extras, type=${typeLabel}` : "no options"})`,
-          );
+          for (const typeValue of typeCandidates) {
+            const payload = {
+              ...basePayload,
+              has_product_options: hasExtras,
+              product_options: hasExtras ? buildProductOptions(extraDishes, typeValue, useVariationsKey) : [],
+            };
 
-          // Log the full payload for debugging
-          console.log(`[DEBUG] Full payload for ${dishName}:`, JSON.stringify(payload, null, 2));
+            const typeLabel =
+              typeValue === undefined ? "(no type field)" : typeValue === "" ? "(empty string)" : String(typeValue);
+            const keyLabel = useVariationsKey ? "variations" : "options";
 
-          const response = await fetch(PRODUCT_CREATE_URL, {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              "X-TENANT": TENANT_ID,
-              "X-API-KEY": HYPERZOD_API_KEY!,
-            },
-            body: JSON.stringify(payload),
-          });
+            console.log(
+              `Creating main product: ${dishName} (${hasExtras ? `with ${extraDishes.length} extras, type=${typeLabel}, key=${keyLabel}` : "no options"})`,
+            );
 
-          const rawText = await response.text();
+            // Log the full payload for debugging (first attempt only to reduce logs)
+            if (typeValue === typeCandidates[0] && !useVariationsKey) {
+              console.log(`[DEBUG] Full payload for ${dishName}:`, JSON.stringify(payload, null, 2));
+            }
 
-          if (response.ok) {
-            const data = safeJsonParse(rawText) as any;
-            results.push({
-              dish_name: dishName,
-              success: true,
-              product_id: data?.data?.product_id || data?.data?._id,
-              used_option_group_type: typeValue === undefined ? undefined : String(typeValue),
+            const response = await fetch(PRODUCT_CREATE_URL, {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                "X-TENANT": TENANT_ID,
+                "X-API-KEY": HYPERZOD_API_KEY!,
+              },
+              body: JSON.stringify(payload),
             });
-            console.log(`✓ Product ${dishName} created successfully with type=${typeLabel}`);
-            created = true;
-            break;
+
+            const rawText = await response.text();
+
+            if (response.ok) {
+              const data = safeJsonParse(rawText) as any;
+              results.push({
+                dish_name: dishName,
+                success: true,
+                product_id: data?.data?.product_id || data?.data?._id,
+                used_option_group_type: `${typeValue === undefined ? undefined : String(typeValue)} (${keyLabel})`,
+              });
+              console.log(`✓ Product ${dishName} created successfully with type=${typeLabel}, key=${keyLabel}`);
+              created = true;
+              break;
+            }
+
+            const parsed = safeJsonParse(rawText);
+            const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+            lastErrorDetail = truncateForLog(errorForLog);
+
+            console.log(
+              `✗ Attempt with type=${typeLabel}, key=${keyLabel} failed: ${response.status} body=${truncateForLog(
+                typeof parsed === "string" ? parsed : JSON.stringify(parsed),
+              )}`,
+            );
           }
-
-          const parsed = safeJsonParse(rawText);
-          const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-          lastErrorDetail = truncateForLog(errorForLog);
-
-          console.log(
-            `✗ Attempt with type=${typeLabel} failed: ${response.status} body=${truncateForLog(
-              typeof parsed === "string" ? parsed : JSON.stringify(parsed),
-            )}`,
-          );
         }
 
         // FALLBACK: If all type values failed BUT we have options, try creating WITHOUT options
