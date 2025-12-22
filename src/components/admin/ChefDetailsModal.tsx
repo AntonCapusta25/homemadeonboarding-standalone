@@ -19,7 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   CheckCircle, XCircle, Loader2, Eye, Phone, Mail, MapPin,
   Calendar, Clock, User, Utensils, ChefHat, FileCheck, Shield,
-  Download, Store, AlertTriangle, Rocket, Upload, Pencil, Trash2, Save, Send, ChevronDown
+  Download, Store, AlertTriangle, Rocket, Upload, Pencil, Trash2, Save, Send, ChevronDown, Home
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -999,6 +999,22 @@ export function ChefDetailsModal({
         nvwa: verification?.nvwa_document_url,
       },
       icon: <FileCheck className="w-4 h-4" />
+    },
+    {
+      id: 'kitchen_verified',
+      name: 'Kitchen Safety Check',
+      completed: !!verification?.kitchen_verified_at,
+      data: {
+        score: verification?.kitchen_score,
+        status: verification?.kitchen_status,
+        analysis: verification?.kitchen_analysis,
+        photos: {
+          kitchen1: verification?.kitchen_photo_1_url,
+          kitchen2: verification?.kitchen_photo_2_url,
+          fridge: verification?.fridge_photo_url,
+        }
+      },
+      icon: <Home className="w-4 h-4" />
     },
   ];
 

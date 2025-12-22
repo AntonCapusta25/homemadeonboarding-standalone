@@ -175,23 +175,15 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
           {/* Show verification steps or completion message */}
           {!verificationComplete ? (
             <>
-              {/* CTA Buttons - Now at the top! */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+              {/* CTA Button */}
+              <div className="flex justify-center mb-8">
                 <Button 
                   size="xl" 
                   onClick={onStartFastVerification}
                   className="shadow-glow hover:shadow-medium"
                 >
-                  {t('congrats.startVerification', 'Complete Profile')}
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-                <Button 
-                  size="xl" 
-                  variant="outline"
-                  onClick={handleBookMeeting}
-                >
-                  <Calendar className="w-5 h-5 mr-2" />
-                  {t('congrats.bookMeeting', 'Book a Meeting')}
+                  <Zap className="w-5 h-5 mr-2" />
+                  {t('congrats.speedUpVerification', 'Speed Up Verification')}
                 </Button>
               </div>
 
