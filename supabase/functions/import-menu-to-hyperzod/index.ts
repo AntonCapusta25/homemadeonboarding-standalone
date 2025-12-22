@@ -298,7 +298,7 @@ serve(async (req) => {
 
     // Build product options from created extras
     const productOptions = buildProductOptions(createdExtras);
-    const hasOptions = productOptions.length > 0 && productOptions[0].option_values.length > 0;
+    const hasOptions = productOptions.length > 0 && productOptions[0].options?.length > 0;
 
     // STEP 2: Create main dishes with extras as options
     for (const dish of mainDishes) {
