@@ -1731,6 +1731,31 @@ export function ChefDetailsModal({
                         <Download className="w-4 h-4" />
                         Download ZIP
                       </Button>
+                      {storedMerchantId && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={async () => {
+                            toast({ title: 'Testing import...', description: `Merchant: ${storedMerchantId}` });
+                            const { data, error } = await supabase.functions.invoke('import-menu-to-hyperzod', {
+                              body: { chef_profile_id: chef.id }
+                            });
+                            console.log('Import result:', data, error);
+                            if (error) {
+                              toast({ title: 'Import failed', description: error.message, variant: 'destructive' });
+                            } else {
+                              toast({ 
+                                title: data?.success ? 'Import succeeded' : 'Import had issues', 
+                                description: data?.message || JSON.stringify(data) 
+                              });
+                            }
+                          }}
+                          className="gap-2"
+                        >
+                          <Upload className="w-4 h-4" />
+                          Test Import
+                        </Button>
+                      )}
                     </div>
                     {menu.summary && (
                       <Card className="p-4">
