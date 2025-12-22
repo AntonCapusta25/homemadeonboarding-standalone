@@ -257,8 +257,10 @@ serve(async (req) => {
 
     const discoveredType = hasExtras ? await fetchExistingOptionGroupType(merchant_id) : null;
 
+    // "custom" is the correct type discovered from Hyperzod admin panel
     const stringTypeCandidates = [
-      ...(discoveredType ? [discoveredType] : []),
+      "custom", // PRIMARY - from Hyperzod admin console logs
+      ...(discoveredType && discoveredType !== "custom" ? [discoveredType] : []),
       "nested",
       "simple",
       "standard",

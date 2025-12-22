@@ -227,8 +227,10 @@ serve(async (req) => {
     // STEP 2: Update with options; must include full payload + product_options.0.type
     const discoveredType = await fetchExistingOptionGroupType(merchant_id);
 
+    // "custom" is the correct type discovered from Hyperzod admin panel
     const stringTypeCandidates = [
-      ...(discoveredType ? [discoveredType] : []),
+      "custom", // PRIMARY - from Hyperzod admin console logs
+      ...(discoveredType && discoveredType !== "custom" ? [discoveredType] : []),
       "nested",
       "simple",
       "standard",
