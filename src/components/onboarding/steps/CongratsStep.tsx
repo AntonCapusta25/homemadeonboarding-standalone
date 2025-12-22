@@ -175,8 +175,17 @@ export function CongratsStep({ profile, onStartFastVerification, verificationCom
           {/* Show verification steps or completion message */}
           {!verificationComplete ? (
             <>
-              {/* CTA Button */}
-              <div className="flex justify-center mb-8">
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
+                <Button 
+                  size="xl" 
+                  variant="outline"
+                  onClick={handleBookMeeting}
+                  className="border-2"
+                >
+                  <Calendar className="w-5 h-5 mr-2" />
+                  {t('congrats.bookMeeting', 'Book a Meeting')}
+                </Button>
                 <Button 
                   size="xl" 
                   onClick={onStartFastVerification}
