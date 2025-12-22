@@ -38,6 +38,9 @@ export interface ChefWithStats extends ChefProfile {
   verification_quiz_completed?: boolean;
   verification_quiz_score?: number | null;
   verification_quiz_passed?: boolean;
+  // Kitchen safety check data
+  verification_kitchen_score?: number | null;
+  verification_kitchen_status?: string | null;
 }
 
 export interface PendingProfile {
@@ -204,7 +207,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
       // Fetch admin data for these profiles
       const profileIds = (profilesData || []).map(p => p.id);
       let adminDataMap: Record<string, ChefAdminData> = {};
-      let verificationDataMap: Record<string, { menu_reviewed: boolean; food_safety_viewed: boolean; documents_uploaded: boolean; kitchen_verified: boolean; quiz_completed: boolean; quiz_score: number | null; quiz_passed: boolean }> = {};
+      let verificationDataMap: Record<string, { menu_reviewed: boolean; food_safety_viewed: boolean; documents_uploaded: boolean; kitchen_verified: boolean; quiz_completed: boolean; quiz_score: number | null; quiz_passed: boolean; kitchen_score: number | null; kitchen_status: string | null }> = {};
 
       if (profileIds.length > 0) {
         // Fetch admin data and verification data in parallel
@@ -215,7 +218,7 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
             .in('chef_profile_id', profileIds),
           supabase
             .from('chef_verification')
-            .select('chef_profile_id, menu_reviewed, food_safety_viewed, documents_uploaded, kitchen_verified_at, food_safety_quiz_completed, food_safety_quiz_score, food_safety_quiz_passed')
+            .select('chef_profile_id, menu_reviewed, food_safety_viewed, documents_uploaded, kitchen_verified_at, food_safety_quiz_completed, food_safety_quiz_score, food_safety_quiz_passed, kitchen_score, kitchen_status')
             .in('chef_profile_id', profileIds)
         ]);
 
@@ -236,9 +239,11 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
               quiz_completed: v.food_safety_quiz_completed || false,
               quiz_score: v.food_safety_quiz_score,
               quiz_passed: v.food_safety_quiz_passed || false,
+              kitchen_score: v.kitchen_score || null,
+              kitchen_status: v.kitchen_status || null,
             };
             return acc;
-          }, {} as Record<string, { menu_reviewed: boolean; food_safety_viewed: boolean; documents_uploaded: boolean; kitchen_verified: boolean; quiz_completed: boolean; quiz_score: number | null; quiz_passed: boolean }>);
+          }, {} as Record<string, { menu_reviewed: boolean; food_safety_viewed: boolean; documents_uploaded: boolean; kitchen_verified: boolean; quiz_completed: boolean; quiz_score: number | null; quiz_passed: boolean; kitchen_score: number | null; kitchen_status: string | null }>);
         }
       }
 
@@ -259,6 +264,8 @@ export function useChefProfiles(options: UseChefProfilesOptions = {}) {
         verification_quiz_completed: verificationDataMap[chef.id]?.quiz_completed || false,
         verification_quiz_score: verificationDataMap[chef.id]?.quiz_score,
         verification_quiz_passed: verificationDataMap[chef.id]?.quiz_passed || false,
+        verification_kitchen_score: verificationDataMap[chef.id]?.kitchen_score,
+        verification_kitchen_status: verificationDataMap[chef.id]?.kitchen_status,
       }));
 
       // Apply status filter after merging (since status is now in admin_data)
