@@ -133,11 +133,10 @@ async function fetchExistingOptionGroupType(merchantId: string): Promise<string 
 // Build product options from extras list (matching Hyperzod API spec)
 function buildProductOptions(extras: CreatedExtra[], optionGroupType: string | null): any[] {
   if (extras.length === 0) return [];
-  if (!optionGroupType) return [];
 
   return [
     {
-      type: optionGroupType,
+      ...(optionGroupType ? { type: optionGroupType } : {}),
       language_translation: [{ key: "option_name", locale: "en", value: "Extras" }],
       selection_type: "multiple",
       enable_range: true,
@@ -334,13 +333,13 @@ serve(async (req) => {
     const optionGroupType = optionGroupTypeRequested || (await fetchExistingOptionGroupType(merchant_id));
     if (!optionGroupType) {
       console.log(
-        "No valid option group type discovered; main products will be created without options (extras still created as standalone products).",
+        "No option group type discovered; sending options without type (Hyperzod may still accept this format).",
       );
     }
 
     // Build product options from created extras
     const productOptions = buildProductOptions(createdExtras, optionGroupType);
-    const hasOptions = Boolean(optionGroupType) && productOptions.length > 0 && productOptions[0].options?.length > 0;
+    const hasOptions = productOptions.length > 0 && productOptions[0].options?.length > 0;
 
     // STEP 2: Create main dishes with extras as options
     for (const dish of mainDishes) {
@@ -414,6 +413,11 @@ serve(async (req) => {
         if (response.ok) {
           console.log(`✓ Product ${dishName} created: ${response.status}`);
           const data = JSON.parse(text);
+          const returnedHasOptions = Boolean(data?.data?.has_product_options);
+          const returnedGroups = Array.isArray(data?.data?.product_options)
+            ? data.data.product_options.length
+            : 0;
+          console.log(`  ↳ has_product_options=${returnedHasOptions}, groups=${returnedGroups}`);
           results.push({
             dish_name: dishName,
             success: true,

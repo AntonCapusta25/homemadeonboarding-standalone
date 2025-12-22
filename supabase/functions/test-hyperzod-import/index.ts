@@ -252,14 +252,16 @@ serve(async (req) => {
       "option",
     ].filter((v, i, arr) => arr.indexOf(v) === i);
 
+    const candidates: Array<string | null> = [null, ...typeCandidates];
+
     const mainAttempts: any[] = [];
     let mainCreated: any = null;
 
     if (baseOptionGroup) {
-      for (const type of typeCandidates) {
+      for (const type of candidates) {
         const mainPayload = {
           merchant_id,
-          sku: `TEST-MAIN-${type}-${Date.now()}`,
+          sku: `TEST-MAIN-${type ?? "no-type"}-${Date.now()}`,
           language_translation: [
             { key: "name", locale: "en", value: "Test Main Dish" },
             { key: "description", locale: "en", value: "A test main dish with extras" },
@@ -275,7 +277,7 @@ serve(async (req) => {
             tax: 0,
           },
           has_product_options: true,
-          product_options: [{ ...baseOptionGroup, type }],
+          product_options: [type ? { ...baseOptionGroup, type } : baseOptionGroup],
           product_category: [mainCategoryId],
           product_tags: ["main", "test"],
           product_labels: [],
@@ -289,7 +291,10 @@ serve(async (req) => {
           product_images: [],
         };
 
-        console.log(`[TEST] Creating main dish with type="${type}" payload:`, JSON.stringify(mainPayload, null, 2));
+        console.log(
+          `[TEST] Creating main dish with ${type ? `type="${type}"` : "no type"} payload:`,
+          JSON.stringify(mainPayload, null, 2),
+        );
 
         const mainResponse = await fetch(PRODUCT_CREATE_URL, {
           method: "POST",
@@ -303,8 +308,10 @@ serve(async (req) => {
         });
 
         const mainText = await mainResponse.text();
-        console.log(`[TEST] Main dish response status (type="${type}"): ${mainResponse.status}`);
-        console.log(`[TEST] Main dish response body (type="${type}"): ${mainText}`);
+        console.log(
+          `[TEST] Main dish response status (${type ? `type="${type}"` : "no type"}): ${mainResponse.status}`,
+        );
+        console.log(`[TEST] Main dish response body (${type ? `type="${type}"` : "no type"}): ${mainText}`);
 
         if (mainResponse.ok) {
           const mainData = JSON.parse(mainText);
