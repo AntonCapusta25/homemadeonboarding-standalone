@@ -306,8 +306,19 @@ Deno.serve(async (req) => {
           throw new Error(importError.message || 'Failed to import menu to Hyperzod');
         }
 
+        console.log('[run-merchant-setup] Import response:', JSON.stringify(importData));
+
         const importedCount = Number(importData?.successful_count ?? 0);
+        const failedCount = Number(importData?.failed_count ?? 0);
+
         await updateJob({ dishes_imported: importedCount });
+
+        if (failedCount > 0 || importData?.success === false) {
+          const firstError = Array.isArray(importData?.results)
+            ? importData.results.find((r: any) => r && r.success === false)?.error
+            : null;
+          throw new Error(firstError || `Menu import failed (${failedCount} failed)`);
+        }
 
         console.log(`[run-merchant-setup] Imported ${importedCount} dishes`);
 
