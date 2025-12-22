@@ -122,10 +122,9 @@ function buildProductOptions(extras: Dish[]): any[] {
   const options = buildOptionItemsFromExtras(extras);
   if (options.length === 0) return [];
 
-  // API requires 'type' field - trying 'variant' based on Hyperzod UI terminology
+  // API documentation example does NOT include 'type' field - omitting it
   const group = {
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
-    type: "variant", // Hyperzod UI calls individual options "variants"
     selection_type: "multiple",
     enable_range: true,
     min_quantity: 1,
@@ -262,7 +261,7 @@ serve(async (req) => {
 
         const attempts: Array<{ tried_type: string; status: number; body: string }> = [];
 
-        // Create product with options (no type field needed)
+        // Create product with extras as options (no type field per API docs)
         const payload = {
           ...basePayload,
           has_product_options: hasExtras,
@@ -270,7 +269,7 @@ serve(async (req) => {
         };
 
         console.log(
-          `Creating main product: ${dishName} (${hasExtras ? `options=${extraDishes.length}` : "no options"})`,
+          `Creating main product: ${dishName} (${hasExtras ? `with ${extraDishes.length} extras as options` : "no options"})`,
         );
 
         // Log the full payload for debugging
