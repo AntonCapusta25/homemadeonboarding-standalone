@@ -147,6 +147,8 @@ Deno.serve(async (req) => {
         });
 
         const createText = await createResponse.text();
+        console.log(`[run-merchant-setup] Hyperzod response status: ${createResponse.status}`);
+        console.log(`[run-merchant-setup] Hyperzod response body: ${createText.substring(0, 500)}`);
 
         let createData: any = null;
         try {
@@ -156,7 +158,10 @@ Deno.serve(async (req) => {
         }
 
         if (!createResponse.ok) {
-          throw new Error(createData?.message || `Hyperzod create merchant failed (${createResponse.status})`);
+          // Log full validation error details
+          console.error(`[run-merchant-setup] Hyperzod validation error:`, JSON.stringify(createData, null, 2));
+          const errorMsg = createData?.message || createData?.error || createData?.errors || `Hyperzod create merchant failed (${createResponse.status})`;
+          throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
         }
 
         const merchantId = createData?.data?.merchant_id || createData?.data?._id || createData?.data?.id || null;
