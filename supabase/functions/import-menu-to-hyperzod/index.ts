@@ -132,38 +132,6 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   return null;
 }
 
-async function fetchExistingOptionGroupType(merchantId: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-TENANT": TENANT_ID,
-        "X-API-KEY": HYPERZOD_API_KEY!,
-      },
-    });
-
-    if (!res.ok) return null;
-
-    const json = await res.json().catch(() => null);
-    const items = (json as any)?.data?.data || (json as any)?.data || [];
-
-    for (const p of items) {
-      const groups = Array.isArray((p as any)?.product_options) ? (p as any).product_options : [];
-      const groupWithType = groups.find((g: any) => (typeof g?.type === "string" && g.type.trim()) || typeof g?.type === "number");
-      if (groupWithType?.type !== undefined && groupWithType?.type !== null) {
-        console.log(`[OptionTypeDiscovery] Found existing type: ${String(groupWithType.type)}`);
-        return String(groupWithType.type);
-      }
-    }
-
-    return null;
-  } catch (e) {
-    console.log("[OptionTypeDiscovery] error:", e);
-    return null;
-  }
-}
-
 function buildOptionItemsFromExtras(extras: Dish[]): any[] {
   return extras
     .map((extra) => {
@@ -188,22 +156,23 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
     .filter(Boolean);
 }
 
-function buildProductOptions(extras: Dish[], typeValue: string | number): any[] {
+function buildProductOptions(extras: Dish[]): any[] {
   const optionItems = buildOptionItemsFromExtras(extras);
   if (optionItems.length === 0) return [];
 
   return [
     {
-      // Some payloads include both. Keeping both improves compatibility.
       option_name: "Extras",
       language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
-      selection_type: "multiple",
-      enable_range: true,
+      selection_type: "single",
+      view_type: "list",
+      type: "custom",
+      enable_range: false,
       min_quantity: 0,
       max_quantity: optionItems.length,
       is_required: false,
-      view_type: "list",
-      type: typeValue,
+      is_global_quantity_enabled: false,
+      max_global_quantity: 0,
       options: optionItems,
     },
   ];
@@ -255,55 +224,11 @@ serve(async (req) => {
     console.log(`Importing ${mainDishes.length} main dishes for merchant ${merchant_id}`);
     console.log(`Extras detected: ${extraDishes.length}`);
 
-    const discoveredType = hasExtras ? await fetchExistingOptionGroupType(merchant_id) : null;
-
-    // "custom" is the correct type discovered from Hyperzod admin panel
-    const stringTypeCandidates = [
-      "custom", // PRIMARY - from Hyperzod admin console logs
-      ...(discoveredType && discoveredType !== "custom" ? [discoveredType] : []),
-      "nested",
-      "simple",
-      "standard",
-      "flat",
-      "group",
-      "default",
-      "addon",
-      "extra",
-      "modifier",
-      "variation",
-      "variant",
-      "single",
-      "multiple",
-      "checkbox",
-      "radio",
-      "list",
-      "dropdown",
-      "single_select",
-      "multi_select",
-    ].filter((v, i, arr) => arr.indexOf(v) === i);
-
-    const typeCandidates: Array<string | number> = [
-      ...stringTypeCandidates,
-      // numeric enums (some Hyperzod installs do this)
-      0,
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8,
-      9,
-      10,
-    ];
-
     type Result = {
       dish_name: string;
       created: boolean;
       product_id?: string;
       options_added?: boolean;
-      used_type?: string;
       error?: string;
       options_error?: string;
     };
@@ -402,67 +327,50 @@ serve(async (req) => {
       console.log(`✓ Created ${dishName} (id=${productId})`);
     }
 
-    // STEP 2: Update products to add options (needs full payload + product_options.0.type)
+    // STEP 2: Update products to add options with type="custom"
     if (hasExtras && created.length > 0) {
-      console.log(`[STEP 2] Attaching options to ${created.length} products...`);
+      console.log(`[STEP 2] Attaching options to ${created.length} products with type="custom"...`);
 
       for (const item of created) {
         const dishName = results[item.idx]?.dish_name || "(unknown)";
-        let attached = false;
-        let lastError = "";
 
-        for (const typeValue of typeCandidates) {
-          const updatePayload = {
-            id: item.productId,
-            ...item.base,
-            has_product_options: true,
-            product_options: buildProductOptions(extraDishes, typeValue),
+        const updatePayload = {
+          id: item.productId,
+          ...item.base,
+          has_product_options: true,
+          product_options: buildProductOptions(extraDishes),
+        };
+
+        console.log(`[STEP 2] Updating ${dishName}`);
+
+        const res = await fetch(PRODUCT_UPDATE_URL, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-TENANT": TENANT_ID,
+            "X-API-KEY": HYPERZOD_API_KEY!,
+          },
+          body: JSON.stringify(updatePayload),
+        });
+
+        const raw = await res.text();
+
+        if (res.ok) {
+          results[item.idx] = {
+            ...results[item.idx],
+            options_added: true,
           };
-
-          const typeLabel = String(typeValue);
-          console.log(`[STEP 2] Updating ${dishName} with type=${typeLabel}`);
-
-          const res = await fetch(PRODUCT_UPDATE_URL, {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              "X-TENANT": TENANT_ID,
-              "X-API-KEY": HYPERZOD_API_KEY!,
-            },
-            body: JSON.stringify(updatePayload),
-          });
-
-          const raw = await res.text();
-
-          if (res.ok) {
-            results[item.idx] = {
-              ...results[item.idx],
-              options_added: true,
-              used_type: typeLabel,
-            };
-            console.log(`✓ Options attached to ${dishName} with type=${typeLabel}`);
-            attached = true;
-            break;
-          }
-
+          console.log(`✓ Options attached to ${dishName}`);
+        } else {
           const parsed = safeJsonParse(raw);
           const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-          lastError = truncateForLog(errorForLog, 700);
-
-          // don't spam all attempts
-          if (typeCandidates.indexOf(typeValue) < 3) {
-            console.log(`✗ Update failed (${res.status}) for ${dishName} type=${typeLabel}`);
-          }
-        }
-
-        if (!attached) {
           results[item.idx] = {
             ...results[item.idx],
             options_added: false,
-            options_error: lastError || "Options update failed (no details)",
+            options_error: truncateForLog(errorForLog, 700),
           };
-          console.warn(`⚠ ${dishName} created, but options update failed (all type candidates).`);
+          console.warn(`⚠ ${dishName} created, but options update failed: ${truncateForLog(errorForLog, 200)}`);
         }
       }
     }
