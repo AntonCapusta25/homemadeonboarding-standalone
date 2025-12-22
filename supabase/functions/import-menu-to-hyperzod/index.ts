@@ -92,30 +92,35 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   return null;
 }
 
-// Build product options from extras list
+// Build product options from extras list (matching Hyperzod API spec)
 function buildProductOptions(extras: CreatedExtra[]): any[] {
   if (extras.length === 0) return [];
 
   // Create a single option group containing all extras
+  // Using exact field names from Hyperzod API docs
   return [
     {
-      name: "Extras",
-      type: "checkbox", // Allow multiple selections
-      is_required: false,
-      min_selection: 0,
-      max_selection: extras.length,
       language_translation: [
-        { key: "name", locale: "en", value: "Extras" }
+        { key: "option_name", locale: "en", value: "Extras" }
       ],
-      option_values: extras.map((extra, index) => ({
-        name: extra.name,
-        price: extra.price,
-        sort_order: index,
-        status: true,
-        is_default: false,
+      selection_type: "multiple", // allows multiple selections
+      enable_range: true,
+      min_quantity: 0,
+      max_quantity: extras.length,
+      is_required: false,
+      view_type: "list",
+      options: extras.map((extra) => ({
         language_translation: [
           { key: "name", locale: "en", value: extra.name }
         ],
+        name: extra.name,
+        price_buy: 0,
+        price_sell: extra.price,
+        image_url: null,
+        is_description_enabled: false,
+        description: "",
+        is_quantity_enabled: false,
+        quantity: 0,
       })),
     },
   ];
