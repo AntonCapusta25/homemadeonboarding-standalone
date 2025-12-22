@@ -8,43 +8,56 @@ const corsHeaders = {
 const HYPERZOD_API_KEY = Deno.env.get("HYPERZOD_API_KEY");
 const TENANT_ID = "3331";
 const BASE_URL = "https://api.hyperzod.app";
+const PRODUCT_CREATE_URL = `${BASE_URL}/merchant/v1/catalog/product/create`;
+const PRODUCT_UPDATE_URL = `${BASE_URL}/merchant/v1/catalog/product/update`;
 
-interface DishInput {
-  name: string;
-  description?: string | null;
-  price: number;
-  image_url?: string | null;
-  is_upsell?: boolean;
-}
+type ProductPricing = {
+  type: "flat";
+  price_buy: number;
+  price_sell: number;
+  price_sell_compare: null;
+  profit: number;
+  margin: number;
+  is_tax_chargaeble: false;
+  tax: number;
+};
 
-function safeString(input: unknown, maxLen: number) {
-  if (typeof input !== "string") return "";
-  return input.trim().slice(0, maxLen);
-}
+type BaseProductPayload = {
+  merchant_id: string;
+  sku: string;
+  description: string;
+  language_translation: Array<{ key: "name" | "description"; value: string; locale: "en" }>;
+  product_pricing: ProductPricing;
+  product_category: string[];
+  product_tags: string[];
+  product_labels: string[];
+  status: boolean;
+  is_quantity_enabled: boolean;
+  is_inventory_enabled: boolean;
+  product_inventory: number;
+  is_featured: boolean;
+  sort_order: number;
+  product_quantity: { min_quantity: number; max_quantity: number };
+  product_images: Array<{ file_url: string; is_cover: boolean }>;
+};
 
 async function getOrCreateCategory(merchantId: string, categoryName: string): Promise<string | null> {
-  const listResponse = await fetch(
-    `${BASE_URL}/merchant/v1/catalog/product-category/list?merchant_id=${encodeURIComponent(merchantId)}`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-TENANT": TENANT_ID,
-        "X-API-KEY": HYPERZOD_API_KEY!,
-      },
+  const listResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/list?merchant_id=${merchantId}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "X-TENANT": TENANT_ID,
+      "X-API-KEY": HYPERZOD_API_KEY!,
     },
-  );
+  });
 
   if (listResponse.ok) {
     const listData = await listResponse.json().catch(() => null);
-    const categories = listData?.data?.data || listData?.data || [];
+    const categories = (listData as any)?.data?.data || (listData as any)?.data || [];
     const existing = categories.find(
       (c: any) => c.name === categoryName || c.language_translation?.some((t: any) => t.value === categoryName),
     );
-    if (existing) {
-      console.log(`Found existing category: ${existing._id || existing.category_id}`);
-      return existing._id || existing.category_id;
-    }
+    if (existing) return existing._id || existing.category_id;
   }
 
   const createResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/create`, {
@@ -67,13 +80,41 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   });
 
   const createData = await createResponse.json().catch(() => null);
-  console.log(`Create category response:`, JSON.stringify(createData));
-
-  if (createResponse.ok && createData?.data) {
-    return createData.data._id || createData.data.category_id;
+  if (createResponse.ok && (createData as any)?.data) {
+    return (createData as any).data._id || (createData as any).data.category_id;
   }
-
   return null;
+}
+
+async function fetchExistingOptionGroupType(merchantId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY!,
+      },
+    });
+
+    if (!res.ok) return null;
+
+    const json = await res.json().catch(() => null);
+    const items = (json as any)?.data?.data || (json as any)?.data || [];
+
+    for (const p of items) {
+      const groups = Array.isArray((p as any)?.product_options) ? (p as any).product_options : [];
+      const groupWithType = groups.find((g: any) => (typeof g?.type === "string" && g.type.trim()) || typeof g?.type === "number");
+      if (groupWithType?.type !== undefined && groupWithType?.type !== null) {
+        console.log(`[TEST] Discovered option group type: ${String(groupWithType.type)}`);
+        return String(groupWithType.type);
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -90,71 +131,50 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const merchant_id = safeString(body?.merchant_id, 128);
-    const dish = body?.dish as DishInput | undefined;
+    const merchant_id = body?.merchant_id;
 
-    if (!merchant_id || !dish) {
-      return new Response(JSON.stringify({ success: false, error: "merchant_id and dish are required" }), {
+    if (!merchant_id) {
+      return new Response(JSON.stringify({ success: false, error: "merchant_id is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const dishName = safeString(dish?.name, 120);
-    const description = safeString(dish?.description ?? "", 2000);
-    const isUpsell = !!dish?.is_upsell;
+    console.log(`[TEST] Starting create-then-update test for merchant ${merchant_id}`);
 
-    if (!dishName) {
-      return new Response(JSON.stringify({ success: false, error: "dish.name is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Required by Hyperzod
-    const categoryName = isUpsell ? "Extras" : "Main Dishes";
-    const categoryId = await getOrCreateCategory(merchant_id, categoryName);
-
-    if (!categoryId) {
-      return new Response(JSON.stringify({ success: false, error: `Failed to get/create category: ${categoryName}` }), {
+    const mainCategoryId = await getOrCreateCategory(merchant_id, "Main Dishes");
+    if (!mainCategoryId) {
+      return new Response(JSON.stringify({ success: false, error: "Failed to create/find category" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log(`Testing single product import for: ${dishName} (category: ${categoryName})`);
+    const timestamp = Date.now();
+    const dishName = `TEST Main ${timestamp}`;
+    const sku = `TEST-MAIN-${timestamp}`;
+    const description = "Test product - will attach options via update";
 
-    // Hyperzod expects array of objects with file_url and is_cover fields
-    const productImages: { file_url: string; is_cover: boolean }[] = [];
-    if (dish.image_url) {
-      const imageUrl = safeString(dish.image_url, 2048);
-      if (imageUrl) productImages.push({ file_url: imageUrl, is_cover: true });
-    }
-
-    // Add timestamp to SKU to make it unique for each test run
-    const uniqueSku = `${dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 40)}-${Date.now()}`;
-    
-    const productPayload = {
+    const base: BaseProductPayload = {
       merchant_id,
-      sku: uniqueSku,
+      sku,
+      description,
       language_translation: [
-        { key: "name", locale: "en", value: dishName },
-        { key: "description", locale: "en", value: description },
+        { key: "name", value: dishName, locale: "en" },
+        { key: "description", value: description, locale: "en" },
       ],
       product_pricing: {
         type: "flat",
         price_buy: 0,
-        price_sell: Math.round((Number(dish?.price) || 0) * 100),
+        price_sell: 12.99,
         price_sell_compare: null,
-        profit: 0,
-        margin: 0,
+        profit: 12.99,
+        margin: 100,
         is_tax_chargaeble: false,
         tax: 0,
       },
-      has_product_options: false,
-      product_options: [],
-      product_category: [categoryId],
-      product_tags: isUpsell ? ["upsell", "extra", "test"] : ["main", "test"],
+      product_category: [mainCategoryId],
+      product_tags: ["main", "test"],
       product_labels: [],
       status: true,
       is_quantity_enabled: false,
@@ -163,47 +183,182 @@ serve(async (req) => {
       is_featured: false,
       sort_order: 0,
       product_quantity: { min_quantity: 0, max_quantity: 0 },
-      product_images: productImages,
+      product_images: [],
     };
 
-    console.log("Payload:", JSON.stringify(productPayload, null, 2));
+    // STEP 1: Create without options
+    const createPayload = {
+      ...base,
+      has_product_options: false,
+      product_options: [],
+    };
 
-    const response = await fetch(`${BASE_URL}/merchant/v1/catalog/product/create`, {
+    const createRes = await fetch(PRODUCT_CREATE_URL, {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
         "X-TENANT": TENANT_ID,
-        "X-API-KEY": HYPERZOD_API_KEY,
+        "X-API-KEY": HYPERZOD_API_KEY!,
       },
-      body: JSON.stringify(productPayload),
+      body: JSON.stringify(createPayload),
     });
 
-    const responseText = await response.text();
-    let responseJson: unknown = responseText;
-    try {
-      responseJson = JSON.parse(responseText);
-    } catch {
-      // keep text
+    const createText = await createRes.text();
+    console.log(`[TEST] Create status: ${createRes.status}`);
+    console.log(`[TEST] Create body: ${createText}`);
+
+    if (!createRes.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          step: "create",
+          status: createRes.status,
+          body: createText,
+          payload_sent: createPayload,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    console.log(`Response status: ${response.status}`);
-    console.log(`Response body: ${responseText}`);
+    const createJson = JSON.parse(createText);
+    const productId = createJson?.data?.product_id || createJson?.data?._id;
+
+    // STEP 2: Update with options; must include full payload + product_options.0.type
+    const discoveredType = await fetchExistingOptionGroupType(merchant_id);
+
+    const stringTypeCandidates = [
+      ...(discoveredType ? [discoveredType] : []),
+      "nested",
+      "simple",
+      "standard",
+      "flat",
+      "group",
+      "default",
+      "addon",
+      "extra",
+      "modifier",
+      "variation",
+      "variant",
+      "single",
+      "multiple",
+      "checkbox",
+      "radio",
+      "list",
+      "dropdown",
+      "single_select",
+      "multi_select",
+    ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+    const typeCandidates: Array<string | number> = [
+      ...stringTypeCandidates,
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+    ];
+
+    const productOptionsBase = {
+      option_name: "Extras",
+      language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
+      selection_type: "multiple",
+      enable_range: true,
+      min_quantity: 0,
+      max_quantity: 2,
+      is_required: false,
+      view_type: "list",
+      options: [
+        {
+          language_translation: [{ key: "name", value: "Extra Cheese", locale: "en" }],
+          name: "Extra Cheese",
+          price_buy: 0,
+          price_sell: 1.5,
+          image_url: null,
+          is_description_enabled: false,
+          description: "",
+          is_quantity_enabled: false,
+          quantity: 0,
+        },
+        {
+          language_translation: [{ key: "name", value: "Extra Sauce", locale: "en" }],
+          name: "Extra Sauce",
+          price_buy: 0,
+          price_sell: 0.75,
+          image_url: null,
+          is_description_enabled: false,
+          description: "",
+          is_quantity_enabled: false,
+          quantity: 0,
+        },
+      ],
+    };
+
+    const attempts: any[] = [];
+
+    for (const typeValue of typeCandidates) {
+      const updatePayload = {
+        id: productId,
+        ...base,
+        has_product_options: true,
+        product_options: [{ ...productOptionsBase, type: typeValue }],
+      };
+
+      console.log(`[TEST] Updating with type=${String(typeValue)}`);
+
+      const updateRes = await fetch(PRODUCT_UPDATE_URL, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-TENANT": TENANT_ID,
+          "X-API-KEY": HYPERZOD_API_KEY!,
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      const updateText = await updateRes.text();
+      console.log(`[TEST] Update status (type=${String(typeValue)}): ${updateRes.status}`);
+      console.log(`[TEST] Update body (type=${String(typeValue)}): ${updateText}`);
+
+      if (updateRes.ok) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Create + update with options succeeded",
+            product_id: productId,
+            used_type: String(typeValue),
+            create_response: createJson,
+            update_response: JSON.parse(updateText),
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      attempts.push({ type: typeValue, status: updateRes.status, body: updateText });
+
+      // keep logs manageable
+      if (attempts.length >= 12) break;
+    }
 
     return new Response(
       JSON.stringify({
-        success: response.ok,
-        status: response.status,
-        payload_sent: productPayload,
-        response: responseJson,
+        success: false,
+        message: "Create succeeded, but update with options failed for tried type candidates",
+        product_id: productId,
+        discovered_type: discoveredType,
+        attempts,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: any) {
-    console.error("Error:", error);
+    console.error("[TEST] Fatal error:", error);
     return new Response(JSON.stringify({ success: false, error: error?.message || String(error) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
