@@ -71,12 +71,26 @@ export function useAdminStatistics() {
         dish_types: string[] | null;
         service_type: string | null;
         availability: string[] | null;
+        logo_url: string | null;
+        food_safety_status: string | null;
+        kvk_status: string | null;
+        plan: string | null;
+        onboarding_completed: boolean | null;
+      }> = {};
+
+      // Also get verification data for success calculation
+      let verificationMap: Record<string, {
+        menu_reviewed: boolean | null;
+        food_safety_viewed: boolean | null;
+        documents_uploaded: boolean | null;
+        kitchen_verified_at: string | null;
+        verification_completed: boolean | null;
       }> = {};
 
       if (profileIds.length > 0) {
         const { data: profiles } = await supabase
           .from('chef_profiles')
-          .select('id, business_name, chef_name, city, address, contact_email, contact_phone, cuisines, dish_types, service_type, availability')
+          .select('id, business_name, chef_name, city, address, contact_email, contact_phone, cuisines, dish_types, service_type, availability, logo_url, food_safety_status, kvk_status, plan, onboarding_completed')
           .in('id', profileIds);
 
         if (profiles) {
@@ -84,6 +98,19 @@ export function useAdminStatistics() {
             acc[p.id] = p;
             return acc;
           }, {} as typeof profilesMap);
+        }
+
+        // Fetch verification data
+        const { data: verifications } = await supabase
+          .from('chef_verification')
+          .select('chef_profile_id, menu_reviewed, food_safety_viewed, documents_uploaded, kitchen_verified_at, verification_completed')
+          .in('chef_profile_id', profileIds);
+
+        if (verifications) {
+          verificationMap = verifications.reduce((acc, v) => {
+            acc[v.chef_profile_id] = v;
+            return acc;
+          }, {} as typeof verificationMap);
         }
       }
 
@@ -119,9 +146,7 @@ export function useAdminStatistics() {
         };
       }
 
-      // Process admin data
-      const successStatuses = ['interested', 'meeting_set', 'active'];
-      
+      // Process admin data - success = all steps completed (onboarding + verification)
       for (const adminData of adminDataRows || []) {
         const adminId = adminData.assigned_admin_id;
         if (!adminId || !adminStatsMap[adminId]) continue;
@@ -133,11 +158,6 @@ export function useAdminStatistics() {
         const status = adminData.admin_status || 'new';
         stat.statusBreakdown[status] = (stat.statusBreakdown[status] || 0) + 1;
 
-        // Success tracking
-        if (successStatuses.includes(status)) {
-          stat.successfulConversions++;
-        }
-
         // Call attempts
         stat.totalCalls += adminData.call_attempts || 0;
 
@@ -148,24 +168,46 @@ export function useAdminStatistics() {
 
         // Calculate completion based on profile fields
         const profile = profilesMap[adminData.chef_profile_id];
+        const verification = verificationMap[adminData.chef_profile_id];
+        
         if (profile) {
-          const completionFields = [
-            profile.business_name,
-            profile.chef_name,
+          // Onboarding fields (12 steps)
+          const onboardingFields = [
             profile.city,
-            profile.address,
-            profile.contact_email,
-            profile.contact_phone,
             profile.cuisines && profile.cuisines.length > 0,
-            profile.dish_types && profile.dish_types.length > 0,
-            profile.service_type,
+            profile.contact_email && profile.contact_phone,
+            profile.address,
+            profile.business_name,
+            profile.logo_url,
+            profile.service_type && profile.service_type !== 'unsure',
             profile.availability && profile.availability.length > 0,
+            profile.dish_types && profile.dish_types.length > 0,
+            profile.food_safety_status,
+            profile.kvk_status,
+            profile.plan,
           ];
-          const filledFields = completionFields.filter(Boolean).length;
-          const completion = Math.round((filledFields / completionFields.length) * 100);
+          
+          // Verification fields (4 steps)
+          const verificationFields = [
+            verification?.menu_reviewed,
+            verification?.food_safety_viewed,
+            verification?.documents_uploaded,
+            !!verification?.kitchen_verified_at,
+          ];
+          
+          const allFields = [...onboardingFields, ...verificationFields];
+          const filledFields = allFields.filter(Boolean).length;
+          const totalFields = allFields.length;
+          const completion = Math.round((filledFields / totalFields) * 100);
+          
           stat.averageCompletion = stat.assignedChefs === 1 
             ? completion 
             : Math.round((stat.averageCompletion * (stat.assignedChefs - 1) + completion) / stat.assignedChefs);
+
+          // Success = ALL steps completed (100% completion)
+          if (filledFields === totalFields) {
+            stat.successfulConversions++;
+          }
         }
       }
 

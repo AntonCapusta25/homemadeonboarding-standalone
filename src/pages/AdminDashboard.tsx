@@ -78,6 +78,7 @@ export default function AdminDashboard() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [adminFilter, setAdminFilter] = useState<string>('all');
+  const [stepFilter, setStepFilter] = useState<string>('all');
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
@@ -97,7 +98,7 @@ export default function AdminDashboard() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, adminFilter]);
+  }, [statusFilter, adminFilter, stepFilter]);
 
   // Memoize the options - fetch ALL data when searching to enable proper global search
   const chefProfilesOptions = useMemo(() => ({
@@ -381,28 +382,52 @@ export default function AdminDashboard() {
     }
   };
 
-  // Client-side search filtering for instant results
+  // Client-side search and step filtering for instant results
   const filteredChefs = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return chefs;
-    }
-
-    const query = searchQuery.trim().toLowerCase();
-    const filtered = chefs.filter(chef =>
-      chef.business_name?.toLowerCase().includes(query) ||
-      chef.chef_name?.toLowerCase().includes(query) ||
-      chef.contact_email?.toLowerCase().includes(query) ||
-      chef.city?.toLowerCase().includes(query) ||
-      chef.contact_phone?.includes(query)
-    );
+    let result = chefs;
     
-    // When searching, paginate client-side
-    return filtered;
-  }, [chefs, searchQuery]);
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      result = result.filter(chef =>
+        chef.business_name?.toLowerCase().includes(query) ||
+        chef.chef_name?.toLowerCase().includes(query) ||
+        chef.contact_email?.toLowerCase().includes(query) ||
+        chef.city?.toLowerCase().includes(query) ||
+        chef.contact_phone?.includes(query)
+      );
+    }
+    
+    // Apply step filter
+    if (stepFilter !== 'all') {
+      result = result.filter(chef => {
+        const onboardingTasks = getOnboardingTasks(chef);
+        const verificationTasks = getVerificationTasks(chef);
+        const allTasks = [...onboardingTasks, ...verificationTasks];
+        const incompleteTaskNames = getIncompleteTasks(allTasks);
+        
+        if (stepFilter === 'complete') {
+          return incompleteTaskNames.length === 0;
+        }
+        
+        // Check if the specific step is incomplete
+        return incompleteTaskNames.includes(stepFilter);
+      });
+    }
+    
+    return result;
+  }, [chefs, searchQuery, stepFilter]);
+
+  // All possible step names for filter
+  const stepFilterOptions = useMemo(() => {
+    const onboardingSteps = ['City', 'Cuisines', 'Contact Info', 'Address', 'Business Name', 'Logo', 'Service Type', 'Availability', 'Dish Types', 'Food Safety', 'KVK Status', 'Plan'];
+    const verificationSteps = ['Menu Review', 'Food Safety Training', 'Documents Upload', 'Kitchen Verification'];
+    return [...onboardingSteps, ...verificationSteps];
+  }, []);
 
   // Calculate effective pagination
-  const effectiveTotalPages = searchQuery ? Math.ceil(filteredChefs.length / 10) : totalPages;
-  const displayedChefs = searchQuery 
+  const effectiveTotalPages = (searchQuery || stepFilter !== 'all') ? Math.ceil(filteredChefs.length / 10) : totalPages;
+  const displayedChefs = (searchQuery || stepFilter !== 'all')
     ? filteredChefs.slice((page - 1) * 10, page * 10)
     : filteredChefs;
 
@@ -660,6 +685,21 @@ export default function AdminDashboard() {
                   {admins.map((admin) => (
                     <SelectItem key={admin.id} value={admin.id}>
                       {admin.name || admin.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={stepFilter} onValueChange={setStepFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Filter by step" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Steps</SelectItem>
+                  <SelectItem value="complete">Fully Complete</SelectItem>
+                  {stepFilterOptions.map((step) => (
+                    <SelectItem key={step} value={step}>
+                      Missing: {step}
                     </SelectItem>
                   ))}
                 </SelectContent>
