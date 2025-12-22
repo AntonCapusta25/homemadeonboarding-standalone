@@ -118,7 +118,7 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
     .filter(Boolean);
 }
 
-function buildProductOptions(extras: Dish[], typeValue?: string): any[] {
+function buildProductOptions(extras: Dish[], typeValue?: string | number): any[] {
   const options = buildOptionItemsFromExtras(extras);
   if (options.length === 0) return [];
 
@@ -133,7 +133,7 @@ function buildProductOptions(extras: Dish[], typeValue?: string): any[] {
     options,
   };
 
-  // Add type if provided
+  // Add type only if provided (undefined means skip the field entirely)
   if (typeValue !== undefined) {
     group.type = typeValue;
   }
@@ -263,17 +263,18 @@ serve(async (req) => {
           product_images: productImages,
         };
 
-        // Try different type values - API requires it but rejects most values
-        const typeCandidates = [
-          "list", // Try matching view_type value first
-          "", // Empty string
-          "addon",
-          "customization",
-          "topping",
-          "extra",
-          "side",
-          "supplement",
-          "addition",
+        // Try different type values - including NO type field, and numeric values
+        const typeCandidates: (string | number | undefined)[] = [
+          undefined, // No type field at all
+          0, // Numeric 0
+          1, // Numeric 1
+          2, // Numeric 2
+          "single", // Match selection_type
+          "multiple",
+          "checkbox",
+          "radio",
+          "modifier",
+          "variant",
         ];
 
         let created = false;
@@ -285,7 +286,7 @@ serve(async (req) => {
             product_options: hasExtras ? buildProductOptions(extraDishes, typeValue) : [],
           };
 
-          const typeLabel = typeValue === "" ? "(empty string)" : typeValue;
+          const typeLabel = typeValue === undefined ? "(no type field)" : typeValue === "" ? "(empty string)" : String(typeValue);
           console.log(
             `Creating main product: ${dishName} (${hasExtras ? `with ${extraDishes.length} extras, type=${typeLabel}` : "no options"})`,
           );
