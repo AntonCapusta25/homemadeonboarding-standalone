@@ -52,7 +52,6 @@ import {
   Download,
   RefreshCw,
   Award,
-  Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -688,7 +687,6 @@ export default function AdminDashboard() {
                   <TableHead className="min-w-[100px]">City</TableHead>
                   <TableHead className="min-w-[120px]">Progress</TableHead>
                   <TableHead className="min-w-[80px]">Quiz</TableHead>
-                  <TableHead className="min-w-[80px]">Kitchen</TableHead>
                   <TableHead className="min-w-[140px]">Assigned To</TableHead>
                   <TableHead className="min-w-[150px]">Status</TableHead>
                   <TableHead className="min-w-[180px]">Notes</TableHead>
@@ -863,26 +861,6 @@ export default function AdminDashboard() {
                               chef.verification_quiz_passed ? "text-green-600" : "text-orange-500"
                             )}>
                               {chef.verification_quiz_score}%
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {chef.verification_kitchen_verified ? (
-                          <div className="flex items-center gap-1">
-                            <Home className={cn(
-                              "w-4 h-4",
-                              chef.verification_kitchen_status === 'pass' ? "text-green-600" : 
-                              chef.verification_kitchen_status === 'conditional' ? "text-orange-500" : "text-red-500"
-                            )} />
-                            <span className={cn(
-                              "text-sm font-medium",
-                              chef.verification_kitchen_status === 'pass' ? "text-green-600" : 
-                              chef.verification_kitchen_status === 'conditional' ? "text-orange-500" : "text-red-500"
-                            )}>
-                              {chef.verification_kitchen_score || '—'}
                             </span>
                           </div>
                         ) : (
