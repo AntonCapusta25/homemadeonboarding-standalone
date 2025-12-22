@@ -169,103 +169,132 @@ serve(async (req) => {
     }
 
     // STEP 2: Create one test main dish WITH the extra as an option
-    const productOptions = extraProductId ? [
-      {
-        language_translation: [
-          { key: "option_name", locale: "en", value: "Extras" },
-        ],
-        type: "multiple",
-        selection_type: "multiple",
-        enable_range: true,
-        min_quantity: 0,
-        max_quantity: 1,
-        is_required: false,
-        view_type: "list",
-        options: [
-          {
-            language_translation: [
-              { key: "name", locale: "en", value: "Test Extra Item" },
-            ],
-            name: "Test Extra Item",
+    const baseOptionGroup = extraProductId
+      ? {
+          language_translation: [
+            { key: "option_name", locale: "en", value: "Extras" },
+          ],
+          selection_type: "multiple",
+          enable_range: true,
+          min_quantity: 0,
+          max_quantity: 1,
+          is_required: false,
+          view_type: "list",
+          options: [
+            {
+              language_translation: [
+                { key: "name", locale: "en", value: "Test Extra Item" },
+              ],
+              name: "Test Extra Item",
+              price_buy: 0,
+              price_sell: 2.5,
+              image_url: null,
+              is_description_enabled: false,
+              description: "",
+              is_quantity_enabled: false,
+              quantity: 0,
+            },
+          ],
+        }
+      : null;
+
+    const typeCandidates = [
+      "multi",
+      "multiple",
+      "multi_select",
+      "multiselect",
+      "checkbox",
+      "radio",
+      "list",
+    ];
+
+    const mainAttempts: any[] = [];
+    let mainCreated: any = null;
+
+    if (baseOptionGroup) {
+      for (const type of typeCandidates) {
+        const mainPayload = {
+          merchant_id,
+          sku: `TEST-MAIN-${type}-${Date.now()}`,
+          language_translation: [
+            { key: "name", locale: "en", value: "Test Main Dish" },
+            { key: "description", locale: "en", value: "A test main dish with extras" },
+          ],
+          product_pricing: {
+            type: "flat",
             price_buy: 0,
-            price_sell: 2.50,
-            image_url: null,
-            is_description_enabled: false,
-            description: "",
-            is_quantity_enabled: false,
-            quantity: 0,
+            price_sell: 12.99,
+            price_sell_compare: null,
+            profit: 0,
+            margin: 0,
+            is_tax_chargaeble: false,
+            tax: 0,
           },
-        ],
-      },
-    ] : [];
+          has_product_options: true,
+          product_options: [{ ...baseOptionGroup, type }],
+          product_category: [mainCategoryId],
+          product_tags: ["main", "test"],
+          product_labels: [],
+          status: true,
+          is_quantity_enabled: false,
+          is_inventory_enabled: false,
+          product_inventory: 0,
+          is_featured: false,
+          sort_order: 0,
+          product_quantity: { min_quantity: 0, max_quantity: 0 },
+          product_images: [],
+        };
 
-    const mainPayload = {
-      merchant_id,
-      sku: `TEST-MAIN-${Date.now()}`,
-      language_translation: [
-        { key: "name", locale: "en", value: "Test Main Dish" },
-        { key: "description", locale: "en", value: "A test main dish with extras" },
-      ],
-      product_pricing: {
-        type: "flat",
-        price_buy: 0,
-        price_sell: 12.99,
-        price_sell_compare: null,
-        profit: 0,
-        margin: 0,
-        is_tax_chargaeble: false,
-        tax: 0,
-      },
-      has_product_options: productOptions.length > 0,
-      product_options: productOptions,
-      product_category: [mainCategoryId],
-      product_tags: ["main", "test"],
-      product_labels: [],
-      status: true,
-      is_quantity_enabled: false,
-      is_inventory_enabled: false,
-      product_inventory: 0,
-      is_featured: false,
-      sort_order: 0,
-      product_quantity: { min_quantity: 0, max_quantity: 0 },
-      product_images: [],
-    };
+        console.log(`[TEST] Creating main dish with type="${type}" payload:`, JSON.stringify(mainPayload, null, 2));
 
-    console.log(`[TEST] Creating main dish with payload:`, JSON.stringify(mainPayload, null, 2));
+        const mainResponse = await fetch(PRODUCT_CREATE_URL, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-TENANT": TENANT_ID,
+            "X-API-KEY": HYPERZOD_API_KEY!,
+          },
+          body: JSON.stringify(mainPayload),
+        });
 
-    const mainResponse = await fetch(PRODUCT_CREATE_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-TENANT": TENANT_ID,
-        "X-API-KEY": HYPERZOD_API_KEY!,
-      },
-      body: JSON.stringify(mainPayload),
-    });
+        const mainText = await mainResponse.text();
+        console.log(`[TEST] Main dish response status (type="${type}"): ${mainResponse.status}`);
+        console.log(`[TEST] Main dish response body (type="${type}"): ${mainText}`);
 
-    const mainText = await mainResponse.text();
-    console.log(`[TEST] Main dish response status: ${mainResponse.status}`);
-    console.log(`[TEST] Main dish response body: ${mainText}`);
+        if (mainResponse.ok) {
+          const mainData = JSON.parse(mainText);
+          mainCreated = {
+            type: "main_dish",
+            name: "Test Main Dish",
+            success: true,
+            used_type: type,
+            product_id: mainData?.data?.product_id || mainData?.data?._id,
+            response: mainData,
+          };
+          break;
+        }
 
-    if (mainResponse.ok) {
-      const mainData = JSON.parse(mainText);
-      results.push({
-        type: "main_dish",
-        name: "Test Main Dish",
-        success: true,
-        product_id: mainData?.data?.product_id || mainData?.data?._id,
-        has_options: productOptions.length > 0,
-        response: mainData,
-      });
+        mainAttempts.push({
+          tried_type: type,
+          status: mainResponse.status,
+          error: mainText,
+          payload_sent: mainPayload,
+        });
+      }
+    }
+
+    if (mainCreated) {
+      results.push(mainCreated);
     } else {
       results.push({
         type: "main_dish",
         name: "Test Main Dish",
         success: false,
-        status: mainResponse.status,
-        error: mainText,
-        payload_sent: mainPayload,
+        error: baseOptionGroup
+          ? "All candidate product_options.type values failed"
+          : "Extra was not created, so product options were not tested",
+        attempts: mainAttempts,
       });
     }
 
