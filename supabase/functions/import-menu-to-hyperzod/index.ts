@@ -354,7 +354,7 @@ serve(async (req) => {
           product_images: productImages,
         };
 
-        console.log(`Creating main product: ${dishName} (with ${hasOptions ? productOptions[0].option_values.length : 0} extras as options)`);
+        console.log(`Creating main product: ${dishName} (with ${hasOptions ? productOptions[0].options.length : 0} extras as options)`);
 
         const response = await fetch(PRODUCT_CREATE_URL, {
           method: "POST",
