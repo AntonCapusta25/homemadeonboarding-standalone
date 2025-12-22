@@ -63,6 +63,42 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   return null;
 }
 
+// Try to discover a valid Hyperzod product option group "type" from existing products
+async function fetchExistingOptionGroupType(merchantId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY!,
+      },
+    });
+
+    if (!res.ok) {
+      console.log(`[TEST] Option type discovery: product/list failed (${res.status})`);
+      return null;
+    }
+
+    const json = await res.json().catch(() => null);
+    const items = json?.data?.data || json?.data || [];
+
+    for (const p of items) {
+      const groups = Array.isArray(p?.product_options) ? p.product_options : [];
+      const groupWithType = groups.find((g: any) => typeof g?.type === "string" && g.type.trim().length > 0);
+      if (groupWithType?.type) {
+        console.log(`[TEST] Discovered option group type: ${groupWithType.type}`);
+        return String(groupWithType.type);
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.log("[TEST] Option type discovery error:", e);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -78,6 +114,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const merchant_id = body?.merchant_id;
+    const optionGroupTypeRequested = typeof body?.option_group_type === "string" ? body.option_group_type.trim() : "";
 
     if (!merchant_id) {
       return new Response(JSON.stringify({ success: false, error: "merchant_id is required" }), {
@@ -198,7 +235,10 @@ serve(async (req) => {
         }
       : null;
 
+    const discoveredType = optionGroupTypeRequested || (await fetchExistingOptionGroupType(merchant_id)) || "";
+
     const typeCandidates = [
+      ...(discoveredType ? [discoveredType] : []),
       "multi",
       "multiple",
       "multi_select",
@@ -206,7 +246,11 @@ serve(async (req) => {
       "checkbox",
       "radio",
       "list",
-    ];
+      "addon",
+      "modifier",
+      "extras",
+      "option",
+    ].filter((v, i, arr) => arr.indexOf(v) === i);
 
     const mainAttempts: any[] = [];
     let mainCreated: any = null;
