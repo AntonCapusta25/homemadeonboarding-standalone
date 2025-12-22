@@ -140,31 +140,35 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
         image_url: imageUrl,
         is_description_enabled: false,
         description: "",
-        is_quantity_enabled: false,
-        quantity: 0,
+        is_quantity_enabled: true,
+        quantity: 1,
         name,
       };
     })
     .filter(Boolean);
 }
 
-function buildProductOptions(extras: Dish[], optionGroupType: string): any[] {
+function buildProductOptions(extras: Dish[], optionGroupType?: string | null): any[] {
   const options = buildOptionItemsFromExtras(extras);
   if (options.length === 0) return [];
 
-  return [
-    {
-      type: optionGroupType,
-      language_translation: [{ key: "option_name", locale: "en", value: "Extras" }],
-      selection_type: "multiple",
-      enable_range: true,
-      min_quantity: 0,
-      max_quantity: options.length,
-      is_required: false,
-      view_type: "list",
-      options,
-    },
-  ];
+  const group: any = {
+    language_translation: [{ key: "option_name", locale: "en", value: "Extras" }],
+    selection_type: "multiple",
+    enable_range: true,
+    min_quantity: 1,
+    max_quantity: 20,
+    is_required: false,
+    view_type: "list",
+    options,
+  };
+
+  // Some merchants require a specific option group type; only include it when provided.
+  if (optionGroupType && optionGroupType.trim()) {
+    group.type = optionGroupType;
+  }
+
+  return [group];
 }
 
 function buildOptionGroupTypeCandidates(requested: string | null, discovered: string | null): string[] {
@@ -259,7 +263,7 @@ serve(async (req) => {
       : [];
 
     console.log(
-      `Option group type candidates: ${optionGroupTypeCandidates.length ? optionGroupTypeCandidates.join(", ") : "(none)"}`,
+      `Option group type candidates (will also try omitting type first): ${optionGroupTypeCandidates.length ? optionGroupTypeCandidates.join(", ") : "(none)"}`,
     );
 
     // STEP: Create main dishes with extras as options
@@ -291,7 +295,6 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
-            type: "flat",
             price_buy: 0,
             price_sell: priceSell,
             price_sell_compare: null,
@@ -304,7 +307,7 @@ serve(async (req) => {
           product_tags: ["main"],
           product_labels: [],
           status: true,
-          is_quantity_enabled: false,
+          is_quantity_enabled: true,
           is_inventory_enabled: false,
           product_inventory: 0,
           is_featured: false,
@@ -315,7 +318,7 @@ serve(async (req) => {
 
         const attempts: Array<{ tried_type: string; status: number; body: string }> = [];
 
-        const tryTypes = hasExtras ? optionGroupTypeCandidates : [""];
+        const tryTypes = hasExtras ? ["", ...optionGroupTypeCandidates] : [""];
         let created = false;
 
         for (const optionType of tryTypes) {
@@ -325,8 +328,9 @@ serve(async (req) => {
             product_options: hasExtras ? buildProductOptions(extraDishes, optionType) : [],
           };
 
+          const typeLabel = optionType ? optionType : "(omit)";
           console.log(
-            `Creating main product: ${dishName} (${hasExtras ? `options=${extraDishes.length}, type=${optionType}` : "no options"})`,
+            `Creating main product: ${dishName} (${hasExtras ? `options=${extraDishes.length}, type=${typeLabel}` : "no options"})`,
           );
 
           const response = await fetch(PRODUCT_CREATE_URL, {
@@ -348,13 +352,13 @@ serve(async (req) => {
               dish_name: dishName,
               success: true,
               product_id: data?.data?.product_id || data?.data?._id,
-              used_option_group_type: hasExtras ? optionType : undefined,
+              used_option_group_type: hasExtras && optionType ? optionType : undefined,
             });
             created = true;
             break;
           }
 
-          attempts.push({ tried_type: optionType, status: response.status, body: text });
+          attempts.push({ tried_type: typeLabel, status: response.status, body: text });
         }
 
         if (!created) {
