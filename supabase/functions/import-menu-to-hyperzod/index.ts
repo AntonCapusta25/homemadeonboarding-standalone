@@ -22,6 +22,8 @@ interface Dish {
 interface ImportRequest {
   merchant_id: string;
   dishes: Dish[];
+  /** Optional override for Hyperzod's required product_options[].type value */
+  option_group_type?: string;
 }
 
 interface CreatedExtra {
@@ -92,27 +94,59 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   return null;
 }
 
-// Build product options from extras list (matching Hyperzod API spec)
-function buildProductOptions(extras: CreatedExtra[]): any[] {
-  if (extras.length === 0) return [];
+// Try to discover a valid Hyperzod product option group "type" from existing products
+async function fetchExistingOptionGroupType(merchantId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY!,
+      },
+    });
 
-  // Create a single option group containing all extras
-  // Using exact field names from Hyperzod API docs
+    if (!res.ok) {
+      console.log(`Option type discovery: product/list failed (${res.status})`);
+      return null;
+    }
+
+    const json = await res.json().catch(() => null);
+    const items = json?.data?.data || json?.data || [];
+
+    for (const p of items) {
+      const groups = Array.isArray(p?.product_options) ? p.product_options : [];
+      const groupWithType = groups.find((g: any) => typeof g?.type === "string" && g.type.trim().length > 0);
+      if (groupWithType?.type) {
+        console.log(`Discovered option group type from existing product: ${groupWithType.type}`);
+        return String(groupWithType.type);
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.log("Option type discovery error:", e);
+    return null;
+  }
+}
+
+// Build product options from extras list (matching Hyperzod API spec)
+function buildProductOptions(extras: CreatedExtra[], optionGroupType: string | null): any[] {
+  if (extras.length === 0) return [];
+  if (!optionGroupType) return [];
+
   return [
     {
-      language_translation: [
-        { key: "option_name", locale: "en", value: "Extras" },
-      ],
-      selection_type: "multiple", // allows multiple selections
+      type: optionGroupType,
+      language_translation: [{ key: "option_name", locale: "en", value: "Extras" }],
+      selection_type: "multiple",
       enable_range: true,
       min_quantity: 0,
       max_quantity: extras.length,
       is_required: false,
       view_type: "list",
       options: extras.map((extra) => ({
-        language_translation: [
-          { key: "name", locale: "en", value: extra.name },
-        ],
+        language_translation: [{ key: "name", locale: "en", value: extra.name }],
         name: extra.name,
         price_buy: 0,
         price_sell: extra.price,
@@ -143,6 +177,7 @@ serve(async (req) => {
 
     const body = (await req.json().catch(() => null)) as ImportRequest | null;
     const merchant_id = safeString(body?.merchant_id, 128);
+    const optionGroupTypeRequested = safeString(body?.option_group_type, 64) || null;
     const dishes = Array.isArray(body?.dishes) ? body!.dishes : [];
 
     if (!merchant_id) {
@@ -296,9 +331,16 @@ serve(async (req) => {
 
     console.log(`Created ${createdExtras.length} extras, now creating main products with options...`);
 
+    const optionGroupType = optionGroupTypeRequested || (await fetchExistingOptionGroupType(merchant_id));
+    if (!optionGroupType) {
+      console.log(
+        "No valid option group type discovered; main products will be created without options (extras still created as standalone products).",
+      );
+    }
+
     // Build product options from created extras
-    const productOptions = buildProductOptions(createdExtras);
-    const hasOptions = productOptions.length > 0 && productOptions[0].options?.length > 0;
+    const productOptions = buildProductOptions(createdExtras, optionGroupType);
+    const hasOptions = Boolean(optionGroupType) && productOptions.length > 0 && productOptions[0].options?.length > 0;
 
     // STEP 2: Create main dishes with extras as options
     for (const dish of mainDishes) {
