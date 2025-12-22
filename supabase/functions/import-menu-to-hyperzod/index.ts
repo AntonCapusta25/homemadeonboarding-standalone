@@ -101,8 +101,10 @@ function buildProductOptions(extras: CreatedExtra[]): any[] {
   return [
     {
       language_translation: [
-        { key: "option_name", locale: "en", value: "Extras" }
+        { key: "option_name", locale: "en", value: "Extras" },
       ],
+      // Hyperzod API still validates `type` for product options (even if docs mention `selection_type`)
+      type: "multiple",
       selection_type: "multiple", // allows multiple selections
       enable_range: true,
       min_quantity: 0,
@@ -111,7 +113,7 @@ function buildProductOptions(extras: CreatedExtra[]): any[] {
       view_type: "list",
       options: extras.map((extra) => ({
         language_translation: [
-          { key: "name", locale: "en", value: extra.name }
+          { key: "name", locale: "en", value: extra.name },
         ],
         name: extra.name,
         price_buy: 0,
