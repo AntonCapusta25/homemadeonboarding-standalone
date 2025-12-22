@@ -122,9 +122,10 @@ function buildProductOptions(extras: Dish[]): any[] {
   const options = buildOptionItemsFromExtras(extras);
   if (options.length === 0) return [];
 
-  // Don't include 'type' field - API validation rejects it for this merchant
+  // API requires 'type' field - trying 'variant' based on Hyperzod UI terminology
   const group = {
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
+    type: "variant", // Hyperzod UI calls individual options "variants"
     selection_type: "multiple",
     enable_range: true,
     min_quantity: 1,
