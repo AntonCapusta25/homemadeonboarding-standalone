@@ -321,7 +321,7 @@ serve(async (req) => {
         for (const optionType of tryTypes) {
           const payload = {
             ...basePayload,
-            has_product_options: hasExtras,
+            has_product_options: true,
             product_options: hasExtras ? buildProductOptions(extraDishes, optionType) : [],
           };
 
