@@ -171,14 +171,19 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
     .filter(Boolean);
 }
 
-// Build product options - with alternative key names
-function buildProductOptions(extras: Dish[], typeValue?: string | number, useVariationsKey = false): any[] {
+// Build product options - with alternative key names and selection types
+function buildProductOptions(
+  extras: Dish[], 
+  typeValue?: string | number, 
+  useVariationsKey = false,
+  selectionType: "multiple" | "single" = "multiple"
+): any[] {
   const optionItems = buildOptionItemsFromExtras(extras);
   if (optionItems.length === 0) return [];
 
   const group: any = {
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
-    selection_type: "multiple",
+    selection_type: selectionType,
     enable_range: true,
     min_quantity: 0,
     max_quantity: optionItems.length,
@@ -372,65 +377,71 @@ serve(async (req) => {
 
         // Try with "options" key first (standard), then with "variations" key (as shown in UI)
         const keyVariants = [false, true]; // false = "options" key, true = "variations" key
+        const selectionTypes: Array<"multiple" | "single"> = ["multiple", "single"];
 
-        for (const useVariationsKey of keyVariants) {
+        for (const selectionType of selectionTypes) {
           if (created) break;
 
-          for (const typeValue of typeCandidates) {
-            const payload = {
-              ...basePayload,
-              has_product_options: hasExtras,
-              product_options: hasExtras ? buildProductOptions(extraDishes, typeValue, useVariationsKey) : [],
-            };
+          for (const useVariationsKey of keyVariants) {
+            if (created) break;
 
-            const typeLabel =
-              typeValue === undefined ? "(no type field)" : typeValue === "" ? "(empty string)" : String(typeValue);
-            const keyLabel = useVariationsKey ? "variations" : "options";
+            for (const typeValue of typeCandidates) {
+              const payload = {
+                ...basePayload,
+                has_product_options: hasExtras,
+                product_options: hasExtras ? buildProductOptions(extraDishes, typeValue, useVariationsKey, selectionType) : [],
+              };
 
-            console.log(
-              `Creating main product: ${dishName} (${hasExtras ? `with ${extraDishes.length} extras, type=${typeLabel}, key=${keyLabel}` : "no options"})`,
-            );
+              const typeLabel =
+                typeValue === undefined ? "(no type field)" : typeValue === "" ? "(empty string)" : String(typeValue);
+              const keyLabel = useVariationsKey ? "variations" : "options";
 
-            // Log the full payload for debugging (first attempt only to reduce logs)
-            if (typeValue === typeCandidates[0] && !useVariationsKey) {
-              console.log(`[DEBUG] Full payload for ${dishName}:`, JSON.stringify(payload, null, 2));
-            }
+              console.log(
+                `Creating: ${dishName} (type=${typeLabel}, key=${keyLabel}, sel=${selectionType})`,
+              );
 
-            const response = await fetch(PRODUCT_CREATE_URL, {
-              method: "POST",
-              headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                "X-TENANT": TENANT_ID,
-                "X-API-KEY": HYPERZOD_API_KEY!,
-              },
-              body: JSON.stringify(payload),
-            });
+              // Log the full payload for debugging (first attempt only to reduce logs)
+              if (typeValue === typeCandidates[0] && !useVariationsKey && selectionType === "multiple") {
+                console.log(`[DEBUG] Full payload for ${dishName}:`, JSON.stringify(payload, null, 2));
+              }
 
-            const rawText = await response.text();
-
-            if (response.ok) {
-              const data = safeJsonParse(rawText) as any;
-              results.push({
-                dish_name: dishName,
-                success: true,
-                product_id: data?.data?.product_id || data?.data?._id,
-                used_option_group_type: `${typeValue === undefined ? undefined : String(typeValue)} (${keyLabel})`,
+              const response = await fetch(PRODUCT_CREATE_URL, {
+                method: "POST",
+                headers: {
+                  Accept: "application/json",
+                  "Content-Type": "application/json",
+                  "X-TENANT": TENANT_ID,
+                  "X-API-KEY": HYPERZOD_API_KEY!,
+                },
+                body: JSON.stringify(payload),
               });
-              console.log(`✓ Product ${dishName} created successfully with type=${typeLabel}, key=${keyLabel}`);
-              created = true;
-              break;
+
+              const rawText = await response.text();
+
+              if (response.ok) {
+                const data = safeJsonParse(rawText) as any;
+                results.push({
+                  dish_name: dishName,
+                  success: true,
+                  product_id: data?.data?.product_id || data?.data?._id,
+                  used_option_group_type: `type=${typeValue}, key=${keyLabel}, sel=${selectionType}`,
+                });
+                console.log(`✓ Product ${dishName} created with type=${typeLabel}, key=${keyLabel}, sel=${selectionType}`);
+                created = true;
+                break;
+              }
+
+              const parsed = safeJsonParse(rawText);
+              const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+              lastErrorDetail = truncateForLog(errorForLog);
+
+              // Only log failures for first few attempts to reduce noise
+              if (typeCandidates.indexOf(typeValue) < 3) {
+                console.log(
+                  `✗ type=${typeLabel}, key=${keyLabel}, sel=${selectionType}: ${response.status}`,
+                );
+              }
             }
-
-            const parsed = safeJsonParse(rawText);
-            const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-            lastErrorDetail = truncateForLog(errorForLog);
-
-            console.log(
-              `✗ Attempt with type=${typeLabel}, key=${keyLabel} failed: ${response.status} body=${truncateForLog(
-                typeof parsed === "string" ? parsed : JSON.stringify(parsed),
-              )}`,
-            );
           }
         }
 
