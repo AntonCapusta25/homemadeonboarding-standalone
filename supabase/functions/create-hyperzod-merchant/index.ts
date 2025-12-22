@@ -8,30 +8,6 @@ const corsHeaders = {
 const HYPERZOD_API_KEY = Deno.env.get("HYPERZOD_API_KEY");
 const TENANT_ID = "3331";
 const BASE_URL = "https://api.hyperzod.app";
-const MERCHANT_CREATE_URL = `${BASE_URL}/admin/v1/merchant/create`;
-
-interface Chef {
-  business_name?: string;
-  chef_name?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  contact_phone?: string;
-  contact_email?: string;
-  service_type?: string;
-}
-
-const extractPostalCode = (address: string): string => {
-  if (!address) return "";
-  const match = address.match(/\d{4}\s*[A-Z]{2}/i);
-  return match ? match[0].replace(/\s/g, "") : "";
-};
-
-const mapServiceType = (serviceType: string): string[] => {
-  if (serviceType === "delivery") return ["delivery"];
-  if (serviceType === "pickup") return ["pickup"];
-  return ["delivery", "pickup"];
-};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -39,30 +15,90 @@ serve(async (req) => {
   }
 
   try {
-    if (!HYPERZOD_API_KEY) {
+    console.log("Testing API key with LIST endpoint...");
+
+    // Test 1: List merchants (should work if API key is valid)
+    const listResponse = await fetch(`${BASE_URL}/admin/v1/merchant/list`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY || "",
+      },
+    });
+
+    const listText = await listResponse.text();
+    console.log("LIST Status:", listResponse.status);
+    console.log("LIST Response:", listText.substring(0, 200));
+
+    if (listResponse.status === 401 || listResponse.status === 403) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing HYPERZOD_API_KEY" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          success: false,
+          error: "API key authentication failed on LIST endpoint",
+          details: "Your API key is invalid or expired. Generate a new one in Hyperzod admin.",
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
-    const { chef } = await req.json() as { chef?: Chef };
+    if (!listResponse.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `LIST endpoint failed: ${listResponse.status}`,
+          details: listText,
+        }),
+        {
+          status: listResponse.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    console.log("✅ API key works for LIST!");
+
+    // Test 2: Try CREATE with minimal payload
+    const { chef } = await req.json();
 
     if (!chef) {
       return new Response(
-        JSON.stringify({ success: false, error: "chef data is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          success: true,
+          message: "API key is valid! Can list merchants.",
+          list_status: listResponse.status,
+          note: "Send chef data to test CREATE",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
+    const extractPostalCode = (address: string): string => {
+      if (!address) return "";
+      const match = address.match(/\d{4}\s*[A-Z]{2}/i);
+      return match ? match[0].replace(/\s/g, "") : "";
+    };
+
+    const mapServiceType = (serviceType: string): string[] => {
+      if (serviceType === "delivery") return ["delivery"];
+      if (serviceType === "pickup") return ["pickup"];
+      return ["delivery", "pickup"];
+    };
+
     const acceptedOrderTypes = mapServiceType(chef.service_type || "unsure");
     const postalCode = extractPostalCode(chef.address || "");
-    const merchantName = chef.business_name || chef.chef_name || "Unknown Chef";
 
     const merchantPayload = {
-      name: merchantName,
+      name: chef.business_name || chef.chef_name || "Unknown Chef",
       address: chef.address || "",
-      post_code: postalCode,
+      post_code: postalCode || "",
       country_code: "NL",
       country: "Netherlands",
       state: chef.state || "",
@@ -96,57 +132,103 @@ serve(async (req) => {
       tax_method: "inclusive",
       merchant_category_ids: [],
       language_translation: [
-        { locale: "en", key: "name", value: merchantName },
+        {
+          locale: "en",
+          key: "name",
+          value: chef.business_name || chef.chef_name || "Unknown Chef",
+        },
       ],
     };
 
-    console.log("[create-hyperzod-merchant] Creating merchant:", merchantName);
+    console.log("Attempting CREATE...");
 
-    const createResponse = await fetch(MERCHANT_CREATE_URL, {
+    const createResponse = await fetch(`${BASE_URL}/admin/v1/merchant/create`, {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
         "X-TENANT": TENANT_ID,
-        "X-API-KEY": HYPERZOD_API_KEY,
+        "X-API-KEY": HYPERZOD_API_KEY || "",
       },
       body: JSON.stringify(merchantPayload),
     });
 
-    const responseText = await createResponse.text();
-    console.log("[create-hyperzod-merchant] Response status:", createResponse.status);
-    console.log("[create-hyperzod-merchant] Response body:", responseText.substring(0, 500));
+    const createText = await createResponse.text();
+    console.log("CREATE Status:", createResponse.status);
+    console.log("CREATE Response:", createText);
+
+    if (createResponse.status === 404) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "404 on CREATE but LIST works",
+          list_works: true,
+          create_status: 404,
+          explanation: "API key can LIST but not CREATE. Either:",
+          options: [
+            "1. API key lacks CREATE permission - check Hyperzod admin",
+            "2. Tenant requires manual merchant approval",
+            "3. CREATE endpoint requires different authentication",
+          ],
+          action: "Email Hyperzod support: siddiquiazam966@gmail.com",
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
 
     if (!createResponse.ok) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Merchant creation failed: ${createResponse.status}`,
-          details: responseText,
+          error: `CREATE failed: ${createResponse.status}`,
+          details: createText,
         }),
-        { status: createResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: createResponse.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
-    const createData = JSON.parse(responseText);
-    const merchantId = createData?.data?.merchant_id || createData?.data?._id || null;
+    let createData;
+    try {
+      createData = JSON.parse(createText);
+    } catch {
+      createData = { raw: createText };
+    }
 
-    console.log("[create-hyperzod-merchant] Merchant created:", merchantId);
+    console.log("✅ SUCCESS! Merchant created!");
+
+    // Extract merchant_id from response
+    const merchantId = createData?.data?.merchant_id || createData?.data?._id || null;
+    console.log("Merchant ID:", merchantId);
 
     return new Response(
       JSON.stringify({
         success: true,
-        merchant_id: merchantId,
         merchant: createData,
-        message: "Merchant created successfully",
+        merchant_id: merchantId,
+        message: "Merchant created successfully!",
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   } catch (error: any) {
-    console.error("[create-hyperzod-merchant] Error:", error);
+    console.error("Fatal error:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error?.message || String(error) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        success: false,
+        error: error?.message || String(error),
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 });
