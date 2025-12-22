@@ -272,6 +272,9 @@ serve(async (req) => {
         const dishName = removeEmojis(safeString(dish?.name, 120));
         const description = safeString(dish?.description ?? "", 2000);
         const priceSell = Number(dish?.price) || 0;
+        const priceBuy = 0;
+        const profit = priceSell - priceBuy;
+        const margin = priceSell !== 0 ? (profit / priceSell) * 100 : 0;
 
         if (!dishName) {
           results.push({
@@ -295,11 +298,13 @@ serve(async (req) => {
             { key: "description", locale: "en", value: description },
           ],
           product_pricing: {
-            price_buy: 0,
+            // Hyperzod requires product_pricing.type (validated as required in API responses)
+            type: "flat",
+            price_buy: priceBuy,
             price_sell: priceSell,
             price_sell_compare: null,
-            profit: 0,
-            margin: 0,
+            profit,
+            margin,
             is_tax_chargaeble: false,
             tax: 0,
           },
