@@ -124,7 +124,7 @@ function buildProductOptions(extras: Dish[], typeValue?: string): any[] {
 
   const group: any = {
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
-    selection_type: "multiple",
+    selection_type: "single",
     enable_range: true,
     min_quantity: 1,
     max_quantity: 20,
