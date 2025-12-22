@@ -1114,6 +1114,39 @@ export function ChefDetailsModal({
               </PopoverContent>
             </Popover>
 
+            {/* Test Import Button - sends mock data to test Hyperzod API */}
+            {storedMerchantId && (
+              <Button
+                variant="outline"
+                size="default"
+                onClick={async () => {
+                  const mockDishes = [
+                    { id: 'mock-1', name: 'Test Burger', description: 'A delicious test burger', price: 12.50, category: 'Mains', is_upsell: false },
+                    { id: 'mock-2', name: 'Test Pizza', description: 'Freshly baked test pizza', price: 14.00, category: 'Mains', is_upsell: false },
+                    { id: 'mock-3', name: 'Test Salad', description: 'Fresh garden salad', price: 8.50, category: 'Starters', is_upsell: false },
+                    { id: 'mock-extra-1', name: 'Extra Cheese', description: 'Add extra cheese', price: 1.50, category: 'Extras', is_upsell: true },
+                    { id: 'mock-extra-2', name: 'Garlic Bread', description: 'Crispy garlic bread', price: 3.00, category: 'Extras', is_upsell: true },
+                  ];
+                  toast({ title: 'Testing mock import...', description: `Merchant: ${storedMerchantId}` });
+                  const { data, error } = await supabase.functions.invoke('import-menu-to-hyperzod', {
+                    body: { merchant_id: storedMerchantId, dishes: mockDishes }
+                  });
+                  console.log('Mock import result:', data, error);
+                  if (error) {
+                    toast({ title: 'Mock import failed', description: error.message, variant: 'destructive' });
+                  } else {
+                    toast({ 
+                      title: data?.success ? 'Mock import succeeded' : 'Mock import had issues', 
+                      description: data?.message || JSON.stringify(data) 
+                    });
+                  }
+                }}
+              >
+                <Utensils className="w-4 h-4 mr-2" />
+                Test Import
+              </Button>
+            )}
+
             {/* Send Email Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
