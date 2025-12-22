@@ -11,11 +11,36 @@ const BASE_URL = "https://api.hyperzod.app";
 const PRODUCT_CREATE_URL = `${BASE_URL}/merchant/v1/catalog/product/create`;
 const PRODUCT_UPDATE_URL = `${BASE_URL}/merchant/v1/catalog/product/update`;
 
-function removeEmojis(str: string): string {
-  return str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{231A}-\u{231B}]|[\u{23E9}-\u{23F3}]|[\u{23F8}-\u{23FA}]|[\u{25AA}-\u{25AB}]|[\u{25B6}]|[\u{25C0}]|[\u{25FB}-\u{25FE}]|[\u{2614}-\u{2615}]|[\u{2648}-\u{2653}]|[\u{267F}]|[\u{2693}]|[\u{26A1}]|[\u{26AA}-\u{26AB}]|[\u{26BD}-\u{26BE}]|[\u{26C4}-\u{26C5}]|[\u{26CE}]|[\u{26D4}]|[\u{26EA}]|[\u{26F2}-\u{26F3}]|[\u{26F5}]|[\u{26FA}]|[\u{26FD}]|[\u{2702}]|[\u{2705}]|[\u{2708}-\u{270D}]|[\u{270F}]|[\u{2712}]|[\u{2714}]|[\u{2716}]|[\u{271D}]|[\u{2721}]|[\u{2728}]|[\u{2733}-\u{2734}]|[\u{2744}]|[\u{2747}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2763}-\u{2764}]|[\u{2795}-\u{2797}]|[\u{27A1}]|[\u{27B0}]|[\u{27BF}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{2B50}]|[\u{2B55}]|[\u{3030}]|[\u{303D}]|[\u{3297}]|[\u{3299}]/gu, '').trim();
-}
+type ProductPricing = {
+  type: "flat";
+  price_buy: number;
+  price_sell: number;
+  price_sell_compare: null;
+  profit: number;
+  margin: number;
+  is_tax_chargaeble: false;
+  tax: number;
+};
 
-// Get or create category
+type BaseProductPayload = {
+  merchant_id: string;
+  sku: string;
+  description: string;
+  language_translation: Array<{ key: "name" | "description"; value: string; locale: "en" }>;
+  product_pricing: ProductPricing;
+  product_category: string[];
+  product_tags: string[];
+  product_labels: string[];
+  status: boolean;
+  is_quantity_enabled: boolean;
+  is_inventory_enabled: boolean;
+  product_inventory: number;
+  is_featured: boolean;
+  sort_order: number;
+  product_quantity: { min_quantity: number; max_quantity: number };
+  product_images: Array<{ file_url: string; is_cover: boolean }>;
+};
+
 async function getOrCreateCategory(merchantId: string, categoryName: string): Promise<string | null> {
   const listResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/list?merchant_id=${merchantId}`, {
     method: "GET",
@@ -27,15 +52,12 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   });
 
   if (listResponse.ok) {
-    const listData = await listResponse.json();
-    const categories = listData?.data?.data || listData?.data || [];
+    const listData = await listResponse.json().catch(() => null);
+    const categories = (listData as any)?.data?.data || (listData as any)?.data || [];
     const existing = categories.find(
       (c: any) => c.name === categoryName || c.language_translation?.some((t: any) => t.value === categoryName),
     );
-    if (existing) {
-      console.log(`[TEST] Found existing category: ${existing._id || existing.category_id}`);
-      return existing._id || existing.category_id;
-    }
+    if (existing) return existing._id || existing.category_id;
   }
 
   const createResponse = await fetch(`${BASE_URL}/merchant/v1/catalog/product-category/create`, {
@@ -57,11 +79,42 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
     }),
   });
 
-  const createData = await createResponse.json();
-  if (createResponse.ok && createData?.data) {
-    return createData.data._id || createData.data.category_id;
+  const createData = await createResponse.json().catch(() => null);
+  if (createResponse.ok && (createData as any)?.data) {
+    return (createData as any).data._id || (createData as any).data.category_id;
   }
   return null;
+}
+
+async function fetchExistingOptionGroupType(merchantId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-TENANT": TENANT_ID,
+        "X-API-KEY": HYPERZOD_API_KEY!,
+      },
+    });
+
+    if (!res.ok) return null;
+
+    const json = await res.json().catch(() => null);
+    const items = (json as any)?.data?.data || (json as any)?.data || [];
+
+    for (const p of items) {
+      const groups = Array.isArray((p as any)?.product_options) ? (p as any).product_options : [];
+      const groupWithType = groups.find((g: any) => (typeof g?.type === "string" && g.type.trim()) || typeof g?.type === "number");
+      if (groupWithType?.type !== undefined && groupWithType?.type !== null) {
+        console.log(`[TEST] Discovered option group type: ${String(groupWithType.type)}`);
+        return String(groupWithType.type);
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -87,26 +140,28 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[TEST] Testing 2-step import for merchant ${merchant_id}`);
+    console.log(`[TEST] Starting create-then-update test for merchant ${merchant_id}`);
 
-    // Create categories
     const mainCategoryId = await getOrCreateCategory(merchant_id, "Main Dishes");
-    const extrasCategoryId = await getOrCreateCategory(merchant_id, "Extras");
+    if (!mainCategoryId) {
+      return new Response(JSON.stringify({ success: false, error: "Failed to create/find category" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    console.log(`[TEST] Categories - Main: ${mainCategoryId}, Extras: ${extrasCategoryId}`);
-
-    const results: any[] = [];
-
-    // ============================================
-    // STEP 1: Create a main product WITHOUT options
-    // ============================================
     const timestamp = Date.now();
-    const createPayload = {
+    const dishName = `TEST Main ${timestamp}`;
+    const sku = `TEST-MAIN-${timestamp}`;
+    const description = "Test product - will attach options via update";
+
+    const base: BaseProductPayload = {
       merchant_id,
-      sku: `TEST-MAIN-${timestamp}`,
+      sku,
+      description,
       language_translation: [
-        { key: "name", locale: "en", value: "Test Main Dish" },
-        { key: "description", locale: "en", value: "A test main dish - will add options via update" },
+        { key: "name", value: dishName, locale: "en" },
+        { key: "description", value: description, locale: "en" },
       ],
       product_pricing: {
         type: "flat",
@@ -118,8 +173,6 @@ serve(async (req) => {
         is_tax_chargaeble: false,
         tax: 0,
       },
-      has_product_options: false,
-      product_options: [],
       product_category: [mainCategoryId],
       product_tags: ["main", "test"],
       product_labels: [],
@@ -133,10 +186,14 @@ serve(async (req) => {
       product_images: [],
     };
 
-    console.log(`[TEST] STEP 1: Creating product WITHOUT options...`);
-    console.log(`[TEST] Create payload:`, JSON.stringify(createPayload, null, 2));
+    // STEP 1: Create without options
+    const createPayload = {
+      ...base,
+      has_product_options: false,
+      product_options: [],
+    };
 
-    const createResponse = await fetch(PRODUCT_CREATE_URL, {
+    const createRes = await fetch(PRODUCT_CREATE_URL, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -147,85 +204,115 @@ serve(async (req) => {
       body: JSON.stringify(createPayload),
     });
 
-    const createText = await createResponse.text();
-    console.log(`[TEST] Create response status: ${createResponse.status}`);
-    console.log(`[TEST] Create response body: ${createText}`);
+    const createText = await createRes.text();
+    console.log(`[TEST] Create status: ${createRes.status}`);
+    console.log(`[TEST] Create body: ${createText}`);
 
-    let productId = null;
-    if (createResponse.ok) {
-      const createData = JSON.parse(createText);
-      productId = createData?.data?.product_id || createData?.data?._id;
-      results.push({
-        step: 1,
-        action: "create_product",
-        success: true,
-        product_id: productId,
-        response: createData,
-      });
-      console.log(`[TEST] ✓ Product created with ID: ${productId}`);
-    } else {
-      results.push({
-        step: 1,
-        action: "create_product",
-        success: false,
-        status: createResponse.status,
-        error: createText,
-        payload_sent: createPayload,
-      });
-      console.log(`[TEST] ✗ Product creation failed`);
+    if (!createRes.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          step: "create",
+          status: createRes.status,
+          body: createText,
+          payload_sent: createPayload,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    // ============================================
-    // STEP 2: Update product to add options (if created)
-    // ============================================
-    if (productId) {
-      // Based on Hyperzod Update docs - NO type field, just selection_type, view_type, options
-      const productOptions = [{
-        language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
-        selection_type: "multiple",
-        enable_range: true,
-        min_quantity: 0,
-        max_quantity: 2,
-        is_required: false,
-        view_type: "list",
-        options: [
-          {
-            language_translation: [{ key: "name", value: "Extra Cheese", locale: "en" }],
-            name: "Extra Cheese",
-            price_buy: 0,
-            price_sell: 1.50,
-            image_url: null,
-            is_description_enabled: false,
-            description: "",
-            is_quantity_enabled: false,
-            quantity: 0,
-          },
-          {
-            language_translation: [{ key: "name", value: "Extra Sauce", locale: "en" }],
-            name: "Extra Sauce",
-            price_buy: 0,
-            price_sell: 0.75,
-            image_url: null,
-            is_description_enabled: false,
-            description: "",
-            is_quantity_enabled: false,
-            quantity: 0,
-          },
-        ],
-      }];
+    const createJson = JSON.parse(createText);
+    const productId = createJson?.data?.product_id || createJson?.data?._id;
 
+    // STEP 2: Update with options; must include full payload + product_options.0.type
+    const discoveredType = await fetchExistingOptionGroupType(merchant_id);
+
+    const stringTypeCandidates = [
+      ...(discoveredType ? [discoveredType] : []),
+      "nested",
+      "simple",
+      "standard",
+      "flat",
+      "group",
+      "default",
+      "addon",
+      "extra",
+      "modifier",
+      "variation",
+      "variant",
+      "single",
+      "multiple",
+      "checkbox",
+      "radio",
+      "list",
+      "dropdown",
+      "single_select",
+      "multi_select",
+    ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+    const typeCandidates: Array<string | number> = [
+      ...stringTypeCandidates,
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+    ];
+
+    const productOptionsBase = {
+      option_name: "Extras",
+      language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
+      selection_type: "multiple",
+      enable_range: true,
+      min_quantity: 0,
+      max_quantity: 2,
+      is_required: false,
+      view_type: "list",
+      options: [
+        {
+          language_translation: [{ key: "name", value: "Extra Cheese", locale: "en" }],
+          name: "Extra Cheese",
+          price_buy: 0,
+          price_sell: 1.5,
+          image_url: null,
+          is_description_enabled: false,
+          description: "",
+          is_quantity_enabled: false,
+          quantity: 0,
+        },
+        {
+          language_translation: [{ key: "name", value: "Extra Sauce", locale: "en" }],
+          name: "Extra Sauce",
+          price_buy: 0,
+          price_sell: 0.75,
+          image_url: null,
+          is_description_enabled: false,
+          description: "",
+          is_quantity_enabled: false,
+          quantity: 0,
+        },
+      ],
+    };
+
+    const attempts: any[] = [];
+
+    for (const typeValue of typeCandidates) {
       const updatePayload = {
         id: productId,
-        merchant_id,
-        sku: `TEST-MAIN-${timestamp}`,
+        ...base,
         has_product_options: true,
-        product_options: productOptions,
+        product_options: [{ ...productOptionsBase, type: typeValue }],
       };
 
-      console.log(`[TEST] STEP 2: Updating product to add options...`);
-      console.log(`[TEST] Update payload:`, JSON.stringify(updatePayload, null, 2));
+      console.log(`[TEST] Updating with type=${String(typeValue)}`);
 
-      const updateResponse = await fetch(PRODUCT_UPDATE_URL, {
+      const updateRes = await fetch(PRODUCT_UPDATE_URL, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -236,48 +323,39 @@ serve(async (req) => {
         body: JSON.stringify(updatePayload),
       });
 
-      const updateText = await updateResponse.text();
-      console.log(`[TEST] Update response status: ${updateResponse.status}`);
-      console.log(`[TEST] Update response body: ${updateText}`);
+      const updateText = await updateRes.text();
+      console.log(`[TEST] Update status (type=${String(typeValue)}): ${updateRes.status}`);
+      console.log(`[TEST] Update body (type=${String(typeValue)}): ${updateText}`);
 
-      if (updateResponse.ok) {
-        const updateData = JSON.parse(updateText);
-        results.push({
-          step: 2,
-          action: "update_add_options",
-          success: true,
-          product_id: productId,
-          response: updateData,
-        });
-        console.log(`[TEST] ✓ Options added to product successfully!`);
-      } else {
-        results.push({
-          step: 2,
-          action: "update_add_options",
-          success: false,
-          status: updateResponse.status,
-          error: updateText,
-          payload_sent: updatePayload,
-        });
-        console.log(`[TEST] ✗ Options update failed`);
+      if (updateRes.ok) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Create + update with options succeeded",
+            product_id: productId,
+            used_type: String(typeValue),
+            create_response: createJson,
+            update_response: JSON.parse(updateText),
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
-    }
 
-    const allSuccess = results.every(r => r.success);
+      attempts.push({ type: typeValue, status: updateRes.status, body: updateText });
+
+      // keep logs manageable
+      if (attempts.length >= 12) break;
+    }
 
     return new Response(
       JSON.stringify({
-        success: allSuccess,
-        message: allSuccess 
-          ? "2-step test successful! Product created, then options added via update." 
-          : "Test had failures - check results for details",
-        approach: "2-step: Create product first, then Update to add options",
-        results,
+        success: false,
+        message: "Create succeeded, but update with options failed for tried type candidates",
+        product_id: productId,
+        discovered_type: discoveredType,
+        attempts,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: any) {
     console.error("[TEST] Fatal error:", error);
