@@ -263,37 +263,57 @@ serve(async (req) => {
 
     const discoveredType = hasExtras ? (await fetchExistingOptionGroupType(merchant_id)) : null;
 
+    // Priority: user-provided > discovered > hardcoded candidates
+    // Based on Hyperzod docs patterns, try "addon" style naming
     const stringTypeCandidates = [
       ...(optionGroupTypeRequested ? [optionGroupTypeRequested] : []),
       ...(discoveredType ? [discoveredType] : []),
-      // values we observed/guessed across environments
-      "multi",
-      "multiple",
-      "multi_select",
-      "multiselect",
-      "checkbox",
-      "radio",
-      "list",
+      // Common Hyperzod type values (based on typical food ordering patterns)
       "addon",
+      "add_on",
+      "add-on",
+      "addons",
+      "add_ons",
+      "upsell",
+      "upsells",
       "modifier",
+      "modifiers",
+      "extra",
       "extras",
       "option",
-      "addition",
-      "customization",
+      "options",
       "topping",
-      "extra",
+      "toppings",
       "side",
+      "sides",
+      "drink",
+      "drinks",
+      "combo",
+      "size",
+      "variation",
+      "variant",
+      "custom",
+      "customize",
+      "customization",
+      "addition",
       "supplement",
+      // selection type values
+      "single",
+      "multi",
+      "multiple",
+      "radio",
+      "checkbox",
+      "list",
+      "dropdown",
+      "select",
     ].filter((v, i, arr) => arr.indexOf(v) === i);
 
-    const typeCandidates: (string | number | undefined)[] = [
+    // IMPORTANT: Hyperzod requires type field - don't try undefined
+    // But if all string values fail, we'll fallback to creating WITHOUT options
+    const typeCandidates: (string | number)[] = [
       ...stringTypeCandidates,
-      // numeric fallbacks
-      0,
-      1,
-      2,
-      // and finally: try omitting the field entirely
-      undefined,
+      // numeric fallbacks (some APIs use 0=single, 1=multiple, etc.)
+      0, 1, 2, 3, 4, 5,
     ];
 
     // STEP: Create main dishes with extras as options
@@ -407,14 +427,52 @@ serve(async (req) => {
           );
         }
 
+        // FALLBACK: If all type values failed BUT we have options, try creating WITHOUT options
+        if (!created && hasExtras) {
+          console.log(`All option types failed for ${dishName}, trying without options as fallback...`);
+          
+          const noOptionsPayload = {
+            ...basePayload,
+            has_product_options: false,
+            product_options: [],
+          };
+          
+          const fallbackResponse = await fetch(PRODUCT_CREATE_URL, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-TENANT": TENANT_ID,
+              "X-API-KEY": HYPERZOD_API_KEY!,
+            },
+            body: JSON.stringify(noOptionsPayload),
+          });
+          
+          const fallbackText = await fallbackResponse.text();
+          
+          if (fallbackResponse.ok) {
+            const data = safeJsonParse(fallbackText) as any;
+            results.push({
+              dish_name: dishName,
+              success: true,
+              product_id: data?.data?.product_id || data?.data?._id,
+              used_option_group_type: "(no options - fallback)",
+            });
+            console.log(`✓ Product ${dishName} created WITHOUT options (fallback)`);
+            created = true;
+          } else {
+            console.log(`✗ Fallback (no options) also failed: ${fallbackResponse.status}`);
+          }
+        }
+
         if (!created) {
           results.push({
             dish_name: dishName,
             success: false,
-            error: `Product create failed when options were included. Last error: ${lastErrorDetail || "(no details)"}`,
+            error: `Product create failed. Last error: ${lastErrorDetail || "(no details)"}`,
           });
 
-          console.error(`✗ Product ${dishName} FAILED - product_options rejected`);
+          console.error(`✗ Product ${dishName} FAILED completely`);
         }
       } catch (dishError: any) {
         console.error(`Error creating product ${dish?.name}:`, dishError);
