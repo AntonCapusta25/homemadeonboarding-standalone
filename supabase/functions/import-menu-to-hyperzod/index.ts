@@ -158,7 +158,8 @@ function buildProductOptions(extras: Dish[], optionGroupType?: string | null): a
   const options = buildOptionItemsFromExtras(extras);
   if (options.length === 0) return [];
 
-  const group: any = {
+  // Don't include 'type' field - API validation rejects it for this merchant
+  const group = {
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
     selection_type: "multiple",
     enable_range: true,
@@ -168,11 +169,6 @@ function buildProductOptions(extras: Dish[], optionGroupType?: string | null): a
     view_type: "list",
     options,
   };
-
-  // Some merchants require a specific option group type; only include it when provided.
-  if (optionGroupType && optionGroupType.trim()) {
-    group.type = optionGroupType;
-  }
 
   return [group];
 }
