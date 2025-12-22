@@ -118,12 +118,11 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
     .filter(Boolean);
 }
 
-function buildProductOptions(extras: Dish[]): any[] {
+function buildProductOptions(extras: Dish[], typeValue?: string): any[] {
   const options = buildOptionItemsFromExtras(extras);
   if (options.length === 0) return [];
 
-  // API documentation example does NOT include 'type' field - omitting it
-  const group = {
+  const group: any = {
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
     selection_type: "multiple",
     enable_range: true,
@@ -133,6 +132,11 @@ function buildProductOptions(extras: Dish[]): any[] {
     view_type: "list",
     options,
   };
+
+  // Add type if provided
+  if (typeValue !== undefined) {
+    group.type = typeValue;
+  }
 
   return [group];
 }
@@ -259,51 +263,73 @@ serve(async (req) => {
           product_images: productImages,
         };
 
-        const attempts: Array<{ tried_type: string; status: number; body: string }> = [];
+        // Try different type values - API requires it but rejects most values
+        const typeCandidates = [
+          "list", // Try matching view_type value first
+          "", // Empty string
+          "addon",
+          "customization",
+          "topping",
+          "extra",
+          "side",
+          "supplement",
+          "addition",
+        ];
 
-        // Create product with extras as options (no type field per API docs)
-        const payload = {
-          ...basePayload,
-          has_product_options: hasExtras,
-          product_options: hasExtras ? buildProductOptions(extraDishes) : [],
-        };
+        let created = false;
 
-        console.log(
-          `Creating main product: ${dishName} (${hasExtras ? `with ${extraDishes.length} extras as options` : "no options"})`,
-        );
+        for (const typeValue of typeCandidates) {
+          const payload = {
+            ...basePayload,
+            has_product_options: hasExtras,
+            product_options: hasExtras ? buildProductOptions(extraDishes, typeValue) : [],
+          };
 
-        // Log the full payload for debugging
-        console.log(`[DEBUG] Full payload for ${dishName}:`, JSON.stringify(payload, null, 2));
+          const typeLabel = typeValue === "" ? "(empty string)" : typeValue;
+          console.log(
+            `Creating main product: ${dishName} (${hasExtras ? `with ${extraDishes.length} extras, type=${typeLabel}` : "no options"})`,
+          );
 
-        const response = await fetch(PRODUCT_CREATE_URL, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-TENANT": TENANT_ID,
-            "X-API-KEY": HYPERZOD_API_KEY!,
-          },
-          body: JSON.stringify(payload),
-        });
+          // Log the full payload for debugging
+          console.log(`[DEBUG] Full payload for ${dishName}:`, JSON.stringify(payload, null, 2));
 
-        const text = await response.text();
-
-        if (response.ok) {
-          const data = JSON.parse(text);
-          results.push({
-            dish_name: dishName,
-            success: true,
-            product_id: data?.data?.product_id || data?.data?._id,
+          const response = await fetch(PRODUCT_CREATE_URL, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-TENANT": TENANT_ID,
+              "X-API-KEY": HYPERZOD_API_KEY!,
+            },
+            body: JSON.stringify(payload),
           });
-        } else {
+
+          const text = await response.text();
+
+          if (response.ok) {
+            const data = JSON.parse(text);
+            results.push({
+              dish_name: dishName,
+              success: true,
+              product_id: data?.data?.product_id || data?.data?._id,
+            });
+            console.log(`✓ Product ${dishName} created successfully with type=${typeLabel}`);
+            created = true;
+            break;
+          } else {
+            console.log(`✗ Attempt with type=${typeLabel} failed: ${response.status}`);
+          }
+        }
+
+        if (!created) {
+          // All attempts failed
           results.push({
             dish_name: dishName,
             success: false,
-            error: `Product create failed: ${response.status}`,
+            error: `Product create failed: all type values rejected`,
           });
 
-          console.error(`✗ Product ${dishName} FAILED (${response.status})`);
-          console.error(`  Response body: ${text}`);
+          console.error(`✗ Product ${dishName} FAILED - all type values rejected`);
         }
       } catch (dishError: any) {
         console.error(`Error creating product ${dish?.name}:`, dishError);
