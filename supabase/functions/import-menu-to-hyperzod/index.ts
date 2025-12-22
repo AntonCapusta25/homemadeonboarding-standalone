@@ -26,13 +26,6 @@ interface ImportRequest {
   option_group_type?: string;
 }
 
-interface CreatedExtra {
-  dish_id: string;
-  product_id: string;
-  name: string;
-  price: number;
-}
-
 function safeString(input: unknown, maxLen: number) {
   if (typeof input !== "string") return "";
   return input.trim().slice(0, maxLen);
@@ -130,19 +123,69 @@ async function fetchExistingOptionGroupType(merchantId: string): Promise<string 
   }
 }
 
-// Build product options from extras list (minimal Hyperzod format)
-function buildProductOptions(extras: CreatedExtra[]): any[] {
-  if (extras.length === 0) return [];
+// Build Hyperzod option items from "extras" dishes
+function buildOptionItemsFromExtras(extras: Dish[]): any[] {
+  return extras
+    .map((extra) => {
+      const name = removeEmojis(safeString(extra?.name, 120));
+      if (!name) return null;
+
+      const priceSell = Number(extra?.price) || 0;
+      const imageUrl = typeof extra?.image_url === "string" && extra.image_url.trim() ? extra.image_url.trim() : null;
+
+      return {
+        language_translation: [{ key: "name", locale: "en", value: name }],
+        price_buy: 0,
+        price_sell: priceSell,
+        image_url: imageUrl,
+        is_description_enabled: false,
+        description: "",
+        is_quantity_enabled: false,
+        quantity: 0,
+        name,
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildProductOptions(extras: Dish[], optionGroupType: string): any[] {
+  const options = buildOptionItemsFromExtras(extras);
+  if (options.length === 0) return [];
 
   return [
     {
+      type: optionGroupType,
+      language_translation: [{ key: "option_name", locale: "en", value: "Extras" }],
+      selection_type: "multiple",
+      enable_range: true,
+      min_quantity: 0,
+      max_quantity: options.length,
+      is_required: false,
       view_type: "list",
-      options: extras.map((extra) => ({
-        name: extra.name,
-        image_url: null,
-      })),
+      options,
     },
   ];
+}
+
+function buildOptionGroupTypeCandidates(requested: string | null, discovered: string | null): string[] {
+  const base = [
+    requested,
+    discovered,
+    // Common candidates (Hyperzod seems to require this field, but acceptable values vary)
+    "multiple",
+    "multi",
+    "multi_select",
+    "multiselect",
+    "checkbox",
+    "radio",
+    "list",
+    "addon",
+    "modifier",
+    "extras",
+    "option",
+  ].filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+
+  return base.filter((v, i, arr) => arr.indexOf(v) === i);
 }
 
 const PRODUCT_CREATE_URL = `${BASE_URL}/merchant/v1/catalog/product/create`;
@@ -181,9 +224,9 @@ serve(async (req) => {
 
     console.log(`Importing ${dishes.length} dishes to merchant ${merchant_id}`);
 
-    // Create default categories
+    // Create default categories (extras category is optional, but keeping for future compatibility)
     const mainCategoryId = await getOrCreateCategory(merchant_id, "Main Dishes");
-    const extrasCategoryId = await getOrCreateCategory(merchant_id, "Extras");
+    await getOrCreateCategory(merchant_id, "Extras");
 
     if (!mainCategoryId) {
       return new Response(JSON.stringify({ success: false, error: "Failed to create product categories" }), {
@@ -192,135 +235,34 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Using categories - Main: ${mainCategoryId}, Extras: ${extrasCategoryId}`);
-
     // Separate dishes into main dishes and extras/upsells
-    const mainDishes = dishes.filter(d => !d.is_upsell);
-    const extraDishes = dishes.filter(d => d.is_upsell);
+    const mainDishes = dishes.filter((d) => !d.is_upsell);
+    const extraDishes = dishes.filter((d) => d.is_upsell);
 
     console.log(`Found ${mainDishes.length} main dishes and ${extraDishes.length} extras`);
 
-    const results: { dish_name: string; success: boolean; error?: string; product_id?: string; is_extra?: boolean }[] = [];
-    const createdExtras: CreatedExtra[] = [];
+    const results: {
+      dish_name: string;
+      success: boolean;
+      error?: string;
+      product_id?: string;
+      used_option_group_type?: string;
+    }[] = [];
 
-    // STEP 1: Create extras first (as standalone products)
-    for (const dish of extraDishes) {
-      try {
-        const dishName = removeEmojis(safeString(dish?.name, 120));
-        const description = safeString(dish?.description ?? "", 2000);
-        const priceSell = Number(dish?.price) || 0;
+    // We DO NOT import extras as standalone products.
+    // Instead, we attach them as product_options to every main product.
+    const hasExtras = extraDishes.length > 0;
 
-        if (!dishName) {
-          results.push({
-            dish_name: "(invalid extra)",
-            success: false,
-            error: "Invalid dish payload (missing name)",
-            is_extra: true,
-          });
-          continue;
-        }
+    const discoveredType = hasExtras ? await fetchExistingOptionGroupType(merchant_id) : null;
+    const optionGroupTypeCandidates = hasExtras
+      ? buildOptionGroupTypeCandidates(optionGroupTypeRequested, discoveredType)
+      : [];
 
-        const categoryId = extrasCategoryId || mainCategoryId;
+    console.log(
+      `Option group type candidates: ${optionGroupTypeCandidates.length ? optionGroupTypeCandidates.join(", ") : "(none)"}`,
+    );
 
-        const productImages: { file_url: string; is_cover: boolean }[] = [];
-        if (dish.image_url) {
-          productImages.push({ file_url: dish.image_url, is_cover: true });
-        }
-
-        const productPayload = {
-          merchant_id,
-          sku: `EXTRA-${dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 40)}` || "SKU-EXTRA",
-          language_translation: [
-            { key: "name", locale: "en", value: dishName },
-            { key: "description", locale: "en", value: description },
-          ],
-          product_pricing: {
-            type: "flat",
-            price_buy: 0,
-            price_sell: priceSell,
-            price_sell_compare: null,
-            profit: 0,
-            margin: 0,
-            is_tax_chargaeble: false,
-            tax: 0,
-          },
-          has_product_options: false,
-          product_options: [],
-          product_category: [categoryId],
-          product_tags: ["upsell", "extra"],
-          product_labels: [],
-          status: true,
-          is_quantity_enabled: false,
-          is_inventory_enabled: false,
-          product_inventory: 0,
-          is_featured: false,
-          sort_order: 0,
-          product_quantity: { min_quantity: 0, max_quantity: 0 },
-          product_images: productImages,
-        };
-
-        console.log(`Creating extra product: ${dishName}`);
-
-        const response = await fetch(PRODUCT_CREATE_URL, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-TENANT": TENANT_ID,
-            "X-API-KEY": HYPERZOD_API_KEY!,
-          },
-          body: JSON.stringify(productPayload),
-        });
-
-        const text = await response.text();
-
-        if (response.ok) {
-          const data = JSON.parse(text);
-          const productId = data?.data?.product_id || data?.data?._id;
-          console.log(`✓ Extra ${dishName} created: ${productId}`);
-          
-          // Store for adding as options to main products
-          createdExtras.push({
-            dish_id: dish.id,
-            product_id: productId,
-            name: dishName,
-            price: priceSell,
-          });
-
-          results.push({
-            dish_name: dishName,
-            success: true,
-            product_id: productId,
-            is_extra: true,
-          });
-        } else {
-          console.error(`✗ Extra ${dishName} FAILED: ${response.status}`);
-          console.error(`  Response: ${text}`);
-          results.push({
-            dish_name: dishName,
-            success: false,
-            error: `${response.status}: ${text}`,
-            is_extra: true,
-          });
-        }
-      } catch (dishError: any) {
-        console.error(`Error creating extra ${dish?.name}:`, dishError);
-        results.push({
-          dish_name: safeString(dish?.name, 120) || "(unknown)",
-          success: false,
-          error: dishError?.message || "Unknown error",
-          is_extra: true,
-        });
-      }
-    }
-
-    console.log(`Created ${createdExtras.length} extras, now creating main products with options...`);
-
-    // Build product options from created extras (minimal format)
-    const productOptions = buildProductOptions(createdExtras);
-    const hasOptions = productOptions.length > 0 && productOptions[0].options?.length > 0;
-
-    // STEP 2: Create main dishes with extras as options
+    // STEP: Create main dishes with extras as options
     for (const dish of mainDishes) {
       try {
         const dishName = removeEmojis(safeString(dish?.name, 120));
@@ -341,7 +283,7 @@ serve(async (req) => {
           productImages.push({ file_url: dish.image_url, is_cover: true });
         }
 
-        const productPayload = {
+        const basePayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
           language_translation: [
@@ -358,9 +300,6 @@ serve(async (req) => {
             is_tax_chargaeble: false,
             tax: 0,
           },
-          // Add extras as options if we have any
-          has_product_options: hasOptions,
-          product_options: hasOptions ? productOptions : [],
           product_category: [mainCategoryId],
           product_tags: ["main"],
           product_labels: [],
@@ -374,43 +313,68 @@ serve(async (req) => {
           product_images: productImages,
         };
 
-        console.log(`Creating main product: ${dishName} (with ${hasOptions ? productOptions[0].options.length : 0} extras as options)`);
+        const attempts: Array<{ tried_type: string; status: number; body: string }> = [];
 
-        const response = await fetch(PRODUCT_CREATE_URL, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-TENANT": TENANT_ID,
-            "X-API-KEY": HYPERZOD_API_KEY!,
-          },
-          body: JSON.stringify(productPayload),
-        });
+        const tryTypes = hasExtras ? optionGroupTypeCandidates : [""];
+        let created = false;
 
-        const text = await response.text();
+        for (const optionType of tryTypes) {
+          const payload = {
+            ...basePayload,
+            has_product_options: hasExtras,
+            product_options: hasExtras ? buildProductOptions(extraDishes, optionType) : [],
+          };
 
-        if (response.ok) {
-          console.log(`✓ Product ${dishName} created: ${response.status}`);
-          const data = JSON.parse(text);
-          const returnedHasOptions = Boolean(data?.data?.has_product_options);
-          const returnedGroups = Array.isArray(data?.data?.product_options)
-            ? data.data.product_options.length
-            : 0;
-          console.log(`  ↳ has_product_options=${returnedHasOptions}, groups=${returnedGroups}`);
-          results.push({
-            dish_name: dishName,
-            success: true,
-            product_id: data?.data?.product_id || data?.data?._id,
+          console.log(
+            `Creating main product: ${dishName} (${hasExtras ? `options=${extraDishes.length}, type=${optionType}` : "no options"})`,
+          );
+
+          const response = await fetch(PRODUCT_CREATE_URL, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-TENANT": TENANT_ID,
+              "X-API-KEY": HYPERZOD_API_KEY!,
+            },
+            body: JSON.stringify(payload),
           });
-        } else {
-          console.error(`✗ Product ${dishName} FAILED: ${response.status}`);
-          console.error(`  Response: ${text}`);
-          console.error(`  Request payload sent:`, JSON.stringify(productPayload, null, 2));
+
+          const text = await response.text();
+
+          if (response.ok) {
+            const data = JSON.parse(text);
+            results.push({
+              dish_name: dishName,
+              success: true,
+              product_id: data?.data?.product_id || data?.data?._id,
+              used_option_group_type: hasExtras ? optionType : undefined,
+            });
+            created = true;
+            break;
+          }
+
+          attempts.push({ tried_type: optionType, status: response.status, body: text });
+        }
+
+        if (!created) {
+          const errorSummary = attempts.length
+            ? `All option group types failed. Last error: ${attempts[attempts.length - 1].status}`
+            : "Product create failed";
+
           results.push({
             dish_name: dishName,
             success: false,
-            error: `${response.status}: ${text}`,
+            error: `${errorSummary}`,
           });
+
+          console.error(`✗ Product ${dishName} FAILED`);
+          if (attempts.length) {
+            console.error(
+              `  Attempt details (type/status): ${attempts.map((a) => `${a.tried_type}:${a.status}`).join(", ")}`,
+            );
+            console.error(`  Last response body: ${attempts[attempts.length - 1].body}`);
+          }
         }
       } catch (dishError: any) {
         console.error(`Error creating product ${dish?.name}:`, dishError);
@@ -424,18 +388,21 @@ serve(async (req) => {
 
     const successful = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
-    const extrasCreated = createdExtras.length;
+    const extrasAsOptions = extraDishes.length;
 
-    console.log(`Import complete: ${successful} successful, ${failed} failed, ${extrasCreated} extras attached as options to main products`);
+    console.log(
+      `Import complete: ${successful} main products created, ${failed} failed, ${extrasAsOptions} extras attached as options`,
+    );
 
     return new Response(
       JSON.stringify({
         success: failed === 0,
-        message: `Imported ${successful} of ${dishes.length} dishes (${extrasCreated} extras added as options to ${mainDishes.length} main products)`,
+        message: `Imported ${successful} of ${mainDishes.length} main products (${extrasAsOptions} extras attached as options)`,
         successful_count: successful,
         failed_count: failed,
-        extras_as_options: extrasCreated,
+        extras_as_options: extrasAsOptions,
         main_products_with_options: mainDishes.length,
+        skipped_extras_count: extraDishes.length,
         results,
       }),
       {
