@@ -130,30 +130,16 @@ async function fetchExistingOptionGroupType(merchantId: string): Promise<string 
   }
 }
 
-// Build product options from extras list (matching Hyperzod API spec)
-function buildProductOptions(extras: CreatedExtra[], optionGroupType: string | null): any[] {
+// Build product options from extras list (minimal Hyperzod format)
+function buildProductOptions(extras: CreatedExtra[]): any[] {
   if (extras.length === 0) return [];
 
   return [
     {
-      ...(optionGroupType ? { type: optionGroupType } : {}),
-      language_translation: [{ key: "option_name", locale: "en", value: "Extras" }],
-      selection_type: "multiple",
-      enable_range: true,
-      min_quantity: 0,
-      max_quantity: extras.length,
-      is_required: false,
       view_type: "list",
       options: extras.map((extra) => ({
-        language_translation: [{ key: "name", locale: "en", value: extra.name }],
         name: extra.name,
-        price_buy: 0,
-        price_sell: extra.price,
         image_url: null,
-        is_description_enabled: false,
-        description: "",
-        is_quantity_enabled: false,
-        quantity: 0,
       })),
     },
   ];
@@ -330,15 +316,8 @@ serve(async (req) => {
 
     console.log(`Created ${createdExtras.length} extras, now creating main products with options...`);
 
-    const optionGroupType = optionGroupTypeRequested || (await fetchExistingOptionGroupType(merchant_id));
-    if (!optionGroupType) {
-      console.log(
-        "No option group type discovered; sending options without type (Hyperzod may still accept this format).",
-      );
-    }
-
-    // Build product options from created extras
-    const productOptions = buildProductOptions(createdExtras, optionGroupType);
+    // Build product options from created extras (minimal format)
+    const productOptions = buildProductOptions(createdExtras);
     const hasOptions = productOptions.length > 0 && productOptions[0].options?.length > 0;
 
     // STEP 2: Create main dishes with extras as options
