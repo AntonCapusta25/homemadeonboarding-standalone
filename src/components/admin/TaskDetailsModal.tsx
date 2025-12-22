@@ -2,8 +2,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ChefWithStats } from '@/hooks/useChefProfiles';
-import { CheckCircle, XCircle, ExternalLink, MapPin, Mail, Phone, Calendar, Utensils, ChefHat, Shield, FileCheck, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, ExternalLink, MapPin, Mail, Phone, Calendar, Utensils, ChefHat, Shield, FileCheck, Clock, Home, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
@@ -19,6 +20,14 @@ interface TaskDetailsModalProps {
     kvk_document_url: string | null;
     haccp_document_url: string | null;
     nvwa_document_url: string | null;
+    // Kitchen safety check fields
+    kitchen_score: number | null;
+    kitchen_status: string | null;
+    kitchen_analysis: any | null;
+    kitchen_verified_at: string | null;
+    kitchen_photo_1_url: string | null;
+    kitchen_photo_2_url: string | null;
+    fridge_photo_url: string | null;
   } | null;
   menu: {
     id: string;
@@ -419,6 +428,160 @@ export function TaskDetailsModal({
           </div>
         );
 
+      case 'kitchen_verified':
+        const kitchenScore = verification?.kitchen_score;
+        const kitchenStatus = verification?.kitchen_status;
+        const kitchenAnalysis = verification?.kitchen_analysis as {
+          overall_score?: number;
+          category_scores?: Record<string, number>;
+          issues?: string[];
+          recommendations?: string[];
+        } | null;
+        const kitchenPhotos = {
+          kitchen1: verification?.kitchen_photo_1_url,
+          kitchen2: verification?.kitchen_photo_2_url,
+          fridge: verification?.fridge_photo_url,
+        };
+        
+        const hasPhotos = kitchenPhotos.kitchen1 || kitchenPhotos.kitchen2 || kitchenPhotos.fridge;
+        const hasAnalysis = kitchenAnalysis && Object.keys(kitchenAnalysis).length > 0;
+
+        const getScoreColor = (score: number) => {
+          if (score >= 80) return 'text-green-600';
+          if (score >= 60) return 'text-yellow-600';
+          return 'text-red-600';
+        };
+
+        const getStatusBadge = (status: string | null) => {
+          switch (status) {
+            case 'approved':
+              return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
+            case 'needs_review':
+              return <Badge className="bg-yellow-100 text-yellow-800"><AlertTriangle className="w-3 h-3 mr-1" /> Needs Review</Badge>;
+            case 'rejected':
+              return <Badge className="bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
+            default:
+              return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
+          }
+        };
+
+        return (
+          <div className="space-y-4">
+            {/* Status Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Home className="w-5 h-5 text-primary" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Kitchen Safety Check</p>
+                  {getStatusBadge(kitchenStatus)}
+                </div>
+              </div>
+              {kitchenScore !== null && kitchenScore !== undefined && (
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Score</p>
+                  <p className={`text-2xl font-bold ${getScoreColor(kitchenScore)}`}>
+                    {kitchenScore}%
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Photos Section */}
+            {hasPhotos && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Kitchen Photos</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {kitchenPhotos.kitchen1 && (
+                    <a href={kitchenPhotos.kitchen1} target="_blank" rel="noopener noreferrer" className="block">
+                      <img
+                        src={kitchenPhotos.kitchen1}
+                        alt="Kitchen Photo 1"
+                        className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
+                      />
+                      <p className="text-xs text-center text-muted-foreground mt-1">Overview</p>
+                    </a>
+                  )}
+                  {kitchenPhotos.kitchen2 && (
+                    <a href={kitchenPhotos.kitchen2} target="_blank" rel="noopener noreferrer" className="block">
+                      <img
+                        src={kitchenPhotos.kitchen2}
+                        alt="Kitchen Photo 2"
+                        className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
+                      />
+                      <p className="text-xs text-center text-muted-foreground mt-1">Work Area</p>
+                    </a>
+                  )}
+                  {kitchenPhotos.fridge && (
+                    <a href={kitchenPhotos.fridge} target="_blank" rel="noopener noreferrer" className="block">
+                      <img
+                        src={kitchenPhotos.fridge}
+                        alt="Fridge Photo"
+                        className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
+                      />
+                      <p className="text-xs text-center text-muted-foreground mt-1">Refrigerator</p>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Category Scores */}
+            {hasAnalysis && kitchenAnalysis?.category_scores && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">Category Scores</p>
+                {Object.entries(kitchenAnalysis.category_scores).map(([category, score]) => (
+                  <div key={category} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="capitalize">{category.replace(/_/g, ' ')}</span>
+                      <span className={getScoreColor(score as number)}>{score}%</span>
+                    </div>
+                    <Progress value={score as number} className="h-2" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Issues */}
+            {hasAnalysis && kitchenAnalysis?.issues && kitchenAnalysis.issues.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Issues Found</p>
+                <div className="space-y-1">
+                  {kitchenAnalysis.issues.map((issue, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                      <span>{issue}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recommendations */}
+            {hasAnalysis && kitchenAnalysis?.recommendations && kitchenAnalysis.recommendations.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Recommendations</p>
+                <div className="space-y-1">
+                  {kitchenAnalysis.recommendations.map((rec, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                      <span>{rec}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No Data State */}
+            {!hasPhotos && !hasAnalysis && !kitchenScore && (
+              <div className="text-center py-6">
+                <Home className="w-12 h-12 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-muted-foreground">No kitchen verification data yet</p>
+                <p className="text-sm text-muted-foreground">The chef hasn't completed the kitchen safety check.</p>
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return <p className="text-muted-foreground">No details available for this task.</p>;
     }
@@ -426,7 +589,7 @@ export function TaskDetailsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{taskName}</DialogTitle>
         </DialogHeader>
