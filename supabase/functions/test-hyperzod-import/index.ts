@@ -9,6 +9,7 @@ const HYPERZOD_API_KEY = Deno.env.get("HYPERZOD_API_KEY");
 const TENANT_ID = "3331";
 const BASE_URL = "https://api.hyperzod.app";
 const PRODUCT_CREATE_URL = `${BASE_URL}/merchant/v1/catalog/product/create`;
+const PRODUCT_UPDATE_URL = `${BASE_URL}/merchant/v1/catalog/product/update`;
 
 function removeEmojis(str: string): string {
   return str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{231A}-\u{231B}]|[\u{23E9}-\u{23F3}]|[\u{23F8}-\u{23FA}]|[\u{25AA}-\u{25AB}]|[\u{25B6}]|[\u{25C0}]|[\u{25FB}-\u{25FE}]|[\u{2614}-\u{2615}]|[\u{2648}-\u{2653}]|[\u{267F}]|[\u{2693}]|[\u{26A1}]|[\u{26AA}-\u{26AB}]|[\u{26BD}-\u{26BE}]|[\u{26C4}-\u{26C5}]|[\u{26CE}]|[\u{26D4}]|[\u{26EA}]|[\u{26F2}-\u{26F3}]|[\u{26F5}]|[\u{26FA}]|[\u{26FD}]|[\u{2702}]|[\u{2705}]|[\u{2708}-\u{270D}]|[\u{270F}]|[\u{2712}]|[\u{2714}]|[\u{2716}]|[\u{271D}]|[\u{2721}]|[\u{2728}]|[\u{2733}-\u{2734}]|[\u{2744}]|[\u{2747}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2763}-\u{2764}]|[\u{2795}-\u{2797}]|[\u{27A1}]|[\u{27B0}]|[\u{27BF}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{2B50}]|[\u{2B55}]|[\u{3030}]|[\u{303D}]|[\u{3297}]|[\u{3299}]/gu, '').trim();
@@ -32,7 +33,7 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
       (c: any) => c.name === categoryName || c.language_translation?.some((t: any) => t.value === categoryName),
     );
     if (existing) {
-      console.log(`Found existing category: ${existing._id || existing.category_id}`);
+      console.log(`[TEST] Found existing category: ${existing._id || existing.category_id}`);
       return existing._id || existing.category_id;
     }
   }
@@ -63,42 +64,6 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   return null;
 }
 
-// Try to discover a valid Hyperzod product option group "type" from existing products
-async function fetchExistingOptionGroupType(merchantId: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-TENANT": TENANT_ID,
-        "X-API-KEY": HYPERZOD_API_KEY!,
-      },
-    });
-
-    if (!res.ok) {
-      console.log(`[TEST] Option type discovery: product/list failed (${res.status})`);
-      return null;
-    }
-
-    const json = await res.json().catch(() => null);
-    const items = json?.data?.data || json?.data || [];
-
-    for (const p of items) {
-      const groups = Array.isArray(p?.product_options) ? p.product_options : [];
-      const groupWithType = groups.find((g: any) => typeof g?.type === "string" && g.type.trim().length > 0);
-      if (groupWithType?.type) {
-        console.log(`[TEST] Discovered option group type: ${groupWithType.type}`);
-        return String(groupWithType.type);
-      }
-    }
-
-    return null;
-  } catch (e) {
-    console.log("[TEST] Option type discovery error:", e);
-    return null;
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -114,7 +79,6 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const merchant_id = body?.merchant_id;
-    const optionGroupTypeRequested = typeof body?.option_group_type === "string" ? body.option_group_type.trim() : "";
 
     if (!merchant_id) {
       return new Response(JSON.stringify({ success: false, error: "merchant_id is required" }), {
@@ -123,7 +87,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[TEST] Testing import for merchant ${merchant_id}`);
+    console.log(`[TEST] Testing 2-step import for merchant ${merchant_id}`);
 
     // Create categories
     const mainCategoryId = await getOrCreateCategory(merchant_id, "Main Dishes");
@@ -133,28 +97,31 @@ serve(async (req) => {
 
     const results: any[] = [];
 
-    // STEP 1: Create one test extra
-    const extraPayload = {
+    // ============================================
+    // STEP 1: Create a main product WITHOUT options
+    // ============================================
+    const timestamp = Date.now();
+    const createPayload = {
       merchant_id,
-      sku: `TEST-EXTRA-${Date.now()}`,
+      sku: `TEST-MAIN-${timestamp}`,
       language_translation: [
-        { key: "name", locale: "en", value: "Test Extra Item" },
-        { key: "description", locale: "en", value: "A test extra/upsell item" },
+        { key: "name", locale: "en", value: "Test Main Dish" },
+        { key: "description", locale: "en", value: "A test main dish - will add options via update" },
       ],
       product_pricing: {
         type: "flat",
         price_buy: 0,
-        price_sell: 2.50,
+        price_sell: 12.99,
         price_sell_compare: null,
-        profit: 0,
-        margin: 0,
+        profit: 12.99,
+        margin: 100,
         is_tax_chargaeble: false,
         tax: 0,
       },
       has_product_options: false,
       product_options: [],
-      product_category: [extrasCategoryId || mainCategoryId],
-      product_tags: ["upsell", "extra", "test"],
+      product_category: [mainCategoryId],
+      product_tags: ["main", "test"],
       product_labels: [],
       status: true,
       is_quantity_enabled: false,
@@ -166,9 +133,10 @@ serve(async (req) => {
       product_images: [],
     };
 
-    console.log(`[TEST] Creating extra with payload:`, JSON.stringify(extraPayload, null, 2));
+    console.log(`[TEST] STEP 1: Creating product WITHOUT options...`);
+    console.log(`[TEST] Create payload:`, JSON.stringify(createPayload, null, 2));
 
-    const extraResponse = await fetch(PRODUCT_CREATE_URL, {
+    const createResponse = await fetch(PRODUCT_CREATE_URL, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -176,177 +144,123 @@ serve(async (req) => {
         "X-TENANT": TENANT_ID,
         "X-API-KEY": HYPERZOD_API_KEY!,
       },
-      body: JSON.stringify(extraPayload),
+      body: JSON.stringify(createPayload),
     });
 
-    const extraText = await extraResponse.text();
-    console.log(`[TEST] Extra response status: ${extraResponse.status}`);
-    console.log(`[TEST] Extra response body: ${extraText}`);
+    const createText = await createResponse.text();
+    console.log(`[TEST] Create response status: ${createResponse.status}`);
+    console.log(`[TEST] Create response body: ${createText}`);
 
-    let extraProductId = null;
-    if (extraResponse.ok) {
-      const extraData = JSON.parse(extraText);
-      extraProductId = extraData?.data?.product_id || extraData?.data?._id;
+    let productId = null;
+    if (createResponse.ok) {
+      const createData = JSON.parse(createText);
+      productId = createData?.data?.product_id || createData?.data?._id;
       results.push({
-        type: "extra",
-        name: "Test Extra Item",
+        step: 1,
+        action: "create_product",
         success: true,
-        product_id: extraProductId,
-        response: extraData,
+        product_id: productId,
+        response: createData,
       });
+      console.log(`[TEST] ✓ Product created with ID: ${productId}`);
     } else {
       results.push({
-        type: "extra",
-        name: "Test Extra Item",
+        step: 1,
+        action: "create_product",
         success: false,
-        status: extraResponse.status,
-        error: extraText,
-        payload_sent: extraPayload,
+        status: createResponse.status,
+        error: createText,
+        payload_sent: createPayload,
       });
+      console.log(`[TEST] ✗ Product creation failed`);
     }
 
-    // STEP 2: Create one test main dish WITH the extra as an option
-    const baseOptionGroup = extraProductId
-      ? {
-          language_translation: [
-            { key: "option_name", locale: "en", value: "Extras" },
-          ],
-          selection_type: "multiple",
-          enable_range: true,
-          min_quantity: 0,
-          max_quantity: 1,
-          is_required: false,
-          view_type: "list",
-          options: [
-            {
-              language_translation: [
-                { key: "name", locale: "en", value: "Test Extra Item" },
-              ],
-              name: "Test Extra Item",
-              price_buy: 0,
-              price_sell: 2.5,
-              image_url: null,
-              is_description_enabled: false,
-              description: "",
-              is_quantity_enabled: false,
-              quantity: 0,
-            },
-          ],
-        }
-      : null;
-
-    const discoveredType = optionGroupTypeRequested || (await fetchExistingOptionGroupType(merchant_id)) || "";
-
-    const typeCandidates = [
-      ...(discoveredType ? [discoveredType] : []),
-      "multi",
-      "multiple",
-      "multi_select",
-      "multiselect",
-      "checkbox",
-      "radio",
-      "list",
-      "addon",
-      "modifier",
-      "extras",
-      "option",
-    ].filter((v, i, arr) => arr.indexOf(v) === i);
-
-    const candidates: Array<string | null> = [null, ...typeCandidates];
-
-    const mainAttempts: any[] = [];
-    let mainCreated: any = null;
-
-    if (baseOptionGroup) {
-      for (const type of candidates) {
-        const mainPayload = {
-          merchant_id,
-          sku: `TEST-MAIN-${type ?? "no-type"}-${Date.now()}`,
-          language_translation: [
-            { key: "name", locale: "en", value: "Test Main Dish" },
-            { key: "description", locale: "en", value: "A test main dish with extras" },
-          ],
-          product_pricing: {
-            type: "flat",
+    // ============================================
+    // STEP 2: Update product to add options (if created)
+    // ============================================
+    if (productId) {
+      // Based on Hyperzod Update docs - NO type field, just selection_type, view_type, options
+      const productOptions = [{
+        language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
+        selection_type: "multiple",
+        enable_range: true,
+        min_quantity: 0,
+        max_quantity: 2,
+        is_required: false,
+        view_type: "list",
+        options: [
+          {
+            language_translation: [{ key: "name", value: "Extra Cheese", locale: "en" }],
+            name: "Extra Cheese",
             price_buy: 0,
-            price_sell: 12.99,
-            price_sell_compare: null,
-            profit: 0,
-            margin: 0,
-            is_tax_chargaeble: false,
-            tax: 0,
+            price_sell: 1.50,
+            image_url: null,
+            is_description_enabled: false,
+            description: "",
+            is_quantity_enabled: false,
+            quantity: 0,
           },
-          has_product_options: true,
-          product_options: [type ? { ...baseOptionGroup, type } : baseOptionGroup],
-          product_category: [mainCategoryId],
-          product_tags: ["main", "test"],
-          product_labels: [],
-          status: true,
-          is_quantity_enabled: false,
-          is_inventory_enabled: false,
-          product_inventory: 0,
-          is_featured: false,
-          sort_order: 0,
-          product_quantity: { min_quantity: 0, max_quantity: 0 },
-          product_images: [],
-        };
-
-        console.log(
-          `[TEST] Creating main dish with ${type ? `type="${type}"` : "no type"} payload:`,
-          JSON.stringify(mainPayload, null, 2),
-        );
-
-        const mainResponse = await fetch(PRODUCT_CREATE_URL, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "X-TENANT": TENANT_ID,
-            "X-API-KEY": HYPERZOD_API_KEY!,
+          {
+            language_translation: [{ key: "name", value: "Extra Sauce", locale: "en" }],
+            name: "Extra Sauce",
+            price_buy: 0,
+            price_sell: 0.75,
+            image_url: null,
+            is_description_enabled: false,
+            description: "",
+            is_quantity_enabled: false,
+            quantity: 0,
           },
-          body: JSON.stringify(mainPayload),
-        });
+        ],
+      }];
 
-        const mainText = await mainResponse.text();
-        console.log(
-          `[TEST] Main dish response status (${type ? `type="${type}"` : "no type"}): ${mainResponse.status}`,
-        );
-        console.log(`[TEST] Main dish response body (${type ? `type="${type}"` : "no type"}): ${mainText}`);
+      const updatePayload = {
+        id: productId,
+        merchant_id,
+        sku: `TEST-MAIN-${timestamp}`,
+        has_product_options: true,
+        product_options: productOptions,
+      };
 
-        if (mainResponse.ok) {
-          const mainData = JSON.parse(mainText);
-          mainCreated = {
-            type: "main_dish",
-            name: "Test Main Dish",
-            success: true,
-            used_type: type,
-            product_id: mainData?.data?.product_id || mainData?.data?._id,
-            response: mainData,
-          };
-          break;
-        }
+      console.log(`[TEST] STEP 2: Updating product to add options...`);
+      console.log(`[TEST] Update payload:`, JSON.stringify(updatePayload, null, 2));
 
-        mainAttempts.push({
-          tried_type: type,
-          status: mainResponse.status,
-          error: mainText,
-          payload_sent: mainPayload,
-        });
-      }
-    }
-
-    if (mainCreated) {
-      results.push(mainCreated);
-    } else {
-      results.push({
-        type: "main_dish",
-        name: "Test Main Dish",
-        success: false,
-        error: baseOptionGroup
-          ? "All candidate product_options.type values failed"
-          : "Extra was not created, so product options were not tested",
-        attempts: mainAttempts,
+      const updateResponse = await fetch(PRODUCT_UPDATE_URL, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-TENANT": TENANT_ID,
+          "X-API-KEY": HYPERZOD_API_KEY!,
+        },
+        body: JSON.stringify(updatePayload),
       });
+
+      const updateText = await updateResponse.text();
+      console.log(`[TEST] Update response status: ${updateResponse.status}`);
+      console.log(`[TEST] Update response body: ${updateText}`);
+
+      if (updateResponse.ok) {
+        const updateData = JSON.parse(updateText);
+        results.push({
+          step: 2,
+          action: "update_add_options",
+          success: true,
+          product_id: productId,
+          response: updateData,
+        });
+        console.log(`[TEST] ✓ Options added to product successfully!`);
+      } else {
+        results.push({
+          step: 2,
+          action: "update_add_options",
+          success: false,
+          status: updateResponse.status,
+          error: updateText,
+          payload_sent: updatePayload,
+        });
+        console.log(`[TEST] ✗ Options update failed`);
+      }
     }
 
     const allSuccess = results.every(r => r.success);
@@ -355,8 +269,9 @@ serve(async (req) => {
       JSON.stringify({
         success: allSuccess,
         message: allSuccess 
-          ? "Test import successful! Both extra and main dish created." 
-          : "Test import had failures - check results for details",
+          ? "2-step test successful! Product created, then options added via update." 
+          : "Test had failures - check results for details",
+        approach: "2-step: Create product first, then Update to add options",
         results,
       }),
       {

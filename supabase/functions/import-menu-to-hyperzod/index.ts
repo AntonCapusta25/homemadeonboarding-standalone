@@ -22,8 +22,6 @@ interface Dish {
 interface ImportRequest {
   merchant_id: string;
   dishes: Dish[];
-  /** Optional override for Hyperzod's product option group type */
-  option_group_type?: string;
 }
 
 function safeString(input: unknown, maxLen: number) {
@@ -108,43 +106,7 @@ async function getOrCreateCategory(merchantId: string, categoryName: string): Pr
   return null;
 }
 
-// Try to discover a valid option group type from existing products (when docs are unavailable)
-async function fetchExistingOptionGroupType(merchantId: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/merchant/v1/catalog/product/list?merchant_id=${merchantId}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-TENANT": TENANT_ID,
-        "X-API-KEY": HYPERZOD_API_KEY!,
-      },
-    });
-
-    if (!res.ok) {
-      console.log(`[OptionTypeDiscovery] product/list failed (${res.status})`);
-      return null;
-    }
-
-    const json = await res.json().catch(() => null);
-    const items = (json as any)?.data?.data || (json as any)?.data || [];
-
-    for (const p of items) {
-      const groups = Array.isArray((p as any)?.product_options) ? (p as any).product_options : [];
-      const groupWithType = groups.find((g: any) => typeof g?.type === "string" && g.type.trim().length > 0);
-      if (groupWithType?.type) {
-        console.log(`[OptionTypeDiscovery] Discovered option group type: ${groupWithType.type}`);
-        return String(groupWithType.type);
-      }
-    }
-
-    return null;
-  } catch (e) {
-    console.log("[OptionTypeDiscovery] error:", e);
-    return null;
-  }
-}
-
-// Build Hyperzod option items from "extras" dishes
+// Build option items from extras dishes (for product_options.options array)
 function buildOptionItemsFromExtras(extras: Dish[]): any[] {
   return extras
     .map((extra) => {
@@ -152,14 +114,12 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
       if (!name) return null;
 
       const priceSell = Number(extra?.price) || 0;
-      const priceBuy = 0;
       const imageUrl = typeof extra?.image_url === "string" && extra.image_url.trim() ? extra.image_url.trim() : null;
 
-      // NOTE: This mirrors the payload shape used in our existing test-hyperzod-import function.
       return {
         language_translation: [{ key: "name", value: name, locale: "en" }],
         name,
-        price_buy: priceBuy,
+        price_buy: 0,
         price_sell: priceSell,
         image_url: imageUrl,
         is_description_enabled: false,
@@ -171,42 +131,26 @@ function buildOptionItemsFromExtras(extras: Dish[]): any[] {
     .filter(Boolean);
 }
 
-// Build product options - with alternative key names and selection types
-function buildProductOptions(
-  extras: Dish[], 
-  typeValue?: string | number, 
-  useVariationsKey = false,
-  selectionType: "multiple" | "single" = "multiple"
-): any[] {
+// Build product_options array (based on Hyperzod Update API docs - NO type field!)
+function buildProductOptions(extras: Dish[]): any[] {
   const optionItems = buildOptionItemsFromExtras(extras);
   if (optionItems.length === 0) return [];
 
-  const group: any = {
+  // Based on docs: only selection_type, view_type, options - NO type field
+  return [{
     language_translation: [{ key: "option_name", value: "Extras", locale: "en" }],
-    selection_type: selectionType,
+    selection_type: "multiple",
     enable_range: true,
     min_quantity: 0,
     max_quantity: optionItems.length,
     is_required: false,
     view_type: "list",
-  };
-
-  // Try "variations" key (as shown in UI) or "options" key
-  if (useVariationsKey) {
-    group.variations = optionItems;
-  } else {
-    group.options = optionItems;
-  }
-
-  // Add type only if provided (undefined means skip the field entirely)
-  if (typeValue !== undefined) {
-    group.type = typeValue;
-  }
-
-  return [group];
+    options: optionItems,
+  }];
 }
 
 const PRODUCT_CREATE_URL = `${BASE_URL}/merchant/v1/catalog/product/create`;
+const PRODUCT_UPDATE_URL = `${BASE_URL}/merchant/v1/catalog/product/update`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -223,7 +167,6 @@ serve(async (req) => {
 
     const body = (await req.json().catch(() => null)) as ImportRequest | null;
     const merchant_id = safeString(body?.merchant_id, 128);
-    const optionGroupTypeRequested = safeString(body?.option_group_type, 64) || null;
     const dishes = Array.isArray(body?.dishes) ? body!.dishes : [];
 
     if (!merchant_id) {
@@ -242,9 +185,8 @@ serve(async (req) => {
 
     console.log(`Importing ${dishes.length} dishes to merchant ${merchant_id}`);
 
-    // Create default categories (extras category is optional, but keeping for future compatibility)
+    // Create default category
     const mainCategoryId = await getOrCreateCategory(merchant_id, "Main Dishes");
-    await getOrCreateCategory(merchant_id, "Extras");
 
     if (!mainCategoryId) {
       return new Response(JSON.stringify({ success: false, error: "Failed to create product categories" }), {
@@ -264,61 +206,19 @@ serve(async (req) => {
       success: boolean;
       error?: string;
       product_id?: string;
-      used_option_group_type?: string;
+      options_added?: boolean;
     }[] = [];
 
-    // We DO NOT import extras as standalone products.
-    // Instead, we attach them as product_options to every main product.
     const hasExtras = extraDishes.length > 0;
+    const productOptions = hasExtras ? buildProductOptions(extraDishes) : [];
 
-    console.log(`Will attach ${extraDishes.length} extras as product_options to each main product`);
+    console.log(`Will use 2-step approach: Create products first, then update with options`);
 
-    const discoveredType = hasExtras ? (await fetchExistingOptionGroupType(merchant_id)) : null;
+    // ============================================
+    // STEP 1: Create all main products WITHOUT options
+    // ============================================
+    const createdProducts: { dishName: string; productId: string; categoryId: string }[] = [];
 
-    // Priority: user-provided > discovered > hardcoded candidates
-    // Based on Hyperzod UI analysis - they use specific enum values
-    // The UI shows options like "Spice level" with variations "Low", "Medium", etc.
-    const stringTypeCandidates = [
-      ...(optionGroupTypeRequested ? [optionGroupTypeRequested] : []),
-      ...(discoveredType ? [discoveredType] : []),
-      // Exact enum values that Hyperzod likely uses (based on UI checkbox/radio patterns)
-      "nested",        // Most likely for tree-style options
-      "simple",        // Basic option type
-      "standard",      // Standard option type
-      "flat",          // Flat list of options
-      "group",         // Option group
-      "default",       // Default type
-      "product",       // Product-level options
-      "product_option", // Product option type
-      "addon",
-      "add-on",
-      "extra",
-      "modifier",
-      "variation",
-      "variant",
-      "size",
-      "topping",
-      "side",
-      // Selection type patterns
-      "single_select",
-      "multi_select",
-      "single",
-      "multiple",
-      "multi",
-      "checkbox",
-      "radio",
-      "list",
-      "dropdown",
-    ].filter((v, i, arr) => arr.indexOf(v) === i);
-
-    // Try string values, then numeric values, then finally without options
-    const typeCandidates: (string | number)[] = [
-      ...stringTypeCandidates,
-      // Numeric enum values (common pattern: 0=single, 1=multiple, 2=nested, etc.)
-      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-    ];
-
-    // STEP: Create main dishes with extras as options
     for (const dish of mainDishes) {
       try {
         const dishName = removeEmojis(safeString(dish?.name, 120));
@@ -342,7 +242,8 @@ serve(async (req) => {
           productImages.push({ file_url: dish.image_url, is_cover: true });
         }
 
-        const basePayload = {
+        // Create WITHOUT options first
+        const createPayload = {
           merchant_id,
           sku: dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
           language_translation: [
@@ -370,127 +271,49 @@ serve(async (req) => {
           sort_order: 0,
           product_quantity: { min_quantity: 0, max_quantity: 0 },
           product_images: productImages,
+          // Create WITHOUT options
+          has_product_options: false,
+          product_options: [],
         };
 
-        let created = false;
-        let lastErrorDetail = "";
+        console.log(`[STEP 1] Creating product: ${dishName} (without options)`);
 
-        // Try with "options" key first (standard), then with "variations" key (as shown in UI)
-        const keyVariants = [false, true]; // false = "options" key, true = "variations" key
-        const selectionTypes: Array<"multiple" | "single"> = ["multiple", "single"];
+        const createResponse = await fetch(PRODUCT_CREATE_URL, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-TENANT": TENANT_ID,
+            "X-API-KEY": HYPERZOD_API_KEY!,
+          },
+          body: JSON.stringify(createPayload),
+        });
 
-        for (const selectionType of selectionTypes) {
-          if (created) break;
+        const rawText = await createResponse.text();
 
-          for (const useVariationsKey of keyVariants) {
-            if (created) break;
-
-            for (const typeValue of typeCandidates) {
-              const payload = {
-                ...basePayload,
-                has_product_options: hasExtras,
-                product_options: hasExtras ? buildProductOptions(extraDishes, typeValue, useVariationsKey, selectionType) : [],
-              };
-
-              const typeLabel =
-                typeValue === undefined ? "(no type field)" : typeValue === "" ? "(empty string)" : String(typeValue);
-              const keyLabel = useVariationsKey ? "variations" : "options";
-
-              console.log(
-                `Creating: ${dishName} (type=${typeLabel}, key=${keyLabel}, sel=${selectionType})`,
-              );
-
-              // Log the full payload for debugging (first attempt only to reduce logs)
-              if (typeValue === typeCandidates[0] && !useVariationsKey && selectionType === "multiple") {
-                console.log(`[DEBUG] Full payload for ${dishName}:`, JSON.stringify(payload, null, 2));
-              }
-
-              const response = await fetch(PRODUCT_CREATE_URL, {
-                method: "POST",
-                headers: {
-                  Accept: "application/json",
-                  "Content-Type": "application/json",
-                  "X-TENANT": TENANT_ID,
-                  "X-API-KEY": HYPERZOD_API_KEY!,
-                },
-                body: JSON.stringify(payload),
-              });
-
-              const rawText = await response.text();
-
-              if (response.ok) {
-                const data = safeJsonParse(rawText) as any;
-                results.push({
-                  dish_name: dishName,
-                  success: true,
-                  product_id: data?.data?.product_id || data?.data?._id,
-                  used_option_group_type: `type=${typeValue}, key=${keyLabel}, sel=${selectionType}`,
-                });
-                console.log(`✓ Product ${dishName} created with type=${typeLabel}, key=${keyLabel}, sel=${selectionType}`);
-                created = true;
-                break;
-              }
-
-              const parsed = safeJsonParse(rawText);
-              const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-              lastErrorDetail = truncateForLog(errorForLog);
-
-              // Only log failures for first few attempts to reduce noise
-              if (typeCandidates.indexOf(typeValue) < 3) {
-                console.log(
-                  `✗ type=${typeLabel}, key=${keyLabel}, sel=${selectionType}: ${response.status}`,
-                );
-              }
-            }
-          }
-        }
-
-        // FALLBACK: If all type values failed BUT we have options, try creating WITHOUT options
-        if (!created && hasExtras) {
-          console.log(`All option types failed for ${dishName}, trying without options as fallback...`);
+        if (createResponse.ok) {
+          const data = safeJsonParse(rawText) as any;
+          const productId = data?.data?.product_id || data?.data?._id;
           
-          const noOptionsPayload = {
-            ...basePayload,
-            has_product_options: false,
-            product_options: [],
-          };
+          console.log(`✓ Created product ${dishName} with ID: ${productId}`);
           
-          const fallbackResponse = await fetch(PRODUCT_CREATE_URL, {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              "X-TENANT": TENANT_ID,
-              "X-API-KEY": HYPERZOD_API_KEY!,
-            },
-            body: JSON.stringify(noOptionsPayload),
+          createdProducts.push({
+            dishName,
+            productId,
+            categoryId: mainCategoryId,
           });
+        } else {
+          const parsed = safeJsonParse(rawText);
+          const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
           
-          const fallbackText = await fallbackResponse.text();
+          console.error(`✗ Failed to create product ${dishName}: ${createResponse.status}`);
+          console.error(`  Error: ${truncateForLog(errorForLog)}`);
           
-          if (fallbackResponse.ok) {
-            const data = safeJsonParse(fallbackText) as any;
-            results.push({
-              dish_name: dishName,
-              success: true,
-              product_id: data?.data?.product_id || data?.data?._id,
-              used_option_group_type: "(no options - fallback)",
-            });
-            console.log(`✓ Product ${dishName} created WITHOUT options (fallback)`);
-            created = true;
-          } else {
-            console.log(`✗ Fallback (no options) also failed: ${fallbackResponse.status}`);
-          }
-        }
-
-        if (!created) {
           results.push({
             dish_name: dishName,
             success: false,
-            error: `Product create failed. Last error: ${lastErrorDetail || "(no details)"}`,
+            error: `Create failed (${createResponse.status}): ${truncateForLog(errorForLog, 500)}`,
           });
-
-          console.error(`✗ Product ${dishName} FAILED completely`);
         }
       } catch (dishError: any) {
         console.error(`Error creating product ${dish?.name}:`, dishError);
@@ -502,23 +325,103 @@ serve(async (req) => {
       }
     }
 
+    console.log(`[STEP 1 COMPLETE] Created ${createdProducts.length} products`);
+
+    // ============================================
+    // STEP 2: Update products to add options (if we have extras)
+    // ============================================
+    if (hasExtras && createdProducts.length > 0) {
+      console.log(`[STEP 2] Adding options to ${createdProducts.length} products...`);
+
+      for (const product of createdProducts) {
+        try {
+          // Update payload based on Hyperzod docs - use product ID and add options
+          const updatePayload = {
+            id: product.productId,
+            merchant_id,
+            sku: product.dishName.replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50) || "SKU",
+            has_product_options: true,
+            product_options: productOptions,
+          };
+
+          console.log(`[STEP 2] Updating product ${product.dishName} with options...`);
+
+          const updateResponse = await fetch(PRODUCT_UPDATE_URL, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              "X-TENANT": TENANT_ID,
+              "X-API-KEY": HYPERZOD_API_KEY!,
+            },
+            body: JSON.stringify(updatePayload),
+          });
+
+          const updateText = await updateResponse.text();
+
+          if (updateResponse.ok) {
+            console.log(`✓ Added options to product ${product.dishName}`);
+            results.push({
+              dish_name: product.dishName,
+              success: true,
+              product_id: product.productId,
+              options_added: true,
+            });
+          } else {
+            const parsed = safeJsonParse(updateText);
+            const errorForLog = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+            
+            console.warn(`⚠ Product ${product.dishName} created but options update failed: ${updateResponse.status}`);
+            console.warn(`  Error: ${truncateForLog(errorForLog)}`);
+            
+            // Still consider it a partial success - product was created
+            results.push({
+              dish_name: product.dishName,
+              success: true,
+              product_id: product.productId,
+              options_added: false,
+              error: `Options update failed: ${truncateForLog(errorForLog, 300)}`,
+            });
+          }
+        } catch (updateError: any) {
+          console.error(`Error updating product ${product.dishName}:`, updateError);
+          results.push({
+            dish_name: product.dishName,
+            success: true,
+            product_id: product.productId,
+            options_added: false,
+            error: `Options update error: ${updateError?.message || "Unknown"}`,
+          });
+        }
+      }
+    } else if (createdProducts.length > 0) {
+      // No extras, just mark all as success
+      for (const product of createdProducts) {
+        results.push({
+          dish_name: product.dishName,
+          success: true,
+          product_id: product.productId,
+          options_added: false,
+        });
+      }
+    }
+
     const successful = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
-    const extrasAsOptions = extraDishes.length;
+    const withOptions = results.filter((r) => r.success && r.options_added).length;
 
     console.log(
-      `Import complete: ${successful} main products created, ${failed} failed, ${extrasAsOptions} extras attached as options`,
+      `Import complete: ${successful} products created, ${failed} failed, ${withOptions} with options attached`,
     );
 
     return new Response(
       JSON.stringify({
         success: failed === 0,
-        message: `Imported ${successful} of ${mainDishes.length} main products (${extrasAsOptions} extras attached as options)`,
+        message: `Imported ${successful} of ${mainDishes.length} main products (${withOptions} with extras as options)`,
         successful_count: successful,
         failed_count: failed,
-        extras_as_options: extrasAsOptions,
-        main_products_with_options: mainDishes.length,
-        skipped_extras_count: extraDishes.length,
+        products_with_options: withOptions,
+        extras_count: extraDishes.length,
         results,
       }),
       {
