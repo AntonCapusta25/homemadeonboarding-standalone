@@ -459,10 +459,50 @@ export default function AdminDashboard() {
             <h1 className="font-display text-xl font-bold text-foreground">Admin Dashboard</h1>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="gap-2">
-            <LogOut className="w-4 h-4" />
-            Logout
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={async () => {
+                // Find a chef with hyperzod_merchant_id and menu images
+                const { data: chef } = await supabase
+                  .from('chef_profiles')
+                  .select('id, business_name, hyperzod_merchant_id')
+                  .not('hyperzod_merchant_id', 'is', null)
+                  .limit(1)
+                  .single();
+                
+                if (!chef) {
+                  toast({ title: 'No chef with merchant ID found', variant: 'destructive' });
+                  return;
+                }
+
+                toast({ title: 'Testing import...', description: `Chef: ${chef.business_name}` });
+
+                const { data, error } = await supabase.functions.invoke('import-menu-to-hyperzod', {
+                  body: { chef_profile_id: chef.id }
+                });
+
+                console.log('Import result:', data, error);
+                
+                if (error) {
+                  toast({ title: 'Import failed', description: error.message, variant: 'destructive' });
+                } else {
+                  toast({ 
+                    title: data?.success ? 'Import succeeded' : 'Import had issues', 
+                    description: data?.message || JSON.stringify(data) 
+                  });
+                }
+              }}
+              className="gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Test Import
+            </Button>
+            <Button variant="outline" onClick={handleLogout} className="gap-2">
+              <LogOut className="w-4 h-4" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
