@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Phone, Calendar, Activity, ChevronDown, ChevronUp, Star, Award, Trophy, Medal } from 'lucide-react';
+import { TrendingUp, Phone, Calendar, Activity, ChevronDown, ChevronUp, Star, Award, Trophy, Medal, CheckCircle, Users, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { AdminStats } from '@/hooks/useAdminStatistics';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const CRM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -23,29 +24,22 @@ interface AdminStatisticsProps {
   error: string | null;
 }
 
-// Calculate performance score based on calls and success rate
+// Calculate performance score based on progress score and conversions
 const calculatePerformanceScore = (admin: AdminStats): number => {
-  // Weighted score: 60% success rate, 30% call efficiency, 10% activity
-  const successWeight = 0.6;
-  const callEfficiencyWeight = 0.3;
-  const activityWeight = 0.1;
+  // Weighted score: 50% progress score, 30% success rate, 20% activity
+  const progressWeight = 0.5;
+  const successWeight = 0.3;
+  const activityWeight = 0.2;
 
+  const progressScore = admin.progressScore; // 0-100
   const successScore = admin.successRate; // 0-100
 
-  // Call efficiency: calls per chef (ideal ~3-5 calls per conversion)
-  const callsPerChef = admin.assignedChefs > 0 ? admin.totalCalls / admin.assignedChefs : 0;
-  // Normalize: 3-5 calls per chef = 100%, more or fewer = lower score
-  const idealCalls = 4;
-  const callEfficiency = callsPerChef > 0 
-    ? Math.max(0, 100 - Math.abs(callsPerChef - idealCalls) * 15)
-    : 0;
-
-  // Activity score based on total interactions
-  const activityScore = Math.min(100, (admin.totalCalls + admin.totalFollowUps) * 5);
+  // Activity score based on total interactions (calls + follow-ups)
+  const activityScore = Math.min(100, (admin.totalCalls * 10 + admin.totalFollowUps * 5));
 
   return Math.round(
+    (progressScore * progressWeight) +
     (successScore * successWeight) +
-    (callEfficiency * callEfficiencyWeight) +
     (activityScore * activityWeight)
   );
 };
@@ -56,11 +50,24 @@ const getRatingTier = (score: number): { label: string; color: string; icon: typ
   if (score >= 60) return { label: 'High Achiever', color: 'text-emerald-500', icon: Award, stars: 4 };
   if (score >= 40) return { label: 'Solid Progress', color: 'text-blue-500', icon: Medal, stars: 3 };
   if (score >= 20) return { label: 'Building Up', color: 'text-orange-500', icon: Medal, stars: 2 };
-  return { label: 'Rookie', color: 'text-gray-500', icon: Award, stars: 1 };
+  return { label: 'Getting Started', color: 'text-gray-500', icon: Award, stars: 1 };
 };
 
 export const AdminStatistics = ({ stats, loading, error }: AdminStatisticsProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  const toggleCard = (adminId: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(adminId)) {
+        next.delete(adminId);
+      } else {
+        next.add(adminId);
+      }
+      return next;
+    });
+  };
 
   // Calculate rankings dynamically
   const rankedStats = useMemo(() => {
@@ -132,6 +139,7 @@ export const AdminStatistics = ({ stats, loading, error }: AdminStatisticsProps)
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {rankedStats.map((admin) => {
             const TierIcon = admin.tier.icon;
+            const isCardExpanded = expandedCards.has(admin.adminId);
             // Top 3 get special trophy colors
             const rankColor = admin.rank === 1 
               ? 'text-yellow-500' 
@@ -227,32 +235,67 @@ export const AdminStatistics = ({ stats, loading, error }: AdminStatisticsProps)
                       <p className="text-2xl font-bold text-foreground">{admin.assignedChefs}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Success Rate</p>
+                      <p className="text-sm text-muted-foreground">Closed / Active</p>
                       <div className="flex items-baseline gap-2">
-                        <p className="text-2xl font-bold text-green-600">{admin.successRate}%</p>
+                        <p className="text-2xl font-bold text-green-600">{admin.successfulConversions}</p>
                         <p className="text-xs text-muted-foreground">
-                          ({admin.successfulConversions}/{admin.assignedChefs})
+                          ({admin.successRate}%)
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Average Completion */}
-                  <div>
+                  {/* Closed Chefs List */}
+                  {admin.closedChefs.length > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-xs font-medium text-green-800 mb-2 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Closed Chefs
+                      </p>
+                      <div className="space-y-1">
+                        {admin.closedChefs.slice(0, 3).map((chef) => (
+                          <div key={chef.id} className="flex items-center justify-between text-xs">
+                            <span className="text-green-700 font-medium truncate max-w-[150px]">
+                              {chef.businessName || chef.name}
+                            </span>
+                            <span className="text-green-600">
+                              {format(new Date(chef.closedAt), 'MMM d')}
+                            </span>
+                          </div>
+                        ))}
+                        {admin.closedChefs.length > 3 && (
+                          <p className="text-xs text-green-600 text-center pt-1">
+                            +{admin.closedChefs.length - 3} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chef Progress Breakdown */}
+                  <div className="pt-2 border-t border-border">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <TrendingUp className="h-4 w-4" />
-                        Avg Completion
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">
-                        {admin.averageCompletion}%
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                        <Target className="h-3 w-3" />
+                        Chef Progress Breakdown
+                      </p>
+                      <span className="text-xs font-bold text-foreground">
+                        Score: {admin.progressScore}
                       </span>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-primary to-primary/80 h-2 rounded-full transition-all"
-                        style={{ width: `${admin.averageCompletion}%` }}
-                      />
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="text-center p-2 rounded-lg bg-green-50 border border-green-200">
+                        <p className="text-lg font-bold text-green-700">{admin.chefsByProgress.high.length}</p>
+                        <p className="text-[10px] text-green-600">75%+ Ready</p>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-yellow-50 border border-yellow-200">
+                        <p className="text-lg font-bold text-yellow-700">{admin.chefsByProgress.medium.length}</p>
+                        <p className="text-[10px] text-yellow-600">50-74%</p>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-red-50 border border-red-200">
+                        <p className="text-lg font-bold text-red-700">{admin.chefsByProgress.low.length}</p>
+                        <p className="text-[10px] text-red-600">&lt;50%</p>
+                      </div>
                     </div>
                   </div>
 
@@ -268,41 +311,106 @@ export const AdminStatistics = ({ stats, loading, error }: AdminStatisticsProps)
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-purple-500" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Follow-ups Set</p>
+                        <p className="text-xs text-muted-foreground">Follow-ups</p>
                         <p className="text-sm font-semibold">{admin.totalFollowUps}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Status Breakdown */}
-                  {Object.keys(admin.statusBreakdown).length > 0 && (
-                    <div className="pt-2 border-t border-border">
-                      <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                        <Activity className="h-3 w-3" />
-                        Status Breakdown
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {Object.entries(admin.statusBreakdown)
-                          .sort((a, b) => b[1] - a[1])
-                          .map(([status, count]) => {
-                            const statusKey = (!status || status === 'null' || status === 'undefined') ? 'new' : status;
-                            const config = CRM_STATUS_CONFIG[statusKey];
-                            
-                            return (
-                              <Badge
-                                key={status}
-                                className={cn(
-                                  "text-xs px-2 py-0.5 font-normal border whitespace-nowrap",
-                                  config?.color || "bg-muted text-muted-foreground border-border"
-                                )}
-                              >
-                                {config?.label || statusKey}: {count}
-                              </Badge>
-                            );
-                          })}
+                  {/* Expandable Chef Details */}
+                  <Collapsible open={isCardExpanded} onOpenChange={() => toggleCard(admin.adminId)}>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-center gap-2 pt-2 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                        <Users className="h-3 w-3" />
+                        <span>{isCardExpanded ? 'Hide' : 'Show'} Chef Details</span>
+                        {isCardExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       </div>
-                    </div>
-                  )}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="pt-3 space-y-3">
+                        {/* High Progress Chefs */}
+                        {admin.chefsByProgress.high.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-green-700 mb-1">Almost Ready (75%+)</p>
+                            <div className="space-y-1">
+                              {admin.chefsByProgress.high.slice(0, 5).map((chef) => (
+                                <div key={chef.id} className="flex items-center justify-between text-xs p-1.5 bg-green-50 rounded">
+                                  <span className="truncate max-w-[120px]">{chef.businessName || chef.name}</span>
+                                  <Badge variant="outline" className="text-[10px] bg-green-100 text-green-700 border-green-300">
+                                    {chef.progress}%
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Medium Progress Chefs */}
+                        {admin.chefsByProgress.medium.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-yellow-700 mb-1">In Progress (50-74%)</p>
+                            <div className="space-y-1">
+                              {admin.chefsByProgress.medium.slice(0, 5).map((chef) => (
+                                <div key={chef.id} className="flex items-center justify-between text-xs p-1.5 bg-yellow-50 rounded">
+                                  <span className="truncate max-w-[120px]">{chef.businessName || chef.name}</span>
+                                  <Badge variant="outline" className="text-[10px] bg-yellow-100 text-yellow-700 border-yellow-300">
+                                    {chef.progress}%
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Low Progress Chefs */}
+                        {admin.chefsByProgress.low.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-red-700 mb-1">Needs Attention (&lt;50%)</p>
+                            <div className="space-y-1">
+                              {admin.chefsByProgress.low.slice(0, 5).map((chef) => (
+                                <div key={chef.id} className="flex items-center justify-between text-xs p-1.5 bg-red-50 rounded">
+                                  <span className="truncate max-w-[120px]">{chef.businessName || chef.name}</span>
+                                  <Badge variant="outline" className="text-[10px] bg-red-100 text-red-700 border-red-300">
+                                    {chef.progress}%
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Status Breakdown */}
+                        {Object.keys(admin.statusBreakdown).length > 0 && (
+                          <div className="pt-2 border-t border-border">
+                            <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                              <Activity className="h-3 w-3" />
+                              Status Breakdown
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {Object.entries(admin.statusBreakdown)
+                                .sort((a, b) => b[1] - a[1])
+                                .map(([status, count]) => {
+                                  const statusKey = (!status || status === 'null' || status === 'undefined') ? 'new' : status;
+                                  const config = CRM_STATUS_CONFIG[statusKey];
+                                  
+                                  return (
+                                    <Badge
+                                      key={status}
+                                      className={cn(
+                                        "text-xs px-2 py-0.5 font-normal border whitespace-nowrap",
+                                        config?.color || "bg-muted text-muted-foreground border-border"
+                                      )}
+                                    >
+                                      {config?.label || statusKey}: {count}
+                                    </Badge>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
                   {/* Last Activity */}
                   {admin.lastActivity && (
