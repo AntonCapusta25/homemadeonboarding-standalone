@@ -386,5 +386,12 @@
     "menuTimeRemaining": "~{{seconds}}s remaining",
     "menuAlmostDone": "Almost done...",
     "menuGeneratedSuccess": "Your personalized menu is ready! 🎉"
+  },
+  "chapters": {
+    "basics": "The Basics",
+    "contact": "Contact Info",
+    "brand": "Your Brand",
+    "operations": "Operations",
+    "compliance": "Getting Ready"
   }
 }

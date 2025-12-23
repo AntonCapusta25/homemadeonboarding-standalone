@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOnboarding, clearOnboardingProgress } from '@/hooks/useOnboarding';
 import { useAuth } from '@/hooks/useAuth';
 import { useAbandonmentTracking } from '@/hooks/useAbandonmentTracking';
-import { ProgressBar } from './ProgressBar';
+import { ChapterProgressBar } from './ChapterProgressBar';
 import { Logo } from '@/components/Logo';
 import { CityStep } from './steps/CityStep';
 import { CuisineStep } from './steps/CuisineStep';
@@ -598,10 +598,9 @@ export function OnboardingWizard() {
 
         {showProgress && (
           <div className="mb-8 animate-fade-in">
-            <ProgressBar
+            <ChapterProgressBar
               progress={adjustedProgress}
-              currentStep={displayStepNumber}
-              totalSteps={totalSteps}
+              currentStep={currentStep}
             />
           </div>
         )}
