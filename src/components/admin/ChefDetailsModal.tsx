@@ -992,9 +992,10 @@ export function ChefDetailsModal({
     {
       id: 'documents_uploaded',
       name: 'Documents Uploaded',
-      completed: verification?.documents_uploaded || false,
+      // Only show completed if ID (kvk_document_url) is uploaded
+      completed: !!verification?.kvk_document_url,
       data: {
-        kvk: verification?.kvk_document_url,
+        id: verification?.kvk_document_url,
         haccp: verification?.haccp_document_url,
         nvwa: verification?.nvwa_document_url,
       },
