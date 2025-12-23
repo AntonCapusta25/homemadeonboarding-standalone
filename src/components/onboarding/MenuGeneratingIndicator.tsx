@@ -7,7 +7,7 @@ interface MenuGeneratingIndicatorProps {
   isVisible: boolean;
 }
 
-const ESTIMATED_TIME_SECONDS = 15;
+const ESTIMATED_TIME_SECONDS = 5;
 
 export function MenuGeneratingIndicator({ isVisible }: MenuGeneratingIndicatorProps) {
   const { t } = useTranslation();

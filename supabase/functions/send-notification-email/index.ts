@@ -8,9 +8,10 @@ const corsHeaders = {
 };
 
 interface NotificationEmailRequest {
-  type: 'abandonment' | 'welcome' | 'new_signup' | 'food_safety_skipped' | 'food_safety_followup' | 'called_no_answer' | 'onboarding_reminder' | 'meeting_booked' | 'interested_followup';
+  type: 'abandonment' | 'welcome' | 'new_signup' | 'food_safety_skipped' | 'food_safety_followup' | 'called_no_answer' | 'onboarding_reminder' | 'meeting_booked' | 'interested_followup' | 'documents_skipped';
   chefName: string;
   email: string;
+  skippedDocs?: string[];
   phone?: string;
   city?: string;
   address?: string;
@@ -361,6 +362,44 @@ const handler = async (req: Request): Promise<Response> => {
           <p style="font-size: 16px; color: #333;">
             We can't wait to see your delicious dishes on our platform!
           </p>
+          <p style="color: #666;">
+            Best regards,<br>
+            The Homemade Team<br>
+            <a href="https://wa.me/3197010208809">WhatsApp: +31 97010208809</a>
+          </p>
+        </div>
+      `;
+    } else if (type === 'documents_skipped') {
+      // Follow-up for chefs who skipped document uploads
+      toEmail = email;
+      const skippedDocs = request.skippedDocs || ['ID document'];
+      const docListHtml = skippedDocs.map(doc => `<li style="margin: 8px 0; color: #555;">${doc}</li>`).join('');
+      
+      subject = `Don't forget to upload your documents! 📄 - Homemade`;
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #f97316;">Hi ${chefName}! 👋</h1>
+          <p style="font-size: 16px; color: #333;">
+            We noticed you skipped uploading some documents during verification. No worries - you can start cooking and upload them later, but we'll need them for full approval.
+          </p>
+          <div style="background: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fed7aa;">
+            <h3 style="margin-top: 0; color: #c2410c;">📋 Documents Needed:</h3>
+            <ul style="margin: 0; padding-left: 20px;">
+              ${docListHtml}
+            </ul>
+          </div>
+          <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">
+            <h3 style="margin-top: 0; color: #166534;">💡 Why do we need these?</h3>
+            <p style="color: #333; margin-bottom: 0;">
+              These documents help us verify your identity and ensure compliance with food safety regulations. It protects both you and your customers!
+            </p>
+          </div>
+          <p style="font-size: 16px; color: #333;">
+            When you're ready, just log back into your account and upload the documents. Need help? Book a call with our team!
+          </p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="https://calendly.com/homemademeals-info/interview-with-homemade" style="background: #f97316; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">📞 Book a Call</a>
+          </div>
           <p style="color: #666;">
             Best regards,<br>
             The Homemade Team<br>

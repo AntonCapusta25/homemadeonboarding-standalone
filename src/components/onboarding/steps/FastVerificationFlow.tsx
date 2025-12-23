@@ -117,6 +117,28 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
     goToNext();
   };
 
+  const handleDocumentSkipped = async () => {
+    // Mark as "completed" but send follow-up email since they skipped
+    if (chefProfileId) {
+      await updateProgress(chefProfileId, { documentsUploaded: true });
+      
+      // Send documents skipped email
+      try {
+        await supabase.functions.invoke('send-notification-email', {
+          body: {
+            type: 'documents_skipped',
+            chefName: profile.firstName || profile.restaurantName || 'Chef',
+            email: profile.email,
+            skippedDocs: ['ID Document (passport or ID card)'],
+          }
+        });
+      } catch (error) {
+        console.error('Failed to send documents skipped email:', error);
+      }
+    }
+    goToNext();
+  };
+
   const handleCongratsComplete = async () => {
     // Mark verification as fully completed
     if (chefProfileId) {
@@ -189,7 +211,7 @@ export function FastVerificationFlow({ profile, onUpdateProfile, onComplete }: F
             onUpdateProfile={onUpdateProfile}
             onNext={handleDocumentStepComplete}
             onPrevious={goToPrevious}
-            onSkip={handleDocumentStepComplete}
+            onSkip={handleDocumentSkipped}
             onDocumentUpload={handleDocumentUpload}
             verificationProgress={progress}
             chefProfileId={chefProfileId}
