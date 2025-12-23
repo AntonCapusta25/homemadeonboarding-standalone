@@ -26,20 +26,21 @@ interface AdminStatisticsProps {
 
 // Calculate performance score based on progress score and conversions
 const calculatePerformanceScore = (admin: AdminStats): number => {
-  // Weighted score: 50% progress score, 30% success rate, 20% activity
-  const progressWeight = 0.5;
-  const successWeight = 0.3;
+  // Weighted score: 50% closed chefs (priority), 30% progress score, 20% activity
+  const closedWeight = 0.5;
+  const progressWeight = 0.3;
   const activityWeight = 0.2;
 
+  // Closed chefs score - each closed chef adds 20 points (max 100)
+  const closedScore = Math.min(100, admin.successfulConversions * 20);
   const progressScore = admin.progressScore; // 0-100
-  const successScore = admin.successRate; // 0-100
 
   // Activity score based on total interactions (calls + follow-ups)
   const activityScore = Math.min(100, (admin.totalCalls * 10 + admin.totalFollowUps * 5));
 
   return Math.round(
+    (closedScore * closedWeight) +
     (progressScore * progressWeight) +
-    (successScore * successWeight) +
     (activityScore * activityWeight)
   );
 };
