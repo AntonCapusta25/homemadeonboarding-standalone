@@ -1,5 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateOnboardingProgress, calculateVerificationProgress } from '@/lib/chefProgress';
+import { ChefWithStats } from './useChefProfiles';
+
+export interface ClosedChef {
+  id: string;
+  name: string;
+  businessName: string | null;
+  closedAt: string;
+  progress: number;
+}
+
+export interface ChefProgressInfo {
+  id: string;
+  name: string;
+  businessName: string | null;
+  progress: number;
+  status: string;
+  lastContact: string | null;
+}
 
 export interface AdminStats {
   adminId: string;
@@ -13,6 +32,14 @@ export interface AdminStats {
   totalFollowUps: number;
   statusBreakdown: Record<string, number>;
   lastActivity: string | null;
+  // New fields for motivation
+  closedChefs: ClosedChef[];
+  chefsByProgress: {
+    high: ChefProgressInfo[];   // 75%+
+    medium: ChefProgressInfo[]; // 50-74%
+    low: ChefProgressInfo[];    // <50%
+  };
+  progressScore: number; // Weighted score based on chef progress
 }
 
 interface ChefAdminData {
@@ -23,6 +50,7 @@ interface ChefAdminData {
   crm_follow_up_date: string | null;
   call_attempts: number | null;
   assigned_admin_id: string | null;
+  updated_at: string;
 }
 
 export function useAdminStatistics() {
@@ -61,6 +89,7 @@ export function useAdminStatistics() {
       // Get chef profiles for completion stats
       const profileIds = (adminDataRows || []).map(a => a.chef_profile_id);
       let profilesMap: Record<string, {
+        id: string;
         business_name: string | null;
         chef_name: string | null;
         city: string | null;
@@ -143,10 +172,13 @@ export function useAdminStatistics() {
           totalFollowUps: 0,
           statusBreakdown: {},
           lastActivity: null,
+          closedChefs: [],
+          chefsByProgress: { high: [], medium: [], low: [] },
+          progressScore: 0,
         };
       }
 
-      // Process admin data - success = all steps completed (onboarding + verification)
+      // Process admin data
       for (const adminData of adminDataRows || []) {
         const adminId = adminData.assigned_admin_id;
         if (!adminId || !adminStatsMap[adminId]) continue;
@@ -171,53 +203,83 @@ export function useAdminStatistics() {
         const verification = verificationMap[adminData.chef_profile_id];
         
         if (profile) {
-          // Onboarding fields (12 steps)
-          const onboardingFields = [
-            profile.city,
-            profile.cuisines && profile.cuisines.length > 0,
-            profile.contact_email && profile.contact_phone,
-            profile.address,
-            profile.business_name,
-            profile.logo_url,
-            profile.service_type && profile.service_type !== 'unsure',
-            profile.availability && profile.availability.length > 0,
-            profile.dish_types && profile.dish_types.length > 0,
-            profile.food_safety_status,
-            profile.kvk_status,
-            profile.plan,
-          ];
+          // Build a ChefWithStats-like object for progress calculation
+          const chefForProgress = {
+            ...profile,
+            verification_menu_reviewed: verification?.menu_reviewed || false,
+            verification_food_safety_viewed: verification?.food_safety_viewed || false,
+            verification_documents_uploaded: verification?.documents_uploaded || false,
+            verification_kitchen_verified: !!verification?.kitchen_verified_at,
+          } as ChefWithStats;
+
+          const onboardingProgress = calculateOnboardingProgress(chefForProgress);
+          const verificationProgress = calculateVerificationProgress(chefForProgress);
           
-          // Verification fields (4 steps)
-          const verificationFields = [
-            verification?.menu_reviewed,
-            verification?.food_safety_viewed,
-            verification?.documents_uploaded,
-            !!verification?.kitchen_verified_at,
-          ];
-          
-          const allFields = [...onboardingFields, ...verificationFields];
-          const filledFields = allFields.filter(Boolean).length;
-          const totalFields = allFields.length;
-          const completion = Math.round((filledFields / totalFields) * 100);
+          // Combined progress (weighted: 60% onboarding, 40% verification)
+          const totalProgress = Math.round(onboardingProgress * 0.6 + verificationProgress * 0.4);
           
           stat.averageCompletion = stat.assignedChefs === 1 
-            ? completion 
-            : Math.round((stat.averageCompletion * (stat.assignedChefs - 1) + completion) / stat.assignedChefs);
+            ? totalProgress 
+            : Math.round((stat.averageCompletion * (stat.assignedChefs - 1) + totalProgress) / stat.assignedChefs);
 
-          // Success = ALL steps completed (100% completion)
-          if (filledFields === totalFields) {
+          const chefInfo: ChefProgressInfo = {
+            id: profile.id,
+            name: profile.chef_name || profile.contact_email || 'Unknown',
+            businessName: profile.business_name,
+            progress: totalProgress,
+            status: status,
+            lastContact: adminData.crm_last_contact_date,
+          };
+
+          // Categorize by progress
+          if (totalProgress >= 75) {
+            stat.chefsByProgress.high.push(chefInfo);
+          } else if (totalProgress >= 50) {
+            stat.chefsByProgress.medium.push(chefInfo);
+          } else {
+            stat.chefsByProgress.low.push(chefInfo);
+          }
+
+          // Success = status is "active" (they became a paying customer) OR onboarding + verification complete
+          const isActive = status === 'active';
+          const isFullyComplete = onboardingProgress === 100 && verificationProgress === 100;
+          
+          if (isActive || isFullyComplete) {
             stat.successfulConversions++;
+            stat.closedChefs.push({
+              id: profile.id,
+              name: profile.chef_name || profile.business_name || 'Unknown',
+              businessName: profile.business_name,
+              closedAt: adminData.updated_at,
+              progress: totalProgress,
+            });
           }
         }
       }
 
-      // Calculate success rates and get last activity
+      // Calculate success rates, progress scores, and get last activity
       for (const adminId of Object.keys(adminStatsMap)) {
         const stat = adminStatsMap[adminId];
         
         if (stat.assignedChefs > 0) {
           stat.successRate = Math.round((stat.successfulConversions / stat.assignedChefs) * 100);
+          
+          // Progress score: weighted by how many chefs are in high/medium progress
+          // High progress chefs = 3 points, medium = 2 points, low = 1 point
+          const highPoints = stat.chefsByProgress.high.length * 3;
+          const mediumPoints = stat.chefsByProgress.medium.length * 2;
+          const lowPoints = stat.chefsByProgress.low.length * 1;
+          const maxPoints = stat.assignedChefs * 3;
+          stat.progressScore = Math.round(((highPoints + mediumPoints + lowPoints) / maxPoints) * 100);
         }
+
+        // Sort closed chefs by date (most recent first)
+        stat.closedChefs.sort((a, b) => new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime());
+
+        // Sort progress lists by progress (highest first)
+        stat.chefsByProgress.high.sort((a, b) => b.progress - a.progress);
+        stat.chefsByProgress.medium.sort((a, b) => b.progress - a.progress);
+        stat.chefsByProgress.low.sort((a, b) => b.progress - a.progress);
 
         // Get last activity
         const adminActivity = activities?.find(a => a.admin_user_id === adminId);
@@ -226,9 +288,9 @@ export function useAdminStatistics() {
         }
       }
 
-      // Convert to array and sort by assigned chefs (show all admins)
+      // Convert to array and sort by progress score (best performers first)
       const statsArray = Object.values(adminStatsMap)
-        .sort((a, b) => b.assignedChefs - a.assignedChefs);
+        .sort((a, b) => b.progressScore - a.progressScore || b.assignedChefs - a.assignedChefs);
 
       setStats(statsArray);
     } catch (err) {
