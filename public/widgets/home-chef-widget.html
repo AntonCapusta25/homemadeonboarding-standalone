@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Chef Journey</title>
+  <style>
+    /* Apps SDK UI Design Tokens */
+    :root {
+      --gray-0: #ffffff;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-150: #e5e7eb;
+      --gray-200: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-650: #4b5563;
+      --gray-750: #1f2937;
+      --gray-850: #111827;
+      --gray-900: #0b0b0f;
+
+      --color-text: var(--gray-900);
+      --color-text-secondary: var(--gray-500);
+      --color-surface: var(--gray-0);
+      --color-border-default: var(--gray-150);
+      --color-border-subtle: var(--gray-100);
+
+      --color-primary: #10a37f;
+      --color-primary-hover: #0d8a6b;
+      --color-success: #10b981;
+      --color-success-bg: #d1fae5;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+      --space-1: 0.25rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-6: 1.5rem;
+
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+
+    [data-theme="dark"] {
+      --gray-0: #0b0b0f;
+      --gray-50: #111827;
+      --gray-100: #1f2937;
+      --gray-150: #374151;
+      --gray-200: #4b5563;
+      --gray-400: #6b7280;
+      --gray-500: #9ca3af;
+      --gray-650: #d1d5db;
+      --gray-750: #e5e7eb;
+      --gray-850: #f3f4f6;
+      --gray-900: #f9fafb;
+
+      --color-text: var(--gray-900);
+      --color-text-secondary: var(--gray-500);
+      --color-surface: var(--gray-50);
+      --color-border-default: var(--gray-150);
+      --color-border-subtle: var(--gray-100);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-surface);
+      color: var(--color-text);
+      padding: var(--space-4);
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-default);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      padding: var(--space-4);
+    }
+
+    .heading-lg {
+      font-size: 1.25rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--color-text);
+    }
+
+    .text-sm {
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .text-secondary {
+      color: var(--color-text-secondary);
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .badge-success {
+      background: var(--color-success-bg);
+      color: #065f46;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+
+    .button-primary {
+      background: var(--color-primary);
+      color: white;
+    }
+
+    .button-primary:hover {
+      background: var(--color-primary-hover);
+    }
+
+    .button-soft {
+      background: var(--gray-100);
+      color: var(--color-text);
+      border: 1px solid var(--color-border-subtle);
+    }
+
+    .button-soft:hover {
+      background: var(--gray-150);
+    }
+
+    .button-block {
+      width: 100%;
+    }
+
+    .progress-container {
+      margin-top: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: var(--gray-100);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--color-primary);
+      transition: width 0.3s ease;
+      border-radius: 9999px;
+    }
+
+    .progress-text {
+      margin-top: var(--space-2);
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      text-align: right;
+    }
+
+    .step-list {
+      display: grid;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+
+    .step-item {
+      display: flex;
+      align-items: start;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: 8px;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+
+    .step-item:hover {
+      background: var(--gray-50);
+    }
+
+    .step-item.completed {
+      border-color: var(--color-success);
+      background: var(--color-success-bg);
+    }
+
+    .step-item.current {
+      border-color: var(--color-primary);
+      background: rgba(16, 163, 127, 0.05);
+    }
+
+    .step-icon {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .step-icon.completed {
+      background: var(--color-success);
+      color: white;
+    }
+
+    .step-icon.current {
+      background: var(--color-primary);
+      color: white;
+    }
+
+    .step-icon.not-started {
+      background: var(--gray-150);
+      color: var(--color-text-secondary);
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-title {
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--color-text);
+    }
+
+    .step-description {
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--color-border-subtle);
+      margin: var(--space-4) 0;
+    }
+
+    .tips-section {
+      margin-top: var(--space-4);
+    }
+
+    .tips-list {
+      display: grid;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+    }
+
+    .tip-item {
+      padding: var(--space-2) var(--space-3);
+      background: var(--gray-50);
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+    }
+
+    .header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .actions {
+      display: grid;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-border-subtle);
+    }
+
+    @media (min-width: 640px) {
+      .actions {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <div class="header">
+      <div>
+        <p class="text-sm text-secondary">Your Progress</p>
+        <h1 class="heading-lg" style="margin-top: 0.25rem;">🍳 Home Chef Journey</h1>
+      </div>
+      <span class="badge badge-success" id="status-badge">Active</span>
+    </div>
+
+    <div class="progress-container">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+      <p class="progress-text" id="progress-text">0% complete</p>
+    </div>
+
+    <div class="step-list" id="steps-container"></div>
+
+    <div class="divider"></div>
+
+    <div class="tips-section">
+      <h2 class="text-sm font-medium">💡 AI Tips</h2>
+      <div class="tips-list" id="tips-container">
+        <div class="tip-item">Loading tips...</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="button button-soft button-block" onclick="refreshProgress()">
+        🔄 Refresh
+      </button>
+      <a href="https://calendly.com/your-link" class="button button-primary button-block" target="_blank">
+        📅 Book a Call
+      </a>
+    </div>
+  </div>
+
+  <script>
+    const MCP_ENDPOINT = 'http://localhost:8787/api/mcp';
+    let currentData = null;
+
+    async function callMCP(toolName, args = {}) {
+      try {
+        const response = await fetch(MCP_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream'
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: { name: toolName, arguments: args },
+            id: Date.now()
+          })
+        });
+
+        const data = await response.json();
+
+        // MCP response structure: result._meta contains the actual data
+        if (data.result?._meta) {
+          return data.result._meta;
+        }
+
+        // Fallback: try parsing text content
+        if (data.result?.content?.[0]?.text) {
+          try {
+            return JSON.parse(data.result.content[0].text);
+          } catch {
+            return null;
+          }
+        }
+
+        return null;
+      } catch (error) {
+        console.error('MCP call failed:', error);
+        return null;
+      }
+    }
+
+    async function loadProgress() {
+      const data = await callMCP('get_chef_progress');
+      if (data) {
+        currentData = data;
+        renderSteps();
+        renderTips();
+      }
+    }
+
+    async function completeStep(stepId) {
+      await callMCP('complete_step', { stepId });
+      await loadProgress();
+    }
+
+    function renderSteps() {
+      if (!currentData) return;
+
+      const steps = currentData.steps || [];
+      const container = document.getElementById('steps-container');
+
+      container.innerHTML = steps.map((step, index) => {
+        const isCompleted = step.status === 'completed';
+        const isCurrent = !isCompleted && steps.slice(0, index).every(s => s.status === 'completed');
+        const statusClass = isCompleted ? 'completed' : isCurrent ? 'current' : 'not-started';
+        const icon = isCompleted ? '✓' : isCurrent ? '→' : (index + 1);
+
+        return `
+          <div class="step-item ${statusClass}" onclick="completeStep('${step.id}')">
+            <div class="step-icon ${statusClass}">${icon}</div>
+            <div class="step-content">
+              <div class="step-title">${step.title}</div>
+              <div class="step-description">${step.description}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const completedCount = steps.filter(s => s.status === 'completed').length;
+      const progress = Math.round((completedCount / steps.length) * 100);
+      document.getElementById('progress-fill').style.width = progress + '%';
+      document.getElementById('progress-text').textContent = `${progress}% complete (${completedCount}/${steps.length} steps)`;
+    }
+
+    function renderTips() {
+      if (!currentData) return;
+
+      const tips = currentData.aiTips || ['Start with simple recipes', 'Focus on food safety', 'Build your brand'];
+      const container = document.getElementById('tips-container');
+
+      container.innerHTML = tips.map(tip =>
+        `<div class="tip-item">${tip}</div>`
+      ).join('');
+    }
+
+    async function refreshProgress() {
+      await loadProgress();
+    }
+
+    // Detect dark mode
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+    });
+
+    // Initial load
+    loadProgress();
+  </script>
+</body>
+
+</html>

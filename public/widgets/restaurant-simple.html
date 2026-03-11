@@ -1,0 +1,141 @@
+<div id="restaurant-root"></div>
+<style>
+    #restaurant-root {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+        padding: 16px;
+    }
+
+    .restaurant-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        background: white;
+    }
+
+    .restaurant-name {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .restaurant-cuisine {
+        color: #6b7280;
+        font-size: 14px;
+        margin-bottom: 4px;
+    }
+
+    .restaurant-rating {
+        color: #10a37f;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .restaurant-address {
+        color: #9ca3af;
+        font-size: 13px;
+        margin-top: 8px;
+    }
+
+    .order-button {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 8px 16px;
+        background: #10a37f;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .order-button:hover {
+        background: #0d8a6b;
+    }
+</style>
+<script type="module">
+    (function () {
+        const root = document.getElementById('restaurant-root');
+
+        // Debug: log everything
+        console.log('🎨 Widget loaded');
+        console.log('window.openai:', window.openai);
+
+        let toolOutput = window.openai?.toolOutput;
+        console.log('📦 Raw toolOutput:', toolOutput);
+
+        if (!toolOutput) {
+            console.error('❌ No toolOutput data!');
+            root.innerHTML = '<p style="color: red;">Error: No data received</p>';
+            return;
+        }
+
+        // Handle stringified JSON (common in some MCP runtimes)
+        if (typeof toolOutput === "string") {
+            console.log('📝 toolOutput is a string, attempting to parse...');
+            try {
+                toolOutput = JSON.parse(toolOutput);
+                console.log('✅ Parsed toolOutput:', toolOutput);
+            } catch (e) {
+                console.error('❌ Failed to parse toolOutput as JSON:', e);
+            }
+        }
+
+        // MCP passes the full response object, so structuredContent is nested
+        // Handle multiple possible structures for resilience
+        const data =
+            toolOutput.structuredContent ??  // Standard MCP format
+            toolOutput.data ??                 // Alternative format
+            toolOutput;                        // Fallback if already flattened
+
+        console.log('📋 Extracted data:', data);
+        console.log('📋 Data keys:', Object.keys(data));
+
+        // Get restaurants array with fallback paths
+        const restaurants =
+            data.restaurants ??
+            data.structuredContent?.restaurants ??
+            [];
+
+        console.log(`📊 Found ${restaurants.length} restaurants`);
+
+        if (!Array.isArray(restaurants) || restaurants.length === 0) {
+            console.warn('⚠️ No restaurants in data');
+            const city = data.city || data.structuredContent?.city || 'this city';
+            root.innerHTML = `
+                <p>No restaurants found in ${city}. We're onboarding local chefs - check back soon!</p>
+                <details style="margin-top:16px;">
+                    <summary style="cursor:pointer;color:#6b7280;font-size:13px;">Debug payload (click to expand)</summary>
+                    <pre style="white-space: pre-wrap; font-size: 11px; background:#f9fafb; padding:12px; border-radius:8px; margin-top:8px; overflow-x:auto;">
+${JSON.stringify(toolOutput, null, 2)}
+                    </pre>
+                </details>
+            `;
+            return;
+        }
+
+        console.log(`✅ Rendering ${restaurants.length} restaurants`);
+
+        const html = restaurants.map(r => {
+            console.log('  - Restaurant:', r.name, r);
+
+            // Guard against address being an object
+            const address = typeof r.address === "string"
+                ? r.address
+                : r.address?.full ?? r.address?.street ?? '';
+
+            return `
+    <div class="restaurant-card">
+      <div class="restaurant-name">${r.name}</div>
+      <div class="restaurant-cuisine">${r.cuisine || 'Various cuisines'}</div>
+      <div class="restaurant-rating">⭐ ${r.rating || 'N/A'}</div>
+      <div class="restaurant-address">${address}</div>
+      ${r.order_url ? `<a href="${r.order_url}" class="order-button" target="_blank">Order Now</a>` : ''}
+    </div>
+  `;
+        }).join('');
+
+        root.innerHTML = html;
+        console.log('✅ Widget rendered successfully');
+    })();
+</script>

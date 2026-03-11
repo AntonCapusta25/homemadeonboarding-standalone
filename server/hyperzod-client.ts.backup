@@ -1,0 +1,289 @@
+import { z } from "zod";
+
+// Hyperzod API configuration
+const HYPERZOD_API_KEY = process.env.HYPERZOD_API_KEY || "";
+const HYPERZOD_TENANT_ID = process.env.HYPERZOD_TENANT_ID || "3331"; // Default to 3331 if not provided, based on user snippet
+const HYPERZOD_BASE_URL = "https://api.hyperzod.app";
+
+// Type definitions
+export interface Restaurant {
+    id: string;
+    name: string;
+    cuisine: string;
+    rating: number;
+    priceRange: string;
+    image: string;
+    address: string;
+    url: string;
+    description: string;
+    phone?: string;
+    hours?: string;
+}
+
+export interface SearchParams {
+    city: string;
+    cuisine?: string;
+    priceRange?: string;
+    limit?: number;
+}
+
+// Hyperzod merchant response schema
+// Adjusting schema to be more loose as we don't know the exact listing response structure,
+// but relying on common fields seen in snippet/docs
+const MerchantSchema = z.object({
+    id: z.union([z.string(), z.number()]).transform(val => String(val)),
+    name: z.string().optional(),
+    business_name: z.string().optional(),
+    category: z.string().optional(), // Might be merchant_category_ids in some endpoints, or category name
+    rating: z.number().optional(),
+    price_range: z.string().optional(),
+    logo_url: z.string().optional(),
+    cover_image: z.string().optional(),
+    address: z.string().optional(),
+    store_url: z.string().optional(),
+    description: z.string().optional(),
+    phone: z.string().optional(),
+    business_hours: z.string().optional(), // format might vary
+    slug: z.string().optional(),
+});
+
+const MerchantsResponseSchema = z.object({
+    data: z.array(MerchantSchema).optional(), // Hyperzod often wraps list in 'data'
+    // Fallback for if it's direct array or different key
+    merchants: z.array(MerchantSchema).optional(),
+});
+
+/**
+ * Fetch restaurants from Hyperzod API
+ */
+export async function searchRestaurants(params: SearchParams): Promise<Restaurant[]> {
+    if (!HYPERZOD_API_KEY) {
+        throw new Error("HYPERZOD_API_KEY is not configured");
+    }
+
+    try {
+        // Using the admin/merchant list endpoint or client/merchant list endpoint
+        // Assuming /admin/v1/merchant/list based on update endpoint being /admin/v1/merchant/update
+        // Or potentially /client/v1/merchant/list for public listing
+        // Let's try to stick to an endpoint that usually lists merchants.
+        // The snippet used /admin/v1/merchant/update.
+        // Common Hyperzod pattern: /client/v1/merchant/list
+
+        // NOTE: In the absence of specific list endpoint docs in the snippet, 
+        // I will try to use a generic listing endpoint logic or defaults.
+        // However, the user said "list all merchants" in the docs they linked earlier.
+        // Let's deduce /client/v1/merchant seems appropriate for "Listings showcase".
+
+        const url = new URL(`${HYPERZOD_BASE_URL}/admin/v1/merchant/list`);
+
+        // Add query parameters
+        // Note: Hyperzod might use POST for filtering or specific query params.
+        // Assuming GET with standard params for now based on typical REST.
+        if (params.city) {
+            url.searchParams.append("city", params.city);
+        }
+        // Map 'cuisine' to category if possible, or just client side filter
+
+        console.log(`🔍 Calling Hyperzod API: ${url.toString()}`);
+        console.log(`🔑 Headers:`, {
+            "X-TENANT": HYPERZOD_TENANT_ID,
+            "X-API-KEY": HYPERZOD_API_KEY ? `${HYPERZOD_API_KEY.substring(0, 10)}...` : 'NOT SET'
+        });
+
+        const response = await fetch(url.toString(), {
+            method: "GET", // Or POST if required
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-TENANT": HYPERZOD_TENANT_ID,
+                "X-API-KEY": HYPERZOD_API_KEY,
+            },
+        });
+
+        if (!response.ok) {
+            // Log the text for debugging
+            const text = await response.text();
+            console.error(`Hyperzod API Error Body: ${text}`);
+            throw new Error(`Hyperzod API error: ${response.status} ${response.statusText}`);
+        }
+
+        const responseData = await response.json();
+        console.log(`📦 Hyperzod Response:`, JSON.stringify(responseData).substring(0, 300));
+
+        // Hyperzod returns: { success: true, data: { data: [...merchants], total: 194 } }
+        let merchants: any[] = [];
+
+        if (responseData.success && responseData.data) {
+            // Handle nested data structure
+            if (Array.isArray(responseData.data.data)) {
+                merchants = responseData.data.data;
+            } else if (Array.isArray(responseData.data)) {
+                merchants = responseData.data;
+            }
+        } else if (Array.isArray(responseData.data)) {
+            merchants = responseData.data;
+        } else if (Array.isArray(responseData)) {
+            merchants = responseData;
+        }
+
+        console.log(`🍽️ Found ${merchants.length} merchants from Hyperzod`);
+
+        // Filter by city if specified
+        if (params.city) {
+            const cityLower = params.city.toLowerCase();
+            merchants = merchants.filter((m: any) => {
+                const merchantCity = m.city?.toLowerCase() || '';
+                return merchantCity.includes(cityLower) || cityLower.includes(merchantCity);
+            });
+            console.log(`📍 After city filter (${params.city}): ${merchants.length} merchants`);
+        }
+
+        // Map Hyperzod merchants to our Restaurant format
+        return merchants.map((m: any) => mapMerchantToRestaurant(m)).slice(0, params.limit || 6);
+
+    } catch (error) {
+        console.error("Error fetching restaurants from Hyperzod:", error);
+        throw error;
+    }
+}
+
+/**
+ * Get details for a specific restaurant
+ */
+export async function getRestaurantDetails(restaurantId: string): Promise<Restaurant> {
+    if (!HYPERZOD_API_KEY) {
+        throw new Error("HYPERZOD_API_KEY is not configured");
+    }
+
+    try {
+        const response = await fetch(`${HYPERZOD_BASE_URL}/client/v1/merchant/${restaurantId}`, {
+            method: "GET",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-TENANT": HYPERZOD_TENANT_ID,
+                "X-API-KEY": HYPERZOD_API_KEY,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Hyperzod API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        // Assuming data is the merchant object or data.data
+        const merchant = data.data || data;
+
+        return mapMerchantToRestaurant(merchant);
+    } catch (error) {
+        console.error("Error fetching restaurant details from Hyperzod:", error);
+        throw error;
+    }
+}
+
+/**
+ * Get list of available cuisines
+ */
+export async function getCuisines(): Promise<string[]> {
+    // If there is an endpoint for categories: /client/v1/category/list
+    try {
+        const response = await fetch(`${HYPERZOD_BASE_URL}/client/v1/category/list`, {
+            method: "GET",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-TENANT": HYPERZOD_TENANT_ID,
+                "X-API-KEY": HYPERZOD_API_KEY,
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const list = data.data || data;
+            if (Array.isArray(list)) {
+                return list.map((c: any) => c.name);
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to fetch cuisines, using defaults");
+    }
+
+    return [
+        "Italian",
+        "Mexican",
+        "Asian",
+        "American",
+        "Mediterranean",
+        "Indian",
+        "Japanese",
+    ];
+}
+
+/**
+ * Map Hyperzod merchant data to our Restaurant format
+ */
+function mapMerchantToRestaurant(merchant: any): Restaurant {
+    const name = merchant.name || merchant.business_name || "Unknown Restaurant";
+    return {
+        id: String(merchant.id),
+        name: name,
+        cuisine: merchant.category_name || (merchant.categories && merchant.categories[0]?.name) || "Restaurant",
+        rating: Number(merchant.rating) || 4.5,
+        priceRange: normalizePriceRange(merchant.price_range),
+        image: merchant.cover_image || merchant.logo_url || getDefaultImage(),
+        address: merchant.address || "Address not available",
+        url: merchant.store_url || `https://hyperzod.app/merchant/${merchant.slug || merchant.id}`,
+        description: merchant.description || `Experience delicious food at ${name}.`,
+        phone: merchant.phone || merchant.owner_phone,
+        hours: merchant.business_hours || "10:00 AM - 10:00 PM",
+    };
+}
+
+/**
+ * Normalize price range to consistent format
+ */
+function normalizePriceRange(priceRange?: string): string {
+    if (!priceRange) return "Mid-range";
+
+    const normalized = priceRange.toLowerCase();
+    if (normalized.includes("budget") || normalized.includes("$")) return "Budget";
+    if (normalized.includes("premium") || normalized.includes("$$$")) return "Premium";
+    return "Mid-range";
+}
+
+/**
+ * Get default placeholder image for restaurants
+ */
+function getDefaultImage(): string {
+    return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop";
+}
+
+// Mock data fallback
+function getMockRestaurants(params: SearchParams): Restaurant[] {
+    return [
+        {
+            id: "1",
+            name: `Mock ${params.cuisine || "Local"} Bistro`,
+            cuisine: params.cuisine || "International",
+            rating: 4.8,
+            priceRange: "Mid-range",
+            image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop",
+            address: `123 Main St, ${params.city}`,
+            url: "https://example.com/order",
+            description: "A lovely place for dinner.",
+            hours: "9 AM - 10 PM"
+        },
+        {
+            id: "2",
+            name: `${params.city} Dining House`,
+            cuisine: "American",
+            rating: 4.2,
+            priceRange: "Premium",
+            image: "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&h=300&fit=crop",
+            address: `456 Elm St, ${params.city}`,
+            url: "https://example.com/order2",
+            description: "Fine dining experience.",
+            hours: "5 PM - 11 PM"
+        }
+    ]
+}

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Chef Widget Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #0b0b0f;
+        }
+
+        .widget-container {
+            border: 3px solid #e5e7eb;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #f6f8fb;
+        }
+
+        .widget-container iframe {
+            width: 100%;
+            height: 700px;
+            border: none;
+            display: block;
+        }
+
+        .info-section {
+            margin-bottom: 25px;
+        }
+
+        .info-section h3 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #111bf5;
+        }
+
+        .info-section p {
+            color: #6c768a;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+            color: #0b0b0f;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .endpoint-box {
+            background: #f6f8fb;
+            border: 2px dashed #cad3e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .endpoint-box h4 {
+            font-size: 14px;
+            color: #6c768a;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .endpoint-box code {
+            display: block;
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            color: #111bf5;
+            word-break: break-all;
+            margin-top: 8px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 14px 28px;
+            background: #111bf5;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-top: 15px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #0d15c7;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(17, 27, 245, 0.3);
+        }
+
+        @media (max-width: 1024px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍳 Home Chef ChatGPT App</h1>
+            <p>Live Widget Demo - See Your AI-Powered Onboarding in Action</p>
+        </div>
+
+        <div class="demo-grid">
+            <!-- Widget Preview -->
+            <div class="card">
+                <h2>📱 Live Widget</h2>
+                <p style="color: #6c768a; margin-bottom: 20px;">
+                    This is exactly how your app looks in ChatGPT
+                </p>
+                <div class="widget-container">
+                    <iframe src="/widgets/home-chef-widget.html"></iframe>
+                </div>
+            </div>
+
+            <!-- Information Panel -->
+            <div class="card">
+                <h2>🚀 What You're Seeing</h2>
+
+                <div class="info-section">
+                    <h3>10 AI-Powered Tools</h3>
+                    <ul class="feature-list">
+                        <li>Progress Tracking & Step Completion</li>
+                        <li>AI Menu Generation (6 cuisines)</li>
+                        <li>AI Logo Creation (5 styles)</li>
+                        <li>Kitchen Photo Verification</li>
+                        <li>Food Safety Tips (4 categories)</li>
+                        <li>Certification Test (5 questions)</li>
+                        <li>AI Tips & Recommendations</li>
+                        <li>Consultation Booking</li>
+                    </ul>
+                </div>
+
+                <div class="info-section">
+                    <h3>Try in ChatGPT</h3>
+                    <p>
+                        Add your MCP endpoint to ChatGPT and try these prompts:
+                    </p>
+                    <ul style="list-style: none; padding: 0; margin-top: 15px;">
+                        <li style="padding: 8px 0; color: #0b0b0f;">
+                            💬 "Show me my home chef progress"
+                        </li>
+                        <li style="padding: 8px 0; color: #0b0b0f;">
+                            💬 "Generate an Italian menu with 5 dishes"
+                        </li>
+                        <li style="padding: 8px 0; color: #0b0b0f;">
+                            💬 "Create a modern logo for my chef business"
+                        </li>
+                        <li style="padding: 8px 0; color: #0b0b0f;">
+                            💬 "Give me food safety tips"
+                        </li>
+                        <li style="padding: 8px 0; color: #0b0b0f;">
+                            💬 "I want to take the certification test"
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="endpoint-box">
+                    <h4>🔗 Your MCP Endpoint</h4>
+                    <code id="endpoint">Loading...</code>
+                    <a href="https://chat.openai.com" target="_blank" class="btn">
+                        Add to ChatGPT →
+                    </a>
+                </div>
+
+                <div class="info-section" style="margin-top: 30px;">
+                    <h3>📚 Documentation</h3>
+                    <p>
+                        Check out these files for more info:
+                    </p>
+                    <ul style="list-style: disc; padding-left: 20px; margin-top: 10px;">
+                        <li><strong>DEPLOYED.md</strong> - Deployment guide</li>
+                        <li><strong>MCP_HOSTING_GUIDE.md</strong> - Hosting options</li>
+                        <li><strong>walkthrough.md</strong> - Implementation details</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🎯 Next Steps</h2>
+            <div
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
+                <div>
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">1. Test in ChatGPT</h3>
+                    <p style="color: #6c768a; font-size: 14px;">
+                        Add your MCP endpoint to ChatGPT and try all 10 tools
+                    </p>
+                </div>
+                <div>
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">2. Customize</h3>
+                    <p style="color: #6c768a; font-size: 14px;">
+                        Update booking URL, add real OpenAI API integration
+                    </p>
+                </div>
+                <div>
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">3. Deploy</h3>
+                    <p style="color: #6c768a; font-size: 14px;">
+                        Already deployed to Vercel! Update with: vercel --prod
+                    </p>
+                </div>
+                <div>
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">4. Go Live</h3>
+                    <p style="color: #6c768a; font-size: 14px;">
+                        Connect Supabase, add auth, submit to OpenAI
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Detect environment and set endpoint
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const MCP_ENDPOINT = isLocal
+            ? 'http://localhost:8787/api/mcp'
+            : 'https://homemadeonboarding-standalone-kmjcwfumk-autoflowdevs-projects.vercel.app/api/mcp';
+
+        document.getElementById('endpoint').textContent = MCP_ENDPOINT;
+
+        // Auto-refresh widget every 10 seconds to show any updates
+        setInterval(() => {
+            const iframe = document.querySelector('iframe');
+            if (iframe) {
+                iframe.src = iframe.src.split('?')[0] + '?t=' + Date.now();
+            }
+        }, 10000);
+    </script>
+</body>
+
+</html>

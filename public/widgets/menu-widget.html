@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #fff;
+            color: #000;
+        }
+
+        .header {
+            background: #F47A44;
+            padding: 16px 24px;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .merchant-info {
+            padding: 24px;
+            background: #f8f8f8;
+        }
+
+        .merchant-name {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .merchant-details {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .categories-nav {
+            position: sticky;
+            top: 64px;
+            background: white;
+            border-bottom: 2px solid #f0f0f0;
+            padding: 12px 24px;
+            overflow-x: auto;
+            white-space: nowrap;
+            z-index: 99;
+        }
+
+        .category-link {
+            display: inline-block;
+            padding: 8px 16px;
+            margin-right: 12px;
+            color: #000;
+            text-decoration: none;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .category-link:hover,
+        .category-link.active {
+            color: #F47A44;
+            border-bottom-color: #F47A44;
+        }
+
+        .content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .category-section {
+            margin-bottom: 48px;
+        }
+
+        .category-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: #111;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .product-card {
+            background: white;
+            border: 1px solid #f0f0f0;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .product-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: #f0f0f0;
+        }
+
+        .product-info {
+            padding: 16px;
+        }
+
+        .product-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #000;
+        }
+
+        .product-description {
+            font-size: 13px;
+            color: #808080;
+            margin-bottom: 12px;
+            line-height: 1.4;
+            max-height: 40px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .product-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        .product-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: #000;
+        }
+
+        .add-button {
+            display: inline-block;
+            background: white;
+            border: 1px solid #ccc;
+            color: #F47A44;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .add-button:hover {
+            background: #F47A44;
+            color: white;
+            border-color: #F47A44;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .error {
+            text-align: center;
+            padding: 60px 20px;
+            color: #ff0000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Menu</h1>
+    </div>
+
+    <div class="merchant-info" id="merchantInfo">
+        <div class="loading">Loading merchant information...</div>
+    </div>
+
+    <div class="categories-nav" id="categoriesNav"></div>
+
+    <div class="content" id="content">
+        <div class="loading">Loading menu...</div>
+    </div>
+
+    <script>
+        // Get merchant ID from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const merchantId = urlParams.get('merchant');
+
+        if (!merchantId) {
+            document.getElementById('content').innerHTML = '<div class="error">No merchant ID provided</div>';
+        } else {
+            loadMenu(merchantId);
+        }
+
+        async function loadMenu(merchantId) {
+            try {
+                // Call your MCP server endpoint to get menu data
+                const response = await fetch(`http://localhost:8787/api/merchant/${merchantId}/menu`);
+
+                if (!response.ok) {
+                    throw new Error('Failed to load menu');
+                }
+
+                const data = await response.json();
+                window.merchantUrl = data.merchant.url; // Store for product cards
+                renderMerchantInfo(data.merchant);
+                renderCategories(data.categories);
+                renderProducts(data.categories);
+            } catch (error) {
+                console.error('Error loading menu:', error);
+                document.getElementById('content').innerHTML = '<div class="error">Failed to load menu. Please try again.</div>';
+            }
+        }
+
+        function renderMerchantInfo(merchant) {
+            const merchantInfo = document.getElementById('merchantInfo');
+            merchantInfo.innerHTML = `
+                <div class="merchant-name">${merchant.name}</div>
+                <div class="merchant-details">${merchant.address || ''} • ${merchant.cuisine || ''}</div>
+            `;
+        }
+
+        function renderCategories(categories) {
+            const nav = document.getElementById('categoriesNav');
+            nav.innerHTML = categories.map(cat => `
+                <a href="#cat_${cat.id}" class="category-link">${cat.name}</a>
+            `).join('');
+        }
+
+        function renderProducts(categories) {
+            const content = document.getElementById('content');
+            const merchantUrl = window.merchantUrl; // Store merchant URL globally
+
+            content.innerHTML = categories.map(category => `
+                <div class="category-section" id="cat_${category.id}">
+                    <h3 class="category-title">${category.name}</h3>
+                    <div class="products-grid">
+                        ${category.products.map(product => `
+                            <div class="product-card">
+                                ${product.image ? `<img src="${product.image}" alt="${product.name}" class="product-image" onerror="this.style.display='none'">` : ''}
+                                <div class="product-info">
+                                    <div class="product-name">${product.name}</div>
+                                    ${product.description ? `<div class="product-description">${stripHtml(product.description)}</div>` : ''}
+                                    <div class="product-footer">
+                                        <div class="product-price">€${product.price}</div>
+                                        <a href="${merchantUrl}" target="_blank" rel="noopener noreferrer" class="add-button" style="text-decoration: none;">Order Now</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function stripHtml(html) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        }
+    </script>
+</body>
+
+</html>

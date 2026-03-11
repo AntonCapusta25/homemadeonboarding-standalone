@@ -1,0 +1,28 @@
+# fly.toml app configuration file generated for homemade-mcp-server on 2026-01-02T19:06:02+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'homemade-mcp-server'
+primary_region = 'dfw'
+
+[build]
+  [build.args]
+    NODE_VERSION = "18"
+
+[processes]
+  app = "npm run start:server"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024

@@ -1,0 +1,52 @@
+<div id="restaurant-carousel-root"></div>
+<style>
+/* Minimal widget styles */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+#restaurant-carousel-root {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+  padding: 16px;
+}
+.restaurant-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.restaurant-name { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.restaurant-cuisine { color: #6b7280; margin-bottom: 4px; }
+.restaurant-rating { color: #10a37f; font-weight: 500; }
+.order-button {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: #10a37f;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.order-button:hover { background: #0d8a6b; }
+</style>
+<script>
+(function() {
+  const root = document.getElementById('restaurant-carousel-root');
+  const data = window.openai?.toolOutput;
+  
+  if (!data || !data.restaurants) {
+    root.innerHTML = '<p>No restaurants found</p>';
+    return;
+  }
+  
+  const html = data.restaurants.map(r => `
+    <div class="restaurant-card">
+      <div class="restaurant-name">${r.name}</div>
+      <div class="restaurant-cuisine">${r.cuisine || 'Various cuisines'}</div>
+      <div class="restaurant-rating">⭐ ${r.rating || 'N/A'}</div>
+      <div class="restaurant-address">${r.address || ''}</div>
+      ${r.order_url ? `<a href="${r.order_url}" class="order-button" target="_blank">Order Now</a>` : ''}
+    </div>
+  `).join('');
+  
+  root.innerHTML = html;
+})();
+</script>
